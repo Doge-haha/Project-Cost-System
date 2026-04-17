@@ -189,6 +189,27 @@ export class BillVersionService {
     });
   }
 
+  async getSourceChain(input: {
+    projectId: string;
+    billVersionId: string;
+    userId: string;
+  }): Promise<BillVersionRecord[]> {
+    const version = await this.getAuthorizedVersion(input, "view");
+    const chain: BillVersionRecord[] = [version];
+
+    let current = version;
+    while (current.sourceVersionId) {
+      const parent = await this.billVersionRepository.findById(current.sourceVersionId);
+      if (!parent || parent.projectId !== input.projectId) {
+        break;
+      }
+      chain.push(parent);
+      current = parent;
+    }
+
+    return chain;
+  }
+
   async withdrawBillVersion(input: {
     projectId: string;
     billVersionId: string;

@@ -730,3 +730,92 @@ test("GET /v1/reports/summary/details returns variance detail items sorted by ab
 
   await app.close();
 });
+
+test("POST /v1/reports/export creates a completed summary export task and GET /v1/reports/export/:taskId returns it", async () => {
+  const app = createPricingApp({
+    projectDefaults: {
+      defaultPriceVersionId: "price-version-001",
+      defaultFeeTemplateId: "fee-template-001",
+    },
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  await app.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+    },
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/reports/export",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      reportType: "summary",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 202);
+  assert.equal(createResponse.json().status, "completed");
+  assert.equal(createResponse.json().reportType, "summary");
+
+  const taskId = createResponse.json().id as string;
+  const queryResponse = await app.inject({
+    method: "GET",
+    url: `/v1/reports/export/${taskId}`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(queryResponse.statusCode, 200);
+  assert.equal(queryResponse.json().id, taskId);
+  assert.equal(queryResponse.json().resultPreview.projectId, "project-001");
+  assert.equal(queryResponse.json().resultPreview.totalSystemAmount, 1080);
+
+  const downloadResponse = await app.inject({
+    method: "GET",
+    url: `/v1/reports/export/${taskId}/download`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(downloadResponse.statusCode, 200);
+  assert.match(
+    downloadResponse.headers["content-disposition"] ?? "",
+    /attachment; filename="summary-/,
+  );
+  assert.match(downloadResponse.body, /"projectId": "project-001"/);
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=report_export_task&action=export",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(auditResponse.json().items[0].resourceId, taskId);
+
+  await app.close();
+});

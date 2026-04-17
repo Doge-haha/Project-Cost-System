@@ -324,6 +324,26 @@ test("PUT /v1/projects/:id/default-pricing-config updates project default price 
     defaultFeeTemplateId: "fee-template-001",
   });
 
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=project&resourceId=project-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(auditResponse.json().items[0].action, "update_pricing_defaults");
+  assert.deepEqual(auditResponse.json().items[0].beforePayload, {
+    defaultPriceVersionId: null,
+    defaultFeeTemplateId: null,
+  });
+  assert.deepEqual(auditResponse.json().items[0].afterPayload, {
+    defaultPriceVersionId: "price-version-001",
+    defaultFeeTemplateId: "fee-template-001",
+  });
+
   await app.close();
 });
 

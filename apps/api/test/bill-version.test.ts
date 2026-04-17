@@ -545,6 +545,41 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
   await app.close();
 });
 
+test("GET /v1/projects/:id/bill-versions/:versionId/source-chain returns the copied version lineage", async () => {
+  const app = createBillVersionApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const copyResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/copy-from",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  const chainResponse = await app.inject({
+    method: "GET",
+    url: `/v1/projects/project-001/bill-versions/${copyResponse.json().id}/source-chain`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(chainResponse.statusCode, 200);
+  assert.equal(chainResponse.json().items.length, 2);
+  assert.equal(chainResponse.json().items[0].id, copyResponse.json().id);
+  assert.equal(chainResponse.json().items[1].id, "bill-version-001");
+
+  await app.close();
+});
+
 test("GET /v1/projects/:id/bill-versions rejects requests outside scope", async () => {
   const app = createBillVersionApp();
   const token = await signAccessToken(

@@ -16,6 +16,7 @@ import type {
 import { ProjectAuthorizationService } from "./project-authorization-service.js";
 import type { PriceVersionRepository } from "../pricing/price-version-repository.js";
 import type { FeeTemplateRepository } from "../fee/fee-template-repository.js";
+import type { AuditLogService } from "../audit/audit-log-service.js";
 
 export class ProjectService {
   constructor(
@@ -25,6 +26,7 @@ export class ProjectService {
     private readonly projectMemberRepository: ProjectMemberRepository,
     private readonly priceVersionRepository?: PriceVersionRepository,
     private readonly feeTemplateRepository?: FeeTemplateRepository,
+    private readonly auditLogService?: AuditLogService,
   ) {}
 
   async listProjects(input: {
@@ -80,15 +82,34 @@ export class ProjectService {
     defaultFeeTemplateId?: string | null;
   }): Promise<ProjectRecord> {
     await this.assertCanManageProject(input.projectId, input.userId);
+    const before = { ...(await this.getProject(input.projectId)) };
     await this.validatePricingDefaults({
       defaultPriceVersionId: input.defaultPriceVersionId,
       defaultFeeTemplateId: input.defaultFeeTemplateId,
     });
 
-    return this.projectRepository.updateDefaults(input.projectId, {
+    const updated = await this.projectRepository.updateDefaults(input.projectId, {
       defaultPriceVersionId: input.defaultPriceVersionId,
       defaultFeeTemplateId: input.defaultFeeTemplateId,
     });
+
+    await this.auditLogService?.writeAuditLog({
+      projectId: input.projectId,
+      resourceType: "project",
+      resourceId: input.projectId,
+      action: "update_pricing_defaults",
+      operatorId: input.userId,
+      beforePayload: {
+        defaultPriceVersionId: before.defaultPriceVersionId ?? null,
+        defaultFeeTemplateId: before.defaultFeeTemplateId ?? null,
+      },
+      afterPayload: {
+        defaultPriceVersionId: updated.defaultPriceVersionId ?? null,
+        defaultFeeTemplateId: updated.defaultFeeTemplateId ?? null,
+      },
+    });
+
+    return updated;
   }
 
   private async assertCanManageProject(

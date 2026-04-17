@@ -4,7 +4,7 @@ export type ReviewSubmissionRecord = {
   billVersionId: string;
   stageCode: string;
   disciplineCode: string;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "cancelled";
   submittedBy: string;
   submittedAt: string;
   submissionComment?: string | null;

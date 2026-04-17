@@ -96,7 +96,16 @@ import {
 import { z } from "zod";
 import { SummaryService } from "../modules/reports/summary-service.js";
 import {
+  InMemoryReportExportTaskRepository,
+  type ReportExportTaskRepository,
+} from "../modules/reports/report-export-task-repository.js";
+import {
+  createReportExportTaskSchema,
+  ReportExportTaskService,
+} from "../modules/reports/report-export-task-service.js";
+import {
   approveReviewSchema,
+  cancelReviewSchema,
   rejectReviewSchema,
   ReviewSubmissionService,
   submitReviewSchema,
@@ -105,6 +114,20 @@ import {
   InMemoryReviewSubmissionRepository,
   type ReviewSubmissionRepository,
 } from "../modules/review/review-submission-repository.js";
+import {
+  InMemoryAuditLogRepository,
+  type AuditLogRepository,
+} from "../modules/audit/audit-log-repository.js";
+import { AuditLogService } from "../modules/audit/audit-log-service.js";
+import {
+  createProcessDocumentSchema,
+  ProcessDocumentService,
+  updateProcessDocumentStatusSchema,
+} from "../modules/process/process-document-service.js";
+import {
+  InMemoryProcessDocumentRepository,
+  type ProcessDocumentRepository,
+} from "../modules/process/process-document-repository.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -127,6 +150,9 @@ export type CreateAppOptions = {
   feeTemplateRepository?: FeeTemplateRepository;
   feeRuleRepository?: FeeRuleRepository;
   reviewSubmissionRepository?: ReviewSubmissionRepository;
+  auditLogRepository?: AuditLogRepository;
+  processDocumentRepository?: ProcessDocumentRepository;
+  reportExportTaskRepository?: ReportExportTaskRepository;
 };
 
 const updateProjectPricingDefaultsSchema = z.object({
@@ -198,7 +224,19 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     reviewSubmission:
       options.reviewSubmissionRepository ??
       new InMemoryReviewSubmissionRepository([]),
+    auditLog:
+      options.auditLogRepository ?? new InMemoryAuditLogRepository([]),
+    processDocument:
+      options.processDocumentRepository ??
+      new InMemoryProcessDocumentRepository([]),
+    reportExportTask:
+      options.reportExportTaskRepository ??
+      new InMemoryReportExportTaskRepository([]),
   };
+  const auditLogService = new AuditLogService(
+    repositories.auditLog,
+    repositories.project,
+  );
   const projectService = new ProjectService(
     repositories.project,
     repositories.projectStage,
@@ -206,6 +244,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     repositories.projectMember,
     repositories.priceVersion,
     repositories.feeTemplate,
+    auditLogService,
   );
   const billVersionService = new BillVersionService(
     repositories.billVersion,
@@ -278,6 +317,12 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     billVersionRepository: repositories.billVersion,
     billItemRepository: repositories.billItem,
   });
+  const reportExportTaskService = new ReportExportTaskService(
+    repositories.reportExportTask,
+    repositories.project,
+    summaryService,
+    auditLogService,
+  );
   const reviewSubmissionService = new ReviewSubmissionService(
     repositories.reviewSubmission,
     {
@@ -287,6 +332,17 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
       projectMemberRepository: repositories.projectMember,
       billVersionRepository: repositories.billVersion,
     },
+    auditLogService,
+  );
+  const processDocumentService = new ProcessDocumentService(
+    repositories.processDocument,
+    {
+      projectRepository: repositories.project,
+      projectStageRepository: repositories.projectStage,
+      projectDisciplineRepository: repositories.projectDiscipline,
+      projectMemberRepository: repositories.projectMember,
+    },
+    auditLogService,
   );
 
   app.setErrorHandler((error, _request, reply) => {
@@ -390,6 +446,94 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     }));
   });
 
+  app.get("/v1/projects/:projectId/audit-logs", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const query = z
+      .object({
+        resourceType: z.string().min(1).optional(),
+        resourceId: z.string().min(1).optional(),
+        action: z.string().min(1).optional(),
+        limit: z.coerce.number().int().positive().max(100).optional(),
+      })
+      .parse(request.query);
+
+    return transactionRunner.runInTransaction(async () => ({
+      items: await auditLogService.listAuditLogs({
+        projectId,
+        resourceType: query.resourceType,
+        resourceId: query.resourceId,
+        action: query.action,
+        limit: query.limit,
+      }),
+    }));
+  });
+
+  app.get("/v1/projects/:projectId/process-documents", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const query = z
+      .object({
+        stageCode: z.string().min(1).optional(),
+        disciplineCode: z.string().min(1).optional(),
+        documentType: z
+          .enum(["change_order", "site_visa", "progress_payment"])
+          .optional(),
+      })
+      .parse(request.query);
+
+    return transactionRunner.runInTransaction(async () => ({
+      items: await processDocumentService.listProcessDocuments({
+        projectId,
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode,
+        documentType: query.documentType,
+        userId: request.currentUser!.id,
+      }),
+    }));
+  });
+
+  app.post("/v1/projects/:projectId/process-documents", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const payload = createProcessDocumentSchema.parse(request.body);
+
+    const created = await transactionRunner.runInTransaction(async () =>
+      processDocumentService.createProcessDocument({
+        projectId,
+        stageCode: payload.stageCode,
+        disciplineCode: payload.disciplineCode,
+        documentType: payload.documentType,
+        title: payload.title,
+        referenceNo: payload.referenceNo,
+        amount: payload.amount,
+        comment: payload.comment,
+        userId: request.currentUser!.id,
+      }),
+    );
+
+    reply.status(201);
+    return created;
+  });
+
+  app.put(
+    "/v1/projects/:projectId/process-documents/:documentId/status",
+    async (request) => {
+      const { projectId, documentId } = request.params as {
+        projectId: string;
+        documentId: string;
+      };
+      const payload = updateProcessDocumentStatusSchema.parse(request.body);
+
+      return transactionRunner.runInTransaction(async () =>
+        processDocumentService.updateProcessDocumentStatus({
+          projectId,
+          documentId,
+          status: payload.status,
+          comment: payload.comment,
+          userId: request.currentUser!.id,
+        }),
+      );
+    },
+  );
+
   app.put("/v1/projects/:projectId/default-pricing-config", async (request) => {
     const { projectId } = request.params as { projectId: string };
     const payload = updateProjectPricingDefaultsSchema.parse(request.body);
@@ -467,6 +611,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
       .object({
         stageCode: z.string().min(1).optional(),
         disciplineCode: z.string().min(1).optional(),
+        status: z.enum(["pending", "approved", "rejected", "cancelled"]).optional(),
       })
       .parse(request.query);
 
@@ -475,6 +620,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
         projectId,
         stageCode: query.stageCode,
         disciplineCode: query.disciplineCode,
+        status: query.status,
         userId: request.currentUser!.id,
       }),
     }));
@@ -514,6 +660,26 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
           projectId,
           reviewSubmissionId,
           reason: payload.reason,
+          comment: payload.comment,
+          userId: request.currentUser!.id,
+        }),
+      );
+    },
+  );
+
+  app.post(
+    "/v1/projects/:projectId/reviews/:reviewSubmissionId/cancel",
+    async (request) => {
+      const { projectId, reviewSubmissionId } = request.params as {
+        projectId: string;
+        reviewSubmissionId: string;
+      };
+      const payload = cancelReviewSchema.parse(request.body ?? {});
+
+      return transactionRunner.runInTransaction(async () =>
+        reviewSubmissionService.cancelReview({
+          projectId,
+          reviewSubmissionId,
           comment: payload.comment,
           userId: request.currentUser!.id,
         }),
@@ -581,6 +747,24 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
 
       reply.status(201);
       return created;
+    },
+  );
+
+  app.get(
+    "/v1/projects/:projectId/bill-versions/:billVersionId/source-chain",
+    async (request) => {
+      const { projectId, billVersionId } = request.params as {
+        projectId: string;
+        billVersionId: string;
+      };
+
+      return transactionRunner.runInTransaction(async () => ({
+        items: await billVersionService.getSourceChain({
+          projectId,
+          billVersionId,
+          userId: request.currentUser!.id,
+        }),
+      }));
     },
   );
 
@@ -926,6 +1110,52 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
         userId: request.currentUser!.id,
       }),
     );
+  });
+
+  app.post("/v1/reports/export", async (request, reply) => {
+    const payload = createReportExportTaskSchema.parse(request.body);
+
+    const created = await transactionRunner.runInTransaction(async () =>
+      reportExportTaskService.createReportExportTask({
+        projectId: payload.projectId,
+        reportType: payload.reportType,
+        stageCode: payload.stageCode,
+        disciplineCode: payload.disciplineCode,
+        userId: request.currentUser!.id,
+      }),
+    );
+
+    reply.status(202);
+    return created;
+  });
+
+  app.get("/v1/reports/export/:taskId", async (request) => {
+    const { taskId } = request.params as { taskId: string };
+
+    return transactionRunner.runInTransaction(async () =>
+      reportExportTaskService.getReportExportTask({
+        taskId,
+        userId: request.currentUser!.id,
+      }),
+    );
+  });
+
+  app.get("/v1/reports/export/:taskId/download", async (request, reply) => {
+    const { taskId } = request.params as { taskId: string };
+
+    const download = await transactionRunner.runInTransaction(async () =>
+      reportExportTaskService.downloadReportExportTask({
+        taskId,
+        userId: request.currentUser!.id,
+      }),
+    );
+
+    reply.header("content-type", download.contentType);
+    reply.header(
+      "content-disposition",
+      `attachment; filename="${download.fileName}"`,
+    );
+    return download.content;
   });
 
   app.get("/v1/fee-templates", async (request) => {

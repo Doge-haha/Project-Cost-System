@@ -81,6 +81,14 @@ const members: ProjectMemberRecord[] = [
       { scopeType: "discipline", scopeValue: "building" },
     ],
   },
+  {
+    id: "member-003",
+    projectId: "project-001",
+    userId: "owner-001",
+    displayName: "Project Owner",
+    roleCode: "project_owner",
+    scopes: [{ scopeType: "project", scopeValue: "project-001" }],
+  },
 ];
 
 const billVersions: BillVersionRecord[] = [
@@ -135,6 +143,33 @@ test("POST /v1/projects/:id/bill-versions/:versionId/reviews submits a pending r
   assert.equal(response.statusCode, 201);
   assert.equal(response.json().status, "pending");
   assert.equal(response.json().billVersionId, "bill-version-001");
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=review_submission&action=submit",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(auditResponse.json().items[0].resourceId, response.json().id);
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/reviews?status=pending",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listResponse.json().items.length, 1);
+  assert.equal(
+    listResponse.json().items[0].billVersionSummary.versionName,
+    "估算版 V1",
+  );
 
   await app.close();
 });
@@ -193,6 +228,18 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the rev
   assert.equal(versionsResponse.statusCode, 200);
   assert.equal(versionsResponse.json().items[0].versionStatus, "locked");
 
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=review_submission&action=approve",
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(auditResponse.json().items[0].afterPayload.status, "approved");
+
   await app.close();
 });
 
@@ -250,6 +297,117 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/reject rejects the revie
 
   assert.equal(versionsResponse.statusCode, 200);
   assert.equal(versionsResponse.json().items[0].versionStatus, "editable");
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=review_submission&action=reject",
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(
+    auditResponse.json().items[0].afterPayload.reason,
+    "请补充清单说明",
+  );
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve rejects self-review", async () => {
+  const app = createReviewApp();
+  const token = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Project Owner",
+    },
+    jwtSecret,
+  );
+
+  const submitResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/reviews",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+  const reviewSubmissionId = submitResponse.json().id as string;
+
+  const approveResponse = await app.inject({
+    method: "POST",
+    url: `/v1/projects/project-001/reviews/${reviewSubmissionId}/approve`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      comment: "自己通过",
+    },
+  });
+
+  assert.equal(approveResponse.statusCode, 422);
+  assert.equal(approveResponse.json().error.code, "VALIDATION_ERROR");
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/reviews/:reviewSubmissionId/cancel allows submitter to cancel a pending review", async () => {
+  const app = createReviewApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const submitResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/reviews",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+  const reviewSubmissionId = submitResponse.json().id as string;
+
+  const cancelResponse = await app.inject({
+    method: "POST",
+    url: `/v1/projects/project-001/reviews/${reviewSubmissionId}/cancel`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      comment: "撤回后继续修改",
+    },
+  });
+
+  assert.equal(cancelResponse.statusCode, 200);
+  assert.equal(cancelResponse.json().status, "cancelled");
+
+  const versionsResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions?stageCode=estimate&disciplineCode=building",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(versionsResponse.statusCode, 200);
+  assert.equal(versionsResponse.json().items[0].versionStatus, "editable");
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/reviews?status=cancelled",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listResponse.json().items.length, 1);
 
   await app.close();
 });

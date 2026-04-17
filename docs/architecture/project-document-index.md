@@ -232,3 +232,9 @@
 ## 9. 一句话总结
 
 这套文档已经从“产品方案”推进成“可以直接进入研发执行”的完整交付基线。
+
+## 10. 工作日志
+
+用于记录阶段性决策、已完成能力、验证结果和下次启动点。
+
+- [work-log-2026-04-17.md](/Users/huahaha/Documents/New%20project/docs/architecture/work-log-2026-04-17.md)

@@ -1,0 +1,11 @@
+[project]
+name = "saas-pricing-ai-runtime"
+version = "0.1.0"
+description = "Python AI runtime scaffold for the SaaS pricing platform."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "."
+]

@@ -1,0 +1,28 @@
+stages:
+  - code: stage_01
+    name: 投资估算
+    order: 1
+  - code: stage_02
+    name: 设计概算
+    order: 2
+  - code: stage_03
+    name: 施工图预算
+    order: 3
+  - code: stage_04
+    name: 招标控制价
+    order: 4
+  - code: stage_05
+    name: 投标报价
+    order: 5
+  - code: stage_06
+    name: 合同价
+    order: 6
+  - code: stage_07
+    name: 施工过程价款
+    order: 7
+  - code: stage_08
+    name: 竣工结算
+    order: 8
+  - code: stage_09
+    name: 复盘分析
+    order: 9

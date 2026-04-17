@@ -1,0 +1,79 @@
+Issue Key,Summary,Issue Type,Priority,Epic Link,Sprint,Assignee,Component,Labels,Depends On,Description,Acceptance Criteria,Iteration,Epic Name,Sprint Goal
+I3-EPIC-1,定额与价目基础表,Epic,P0,,Sprint 3,,Architecture,"iteration-3,epic,quota,price",,"Iteration 3 下负责定额、价目和取费的基础建表与字段口径。","完成后系统具备定额、价目和取费模板的基础存储能力",I3,定额与价目基础表,完成定额、价目、取费和计价引擎主链，让系统具备正式计价、重算和人工调价能力。
+I3-EPIC-2,定额管理与选择器,Epic,P0,,Sprint 3,,Architecture,"iteration-3,epic,quota,selector",,"Iteration 3 下负责定额明细维护、批量创建和定额选择器。","完成后系统可维护清单项定额并按专业定额集检索候选",I3,定额管理与选择器,完成定额、价目、取费和计价引擎主链，让系统具备正式计价、重算和人工调价能力。
+I3-EPIC-3,价目版本与取费模板,Epic,P0,,Sprint 3,,Architecture,"iteration-3,epic,price,fee",,"Iteration 3 下负责价目版本、取费模板查询和项目绑定。","完成后系统可为项目配置默认价目版本和取费模板",I3,价目版本与取费模板,完成定额、价目、取费和计价引擎主链，让系统具备正式计价、重算和人工调价能力。
+I3-EPIC-4,计价引擎与重算,Epic,P0,,Sprint 3,,Architecture,"iteration-3,epic,pricing-engine,recalculate",,"Iteration 3 下负责系统计价、人工调价和批量重算。","完成后系统可计算系统值、人工值和最终值并支持重算",I3,计价引擎与重算,完成定额、价目、取费和计价引擎主链，让系统具备正式计价、重算和人工调价能力。
+I3-EPIC-5,校验、权限与审计,Epic,P1,,Sprint 3,,Architecture,"iteration-3,epic,validation,permission,audit-log",,"Iteration 3 下负责定额校验、权限控制和计价主链审计。","完成后系统可对计价主链执行校验、权限和追溯控制",I3,校验、权限与审计,完成定额、价目、取费和计价引擎主链，让系统具备正式计价、重算和人工调价能力。
+I3-EPIC-6,前端计价主链,Epic,P1,,Sprint 3,,Architecture,"iteration-3,epic,frontend,pricing",,"Iteration 3 下负责定额管理、价目取费联动和计价结果前端。","完成后前端可使用完整计价主链",I3,前端计价主链,完成定额、价目、取费和计价引擎主链，让系统具备正式计价、重算和人工调价能力。
+I3-01,创建定额、价目与取费基础表迁移,Story,P0,I3-EPIC-1,Sprint 3,,Backend,"iteration-3,quota,price,fee,database","I2-01,I2-02","创建 `quota_line`、`price_version`、`price_item`、`fee_template`、`fee_rule` 五张核心表，并补齐索引和约束。","五张表可完成迁移；`price_version.version_code` 唯一；`price_item(price_version_id, quota_code)` 唯一",I3,,
+I3-02,补齐定额与价目源字段,Story,P0,I3-EPIC-1,Sprint 3,,Backend,"iteration-3,quota,price,compatibility","I3-01","给 `quota_line` 补齐 `source_standard_set_code`、`source_quota_id`、`chapter_code` 等字段，给 `price_item` 补齐人工/材料/机械单价字段。","定额来源字段完整保留；价目明细支持分项单价",I3,,
+I3-03,固化 Iteration 3 枚举与计价字段口径,Task,P0,I3-EPIC-1,Sprint 3,,Backend,"iteration-3,enum,pricing","I3-01","固化 `manual / ai / history_reference`、价目状态、取费模板状态和 `system_* / manual_* / final_*` 三套价格口径。","枚举与文档一致；代码侧统一使用",I3,,
+I3-04,实现定额明细读写接口,Story,P0,I3-EPIC-2,Sprint 3,,Backend,"iteration-3,quota,api","I3-01,I2-10","实现 `GET/POST/PUT /api/v1/projects/{id}/quota-lines...`。","清单项下可新增多条定额；可编辑数量、含量系数和来源方式",I3,,
+I3-05,实现定额批量创建与校验接口,Story,P1,I3-EPIC-2,Sprint 3,,Backend,"iteration-3,quota,batch,validation","I3-04","增加定额批量创建、套用校验和来源链查询接口。","支持批量添加定额；支持单独触发校验",I3,,
+I3-06,实现定额选择器查询能力,Story,P0,I3-EPIC-2,Sprint 3,,Backend,"iteration-3,quota,selector,api","I3-01,I1-14","支持按 `standardSetCode`、`disciplineCode`、关键字和章节号查询候选定额。","可按项目默认专业定额集查询；支持关键字筛选",I3,,
+I3-07,定额选择器前端实现,Story,P1,I3-EPIC-2,Sprint 3,,Frontend,"iteration-3,quota,selector,frontend","I3-06,I3-04","实现定额选择器、批量添加和定额列表展示。","可按专业和定额集切换查询；可批量添加到清单项",I3,,
+I3-08,实现价目版本查询与绑定,Story,P0,I3-EPIC-3,Sprint 3,,Backend,"iteration-3,price,api","I3-01,I1-03","支持按地区和版本查询价目版本，并支持项目绑定默认价目版本。","可查询不同地区、不同版本的价目；项目可绑定默认价目版本",I3,,
+I3-09,实现取费模板查询与绑定,Story,P0,I3-EPIC-3,Sprint 3,,Backend,"iteration-3,fee,api","I3-01,I1-03","支持按地区、项目类型、阶段查询取费模板，并支持项目绑定默认模板。","项目可绑定默认取费模板；不同专业可命中不同规则",I3,,
+I3-10,价目与取费绑定前端实现,Story,P1,I3-EPIC-3,Sprint 3,,Frontend,"iteration-3,price,fee,frontend","I3-08,I3-09","实现价目版本切换入口、取费模板切换入口和基础展示。","可切换价目版本；可切换取费模板",I3,,
+I3-11,实现单项计价接口,Story,P0,I3-EPIC-4,Sprint 3,,Backend,"iteration-3,pricing-engine,api","I3-04,I3-08,I3-09","实现 `POST /api/v1/engine/calculate`，根据定额、价目和取费计算系统值。","可计算 `system_unit_price`；可计算 `system_amount`",I3,,
+I3-12,实现人工调价与最终值计算,Story,P0,I3-EPIC-4,Sprint 3,,Backend,"iteration-3,pricing-engine,manual-adjust","I3-11","支持写入 `manual_unit_price`，并计算 `final_unit_price` 和 `final_amount`。","人工调价不覆盖系统值；最终值可独立计算",I3,,
+I3-13,实现批量重算服务,Story,P0,I3-EPIC-4,Sprint 3,,Backend,"iteration-3,pricing-engine,recalculate","I3-11,I3-12","支持按清单项、专业、单体和项目级触发重算。","支持多粒度重算；记录重算触发原因",I3,,
+I3-14,计价结果前端展示与人工调价实现,Story,P1,I3-EPIC-4,Sprint 3,,Frontend,"iteration-3,pricing-engine,frontend","I3-11,I3-12","在前端展示系统值、人工值、最终值，并支持人工调价入口。","可查看三套价格口径；可发起人工调价",I3,,
+I3-15,接入定额校验规则,Story,P0,I3-EPIC-5,Sprint 3,,Backend,"iteration-3,validation,quota","I3-04,I3-11","接入缺定额、缺价目、缺取费模板、单位不一致等校验规则，并落到 `validation_status`。","重大错误不会静默吞掉；校验结果可持久化",I3,,
+I3-16,接入定额、价目和调价权限校验,Story,P0,I3-EPIC-5,Sprint 3,,Backend,"iteration-3,permission,quota,price","I1-09,I3-04,I3-12","接入 `quota:view`、`quota:edit`、价目只读、取费只读和锁定版本写拦截。","`reviewer` 只能查看；锁定版本写接口返回 `423`",I3,,
+I3-17,接入计价主链审计日志,Story,P1,I3-EPIC-5,Sprint 3,,Backend,"iteration-3,pricing-engine,audit-log","I3-08,I3-09,I3-11,I3-12,I3-13","为定额修改、价目切换、取费模板切换、人工调价和批量重算写审计日志。","任意价格变化可追溯到操作人和原因",I3,,
+I3-18,定额管理页前端实现,Story,P1,I3-EPIC-6,Sprint 3,,Frontend,"iteration-3,quota,frontend","I3-04,I3-07","实现定额列表、右侧详情和批量添加后的展示。","可查看和维护定额明细；可查看来源方式和校验状态",I3,,
+I3-19,价目与取费配置前端联动,Story,P1,I3-EPIC-6,Sprint 3,,Frontend,"iteration-3,price,fee,frontend","I3-10,I3-14","打通价目、取费和计价结果联动展示。","切换价目/取费后可刷新计价结果",I3,,
+I3-20,Iteration 3 集成测试与回归,Test,P0,I3-EPIC-6,Sprint 3,,QA,"iteration-3,qa,regression","I3-04,I3-08,I3-09,I3-11,I3-12,I3-13,I3-16","对定额管理、价目绑定、取费绑定、计价引擎、人工调价和锁定规则做联调回归。","定额主流程通过；计价主流程通过；调价与重算主流程通过；权限与锁定规则通过",I3,,
+I4-EPIC-1,审核与审计基础表,Epic,P0,,Sprint 4,,Architecture,"iteration-4,epic,review,audit-log",,"Iteration 4 下负责审核记录和审计日志的基础建表与动作枚举。","完成后系统具备审核记录和审计日志的基础存储能力",I4,审核与审计基础表,完成审核、汇总、报表和审计主链，让系统具备可审核、可导出、可追溯的正式交付能力。
+I4-EPIC-2,审核流与状态联动,Epic,P0,,Sprint 4,,Architecture,"iteration-4,epic,review,state-machine",,"Iteration 4 下负责审核提交、处理和项目状态联动。","完成后系统可提交审核并驱动项目、阶段和版本状态变化",I4,审核流与状态联动,完成审核、汇总、报表和审计主链，让系统具备可审核、可导出、可追溯的正式交付能力。
+I4-EPIC-3,汇总与偏差分析,Epic,P0,,Sprint 4,,Architecture,"iteration-4,epic,summary,variance",,"Iteration 4 下负责汇总查询和偏差分析能力。","完成后系统可从项目、阶段、专业和单体维度做汇总与偏差分析",I4,汇总与偏差分析,完成审核、汇总、报表和审计主链，让系统具备可审核、可导出、可追溯的正式交付能力。
+I4-EPIC-4,报表导出任务,Epic,P0,,Sprint 4,,Architecture,"iteration-4,epic,report,export",,"Iteration 4 下负责报表异步导出任务和下载。","完成后系统可异步生成并下载报表",I4,报表导出任务,完成审核、汇总、报表和审计主链，让系统具备可审核、可导出、可追溯的正式交付能力。
+I4-EPIC-5,权限与审计接入,Epic,P1,,Sprint 4,,Architecture,"iteration-4,epic,permission,audit-log",,"Iteration 4 下负责审核、汇总、导出和审计权限，以及关键状态审计。","完成后系统可对审核和导出主链执行权限和追溯控制",I4,权限与审计接入,完成审核、汇总、报表和审计主链，让系统具备可审核、可导出、可追溯的正式交付能力。
+I4-EPIC-6,前端审核与汇总主链,Epic,P1,,Sprint 4,,Architecture,"iteration-4,epic,frontend,review,summary",,"Iteration 4 下负责审核前端、汇总前端和审计日志页。","完成后前端可使用审核、汇总、报表和审计主链",I4,前端审核与汇总主链,完成审核、汇总、报表和审计主链，让系统具备可审核、可导出、可追溯的正式交付能力。
+I4-01,创建审核记录与审计日志表迁移,Story,P0,I4-EPIC-1,Sprint 4,,Backend,"iteration-4,review,audit-log,database","I3-01,I3-03","创建 `review_submission`、`audit_log` 两张基础表，并补齐索引和约束。","两张表可完成迁移；`review_submission` 支持按资源状态查询；`audit_log(resource_type, resource_id, created_at desc)` 可索引查询",I4,,
+I4-02,固化审核、导出与审计动作枚举,Task,P0,I4-EPIC-1,Sprint 4,,Backend,"iteration-4,enum,review,report","I4-01","固化审核状态、提交类型、报表任务状态与审计动作枚举。","枚举值与状态机文档一致；代码侧统一使用",I4,,
+I4-03,实现审核提交流程接口,Story,P0,I4-EPIC-2,Sprint 4,,Backend,"iteration-4,review,api","I4-01,I4-02,I3-16","实现 `POST /api/v1/projects/{id}/review-submissions`，支持提交审核并校验资源可提交态。","可提交审核；同一资源存在 `pending` 时不可重复提交",I4,,
+I4-04,实现审核通过、驳回、撤回接口,Story,P0,I4-EPIC-2,Sprint 4,,Backend,"iteration-4,review,api","I4-03","增加 `approve`、`reject`、`cancel` 接口。","可通过、驳回、撤回；审核人与提交人不能为同一人",I4,,
+I4-05,实现阶段、项目与版本状态联动,Story,P0,I4-EPIC-2,Sprint 4,,Backend,"iteration-4,review,state-machine","I4-04","联动清单版本、阶段和项目状态，支持驳回回退和锁定申请流。","审核通过后进入正确下游状态；审核驳回后资源回到可编辑状态；锁定申请可进入审核流",I4,,
+I4-06,实现汇总查询接口,Story,P0,I4-EPIC-3,Sprint 4,,Backend,"iteration-4,summary,api","I3-11,I3-12,I4-02","实现 `GET /api/v1/reports/summary`，支持按项目、阶段、专业、单体查询。","可按 4 个维度汇总；可区分系统值和最终值",I4,,
+I4-07,实现偏差分析服务,Story,P0,I4-EPIC-3,Sprint 4,,Backend,"iteration-4,summary,variance","I4-06","支持上游版本对比、系统值对比最终值、专业和单体维度偏差分析。","可输出偏差金额和偏差比例；可筛出高偏差清单项",I4,,
+I4-08,汇总页与偏差分析页前端实现,Story,P1,I4-EPIC-3,Sprint 4,,Frontend,"iteration-4,summary,variance,frontend","I4-06,I4-07","实现汇总页、多维筛选和偏差分析高亮展示。","可筛选查看汇总；可查看偏差金额、偏差率和异常项",I4,,
+I4-09,实现报表导出任务接口,Story,P0,I4-EPIC-4,Sprint 4,,Backend,"iteration-4,report,export,api","I4-06","实现 `POST /api/v1/reports/export`，并支持异步任务状态流转。","导出接口返回 `202`；任务进入 `queued`",I4,,
+I4-10,实现导出任务查询与下载接口,Story,P1,I4-EPIC-4,Sprint 4,,Backend,"iteration-4,report,export,api","I4-09","实现任务状态查询和下载接口。","可查询 `queued / processing / completed / failed`；任务完成后可下载",I4,,
+I4-11,报表中心前端实现,Story,P1,I4-EPIC-4,Sprint 4,,Frontend,"iteration-4,report,frontend","I4-09,I4-10","实现报表任务创建、状态展示和下载入口。","可发起导出任务；可查看任务状态与下载入口",I4,,
+I4-12,接入审核、汇总、导出和审计权限,Story,P0,I4-EPIC-5,Sprint 4,,Backend,"iteration-4,permission,review,report","I1-09,I4-03,I4-06,I4-09","接入 `review`、`summary:view`、`report:export`、`audit_log:view` 权限控制。","`reviewer` 可审核不能直接改业务数据；无导出权限用户不可创建报表任务",I4,,
+I4-13,接入审核、导出和状态切换审计日志,Story,P1,I4-EPIC-5,Sprint 4,,Backend,"iteration-4,review,report,audit-log","I4-04,I4-05,I4-09","为审核处理、状态联动和导出任务写审计日志。","关键状态切换都有日志；`before_payload` / `after_payload` 覆盖核心字段",I4,,
+I4-14,审核弹层与审核处理页前端实现,Story,P1,I4-EPIC-6,Sprint 4,,Frontend,"iteration-4,review,frontend","I4-03,I4-04","实现提交审核弹层、审核处理页和通过/驳回/撤回操作。","可提交审核；可在前端执行通过/驳回/撤回",I4,,
+I4-15,审计日志页前端实现,Story,P1,I4-EPIC-6,Sprint 4,,Frontend,"iteration-4,audit-log,frontend","I4-13","实现按资源和时间过滤的审计日志页面。","可按资源查看日志；可按时间筛选",I4,,
+I4-16,Iteration 4 集成测试与回归,Test,P0,I4-EPIC-6,Sprint 4,,QA,"iteration-4,qa,regression","I4-04,I4-05,I4-06,I4-07,I4-09,I4-12","对审核流、状态联动、汇总、偏差分析、导出和审计日志做联调回归。","审核主流程通过；汇总与偏差分析主流程通过；导出与审计主流程通过",I4,,
+I5-EPIC-1,AI 推荐基础表与适配层,Epic,P0,,Sprint 5,,Architecture,"iteration-5,epic,ai,provider",,"Iteration 5 下负责 AI 推荐基础表、状态枚举和 Provider 适配层。","完成后系统具备 AI 推荐结果的基础存储和调用适配能力",I5,AI 推荐基础表与适配层,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-EPIC-2,AI 清单推荐,Epic,P0,,Sprint 5,,Architecture,"iteration-5,epic,ai,bill",,"Iteration 5 下负责 AI 清单推荐上下文生成、接口和前端面板。","完成后系统可生成并查看清单推荐结果",I5,AI 清单推荐,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-EPIC-3,AI 定额推荐,Epic,P0,,Sprint 5,,Architecture,"iteration-5,epic,ai,quota",,"Iteration 5 下负责 AI 定额推荐上下文生成、接口和前端面板。","完成后系统可生成并查看定额推荐结果",I5,AI 定额推荐,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-EPIC-4,偏差预警与失效机制,Epic,P0,,Sprint 5,,Architecture,"iteration-5,epic,ai,variance,expired",,"Iteration 5 下负责偏差预警生成、阈值配置和推荐失效机制。","完成后系统可生成偏差预警并在上下文变化时使旧推荐失效",I5,偏差预警与失效机制,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-EPIC-5,人工确认、权限与审计,Epic,P1,,Sprint 5,,Architecture,"iteration-5,epic,ai,permission,audit-log",,"Iteration 5 下负责推荐接受/忽略、人工确认落库、权限和审计。","完成后系统可在人工确认后写正式数据并保留追溯",I5,人工确认、权限与审计,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-EPIC-6,前端 AI 面板,Epic,P1,,Sprint 5,,Architecture,"iteration-5,epic,ai,frontend",,"Iteration 5 下负责统一 AI 面板、历史记录和交互确认。","完成后前端可使用清单推荐、定额推荐和偏差预警面板",I5,前端 AI 面板,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-EPIC-7,AI 原生底座预留,Epic,P1,,Sprint 5,,Architecture,"iteration-5,epic,ai,mcp,knowledge,memory",,"Iteration 5 下负责知识与记忆基础表、MCP 上下文聚合和知识/记忆抽取入口预留。","完成后系统具备 AI 长期增智所需的底层预留能力",I5,AI 原生底座预留,完成 AI 推荐、偏差预警、人工确认和 AI 原生底座预留主链，让系统在不破坏正式数据的前提下具备 AI 辅助与长期增智扩展能力。
+I5-01,创建 AI 推荐表迁移,Story,P0,I5-EPIC-1,Sprint 5,,Backend,"iteration-5,ai,database","I4-01,I4-02","创建 `ai_recommendation` 表，并补齐项目、资源、推荐类型、状态、输入输出字段与索引。","表可完成迁移；可按项目、资源和类型快速查询推荐记录",I5,,
+I5-02,固化 AI 推荐类型与状态枚举,Task,P0,I5-EPIC-1,Sprint 5,,Backend,"iteration-5,ai,enum","I5-01","固化 `bill_recommendation`、`quota_recommendation`、`variance_warning` 和 `generated / accepted / ignored / expired`。","枚举值与状态机文档一致；代码侧统一使用",I5,,
+I5-03,实现 AI Provider 适配层,Story,P0,I5-EPIC-1,Sprint 5,,Backend,"iteration-5,ai,provider","I5-01,I5-02","封装 AI Provider 调用、超时、重试、错误处理和输入输出摘要记录。","AI 失败不会阻断主业务流程；AI 请求上下文可追溯",I5,,
+I5-04,实现清单推荐输入上下文生成,Story,P0,I5-EPIC-2,Sprint 5,,Backend,"iteration-5,ai,bill,context","I5-03,I2-09,I2-10","为新建清单版本、引用版本和缺失项场景生成 AI 清单推荐输入上下文。","可生成清单推荐输入；输入上下文可覆盖来源链和当前版本信息",I5,,
+I5-05,实现 AI 清单推荐接口,Story,P0,I5-EPIC-2,Sprint 5,,Backend,"iteration-5,ai,bill,api","I5-04","增加 `POST /api/v1/ai/bill-recommendations` 与推荐结果查询接口。","可生成清单推荐结果；推荐结果落到 `ai_recommendation`",I5,,
+I5-06,清单推荐前端面板实现,Story,P1,I5-EPIC-2,Sprint 5,,Frontend,"iteration-5,ai,bill,frontend","I5-05","实现 AI 清单推荐面板与推荐卡片展示。","可查看推荐内容、来源和状态；未接受前不改写正式清单",I5,,
+I5-07,实现定额推荐输入上下文生成,Story,P0,I5-EPIC-3,Sprint 5,,Backend,"iteration-5,ai,quota,context","I5-03,I3-04,I3-06","为清单项定额推荐和替代方案推荐生成上下文。","可生成定额推荐输入；输入上下文覆盖清单项和定额候选信息",I5,,
+I5-08,实现 AI 定额推荐接口,Story,P0,I5-EPIC-3,Sprint 5,,Backend,"iteration-5,ai,quota,api","I5-07","增加 `POST /api/v1/ai/quota-recommendations` 与推荐结果查询接口。","可生成定额推荐结果；推荐结果落到 `ai_recommendation`",I5,,
+I5-09,定额推荐前端面板实现,Story,P1,I5-EPIC-3,Sprint 5,,Frontend,"iteration-5,ai,quota,frontend","I5-08","实现 AI 定额推荐面板与候选方案展示。","可查看定额推荐内容；未接受前不改写正式定额",I5,,
+I5-10,实现偏差预警生成服务,Story,P0,I5-EPIC-4,Sprint 5,,Backend,"iteration-5,ai,variance","I4-06,I4-07,I5-03","按项目、阶段、专业、单体和系统值/最终值差异生成偏差预警。","可生成偏差预警；预警结果落到 `ai_recommendation`",I5,,
+I5-11,实现偏差预警接口与阈值配置,Story,P0,I5-EPIC-4,Sprint 5,,Backend,"iteration-5,ai,variance,api","I5-10","增加 `variance-warnings` 接口，并支持项目级、阶段级阈值配置。","可按阈值生成预警；阈值变化后可重新生成",I5,,
+I5-12,实现推荐失效机制,Story,P0,I5-EPIC-4,Sprint 5,,Backend,"iteration-5,ai,expired","I5-05,I5-08,I5-10","在版本、定额上下文或阶段变化时，将旧推荐自动置为 `expired`。","旧推荐不会长期污染页面；失效状态可查询",I5,,
+I5-13,偏差预警前端展示实现,Story,P1,I5-EPIC-4,Sprint 5,,Frontend,"iteration-5,ai,variance,frontend","I5-11","在汇总页高亮偏差预警并支持查看详情。","汇总页可展示高优先级预警；可查看预警详情",I5,,
+I5-14,实现推荐接受与忽略接口,Story,P0,I5-EPIC-5,Sprint 5,,Backend,"iteration-5,ai,accept,ignore","I5-05,I5-08","增加 `accept`、`ignore` 接口，支持推荐从 `generated` 进入 `accepted` 或 `ignored`。","用户可接受或忽略推荐；状态变化可正确保存",I5,,
+I5-15,实现人工确认落正式数据,Story,P0,I5-EPIC-5,Sprint 5,,Backend,"iteration-5,ai,persist","I5-14,I2-10,I3-04","接受清单推荐时写正式 `bill_item`，接受定额推荐时写正式 `quota_line`。","接受动作可真正落库；AI 推荐不会自动直接写正式表",I5,,
+I5-16,接入 AI 权限与按钮控制,Story,P0,I5-EPIC-5,Sprint 5,,Backend,"iteration-5,ai,permission","I1-09,I5-14","接入 AI 推荐查看、接受、忽略和偏差预警查看权限。","`cost_engineer` 可处理推荐；`reviewer` 只能查看不能接受写入",I5,,
+I5-17,接入 AI 推荐审计日志,Story,P1,I5-EPIC-5,Sprint 5,,Backend,"iteration-5,ai,audit-log","I5-14,I5-15,I5-12","为推荐生成、接受、忽略、失效写审计日志。","任意推荐处理动作都可追溯",I5,,
+I5-18,推荐确认弹层与推荐历史实现,Story,P1,I5-EPIC-6,Sprint 5,,Frontend,"iteration-5,ai,frontend,history","I5-14,I5-15","实现接受确认弹层、忽略动作和推荐历史查看区。","可接受和忽略推荐；可查看历史推荐记录",I5,,
+I5-19,AI 推荐面板统一整合,Story,P1,I5-EPIC-6,Sprint 5,,Frontend,"iteration-5,ai,frontend,panel","I5-06,I5-09,I5-13,I5-18","统一整合清单推荐、定额推荐和偏差预警面板。","可按资源类型分区查看推荐；已失效推荐有明显标记",I5,,
+I5-20,Iteration 5 集成测试与回归,Test,P0,I5-EPIC-6,Sprint 5,,QA,"iteration-5,qa,regression","I5-05,I5-08,I5-11,I5-12,I5-15,I5-16","对清单推荐、定额推荐、偏差预警、接受/忽略、失效机制和 AI 权限做联调回归。","AI 推荐主流程通过；推荐失效主流程通过；接受/忽略主流程通过；AI 权限规则通过",I5,,
+I5-21,创建知识与记忆基础表迁移,Story,P1,I5-EPIC-7,Sprint 5,,Backend,"iteration-5,ai,database,knowledge,memory","I5-01,I4-02","创建 `knowledge_entry`、`memory_entry`、`skill_definition`、`knowledge_relation` 四张基础表，并补齐索引与基础约束，为知识沉淀、系统记忆和技能定义预留正式存储结构。","四张表可完成迁移；关键索引与基础约束创建完成；至少支持知识条目和记忆条目的基础落库",I5,,
+I5-22,预留 MCP 上下文聚合能力,Story,P1,I5-EPIC-7,Sprint 5,,Backend,"iteration-5,ai,mcp,context","I5-03,I5-21","预留 `get_project_context`、`get_stage_context`、`get_bill_version_context`、`search_knowledge_entries` 等 MCP 能力对应的上下文聚合服务，确保 AI 工具后续可通过高层上下文接入系统，而不是直接拼接底层 REST 请求。","项目级和阶段级上下文具备聚合服务预留；知识搜索具备统一入口预留；上下文能力仍受项目、阶段和资源权限裁剪",I5,,
+I5-23,预留知识与记忆抽取入口,Story,P1,I5-EPIC-7,Sprint 5,,Backend,"iteration-5,ai,knowledge,memory,extraction","I5-17,I5-21","为项目复盘结论、审核驳回原因、推荐反馈结果预留知识沉淀入口，并为项目偏好、组织偏好和 AI 运行反馈预留记忆写入入口，形成后续 AI 增智闭环的基础能力。","至少一类复盘结论可写入 `knowledge_entry`；至少一类项目或组织偏好可写入 `memory_entry`；知识生成与记忆更新具备审计动作预留",I5,,

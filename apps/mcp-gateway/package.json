@@ -1,0 +1,9 @@
+{
+  "name": "@saas-pricing/mcp-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript MCP gateway scaffold for the SaaS pricing platform.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

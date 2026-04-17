@@ -1,0 +1,23 @@
+{
+  "name": "saas-pricing-platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "npm@11.6.2",
+  "workspaces": [
+    "apps/frontend",
+    "apps/api",
+    "apps/mcp-gateway",
+    "apps/worker"
+  ],
+  "scripts": {
+    "test": "npm run test:workspace && pytest apps/ai-runtime/tests/test_main.py",
+    "test:workspace": "node --test tests/workspace-structure.test.mjs",
+    "test:ai-runtime": "pytest apps/ai-runtime/tests/test_main.py",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}

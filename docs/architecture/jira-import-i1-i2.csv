@@ -1,0 +1,54 @@
+Issue Key,Summary,Issue Type,Priority,Epic Link,Sprint,Assignee,Component,Labels,Depends On,Description,Acceptance Criteria,Iteration,Epic Name,Sprint Goal
+I1-EPIC-1,项目与阶段底座,Epic,P0,,Sprint 1,,Architecture,"iteration-1,epic,project,stage",,"Iteration 1 下负责项目、阶段与基础配置底座。","完成后系统可创建项目、配置阶段并进入工作台",I1,项目与阶段底座,完成项目、阶段、成员、专业和工作台底座，让系统具备进入正式业务流程前的项目级配置能力。
+I1-EPIC-2,权限与成员体系,Epic,P0,,Sprint 1,,Architecture,"iteration-1,epic,permission,member",,"Iteration 1 下负责项目成员、角色、业务身份和范围权限。","完成后系统可维护项目成员并执行基础权限控制",I1,权限与成员体系,完成项目、阶段、成员、专业和工作台底座，让系统具备进入正式业务流程前的项目级配置能力。
+I1-EPIC-3,专业与定额集配置,Epic,P0,,Sprint 1,,Architecture,"iteration-1,epic,discipline,standard-set",,"Iteration 1 下负责专业主数据、定额集主数据和项目专业配置。","完成后系统可配置项目专业并绑定默认定额集",I1,专业与定额集配置,完成项目、阶段、成员、专业和工作台底座，让系统具备进入正式业务流程前的项目级配置能力。
+I1-EPIC-4,阶段工作台,Epic,P1,,Sprint 1,,Architecture,"iteration-1,epic,workspace",,"Iteration 1 下负责阶段工作台聚合能力和前端首页。","完成后系统可展示项目阶段、专业和权限摘要",I1,阶段工作台,完成项目、阶段、成员、专业和工作台底座，让系统具备进入正式业务流程前的项目级配置能力。
+I1-EPIC-5,数据初始化与导入前置准备,Epic,P1,,Sprint 1,,Architecture,"iteration-1,epic,init,import",,"Iteration 1 下负责枚举常量、导入前置能力和回归验证。","完成后系统具备进入清单导入前的基础准备能力",I1,数据初始化与导入前置准备,完成项目、阶段、成员、专业和工作台底座，让系统具备进入正式业务流程前的项目级配置能力。
+I1-01,创建项目基础表迁移,Story,P0,I1-EPIC-1,Sprint 1,,Backend,"iteration-1,project,database",,"创建 `project`、`project_stage` 两张核心表，并补齐主键、时间字段、唯一索引。","可完成数据库迁移；`project.project_code` 唯一；`project_stage(project_id, stage_code)` 唯一",I1,,
+I1-02,初始化标准阶段主数据,Task,P0,I1-EPIC-1,Sprint 1,,Backend,"iteration-1,stage,seed","I1-01","初始化 9 个标准阶段编码和默认顺序，供项目创建时展开模板。","可查询 9 个标准阶段；阶段编码与文档一致",I1,,
+I1-03,实现项目创建接口,Story,P0,I1-EPIC-1,Sprint 1,,Backend,"iteration-1,project,api","I1-01,I1-02","实现 `POST /api/v1/projects`，支持创建项目、展开默认阶段模板、写入负责人。","创建后可返回项目详情；自动生成默认阶段配置；项目负责人自动成为项目成员",I1,,
+I1-04,实现项目详情接口,Story,P0,I1-EPIC-1,Sprint 1,,Backend,"iteration-1,project,api","I1-03","实现 `GET /api/v1/projects/{id}`，返回项目基础信息和默认配置引用。","可按项目 ID 查询详情；非项目成员不可访问",I1,,
+I1-05,实现阶段配置读写接口,Story,P0,I1-EPIC-1,Sprint 1,,Backend,"iteration-1,stage,api","I1-03","实现 `GET/PUT /api/v1/projects/{id}/stages`，支持启停、排序、负责人和审核人配置。","阶段编码不可重复；阶段顺序不可重复；可启停阶段并保存负责人、审核人",I1,,
+I1-06,项目列表页与创建页前端骨架,Story,P1,I1-EPIC-1,Sprint 1,,Frontend,"iteration-1,project,frontend","I1-03,I1-04","实现项目列表页、创建页和详情入口。","可创建项目；创建后可跳转详情页",I1,,
+I1-07,阶段配置页前端实现,Story,P1,I1-EPIC-1,Sprint 1,,Frontend,"iteration-1,stage,frontend","I1-05","实现阶段启停、排序和负责人配置页面。","可调整阶段顺序；可编辑负责人和审核人",I1,,
+I1-08,创建项目成员与权限范围表迁移,Story,P0,I1-EPIC-2,Sprint 1,,Backend,"iteration-1,member,permission,database","I1-01","创建 `project_member`、`project_role_scope`，补齐唯一约束和范围字段。","`project_member(project_id, user_id)` 唯一；可存角色、业务身份、阶段/专业/单体范围",I1,,
+I1-09,实现 JWT 与项目成员鉴权中间件,Story,P0,I1-EPIC-2,Sprint 1,,Backend,"iteration-1,permission,auth","I1-08","实现 JWT、项目成员校验、平台角色校验和基础资源权限校验。","非项目成员不能访问项目详情；项目成员能根据角色拿到不同能力",I1,,
+I1-10,实现项目成员读写接口,Story,P0,I1-EPIC-2,Sprint 1,,Backend,"iteration-1,member,api","I1-08,I1-09","实现 `GET/PUT /api/v1/projects/{id}/members`，支持角色、业务身份、范围配置。","可新增和失活成员；可配置业务身份；可配置阶段与专业范围",I1,,
+I1-11,成员与权限配置页前端实现,Story,P1,I1-EPIC-2,Sprint 1,,Frontend,"iteration-1,member,permission,frontend","I1-10","实现项目成员列表、角色编辑、业务身份与权限范围配置界面。","可新增成员；可设置角色和范围；审核人与编制人可独立配置",I1,,
+I1-12,创建专业与定额集主数据表迁移,Story,P0,I1-EPIC-3,Sprint 1,,Backend,"iteration-1,discipline,standard-set,database","I1-01","创建 `discipline_type`、`standard_set`、`project_discipline`，补齐唯一索引和源字段。","`discipline_type.discipline_code` 唯一；`standard_set.standard_set_code` 唯一；`project_discipline(project_id, discipline_code)` 唯一",I1,,
+I1-13,初始化专业与定额集样本数据,Task,P0,I1-EPIC-3,Sprint 1,,Backend,"iteration-1,discipline,standard-set,seed","I1-12","导入江苏版专业主数据和定额集样本，并保留 `source_field_code`、`source_markup`、`source_system`。","可查询专业主数据；可查询定额集主数据；源系统字段保留完整",I1,,
+I1-14,实现项目专业配置接口,Story,P0,I1-EPIC-3,Sprint 1,,Backend,"iteration-1,discipline,standard-set,api","I1-12,I1-13,I1-09","实现 `GET/PUT /api/v1/projects/{id}/disciplines` 和 `GET /api/v1/standard-sets`。","可配置项目启用专业；每个专业可绑定默认定额集；绑定非法定额集返回 `422`",I1,,
+I1-15,项目专业配置页前端实现,Story,P1,I1-EPIC-3,Sprint 1,,Frontend,"iteration-1,discipline,standard-set,frontend","I1-14","实现项目专业列表、启停、排序和默认定额集绑定界面。","可启停项目专业；可绑定默认定额集；可展示源专业信息摘要",I1,,
+I1-16,设计并实现阶段工作台聚合接口,Story,P0,I1-EPIC-4,Sprint 1,,Backend,"iteration-1,workspace,api","I1-03,I1-05,I1-10,I1-14","实现 `GET /api/v1/projects/{id}/workspace`，聚合项目、阶段、专业、成员权限摘要。","返回项目信息；返回当前阶段和启用阶段摘要；返回项目专业配置摘要；返回成员权限摘要",I1,,
+I1-17,阶段工作台前端页实现,Story,P1,I1-EPIC-4,Sprint 1,,Frontend,"iteration-1,workspace,frontend","I1-16","实现阶段工作台首页，展示当前阶段、专业配置、成员权限和预留待办区域。","可进入工作台；可看到当前阶段、专业和权限摘要",I1,,
+I1-18,固化 Iteration 1 枚举与常量,Task,P0,I1-EPIC-5,Sprint 1,,Backend,"iteration-1,enum,init","I1-01,I1-08,I1-12","固化项目状态、阶段状态、平台角色、业务身份、资源类型和操作类型。","枚举与文档一致；后端代码统一引用枚举常量",I1,,
+I1-19,预留导入任务与 import 权限基础能力,Task,P1,I1-EPIC-5,Sprint 1,,Backend,"iteration-1,import,permission","I1-09,I1-13","在权限和元数据层预留 `import` 动作、导入日志表设计和源系统标识。","权限中间件能识别 `import`；文档里已约定导入任务基础结构",I1,,
+I1-20,Iteration 1 集成测试与回归,Test,P0,I1-EPIC-5,Sprint 1,,QA,"iteration-1,qa,regression","I1-03,I1-05,I1-10,I1-14,I1-16","对项目创建、阶段配置、成员权限、专业配置和工作台主流程做联调回归。","项目创建主流程通过；阶段配置主流程通过；成员权限主流程通过；专业配置主流程通过；工作台可正常展示",I1,,
+I2-EPIC-1,清单版本与建表基础,Epic,P0,,Sprint 2,,Architecture,"iteration-2,epic,bill,version-chain",,"Iteration 2 下负责清单版本、清单项和工作内容的建表基础。","完成后系统具备清单版本与树形数据的基础存储能力",I2,清单版本与建表基础,完成清单版本链、树形清单、工作内容和初始导入主链，让系统具备进入正式计价前的核心业务数据能力。
+I2-EPIC-2,清单树与工作内容,Epic,P0,,Sprint 2,,Architecture,"iteration-2,epic,bill,work-item",,"Iteration 2 下负责清单树结构、工作内容子表和相关校验。","完成后系统可维护清单树和工作内容",I2,清单树与工作内容,完成清单版本链、树形清单、工作内容和初始导入主链，让系统具备进入正式计价前的核心业务数据能力。
+I2-EPIC-3,清单接口与版本链,Epic,P0,,Sprint 2,,Architecture,"iteration-2,epic,bill,version-chain",,"Iteration 2 下负责清单读写接口、版本创建、引用和来源链。","完成后系统可创建版本、引用版本并查询来源链",I2,清单接口与版本链,完成清单版本链、树形清单、工作内容和初始导入主链，让系统具备进入正式计价前的核心业务数据能力。
+I2-EPIC-4,初始导入,Epic,P0,,Sprint 2,,Architecture,"iteration-2,epic,import,bill",,"Iteration 2 下负责源清单解析、字段映射、落库和导入摘要。","完成后系统可导入一版完整初始清单",I2,初始导入,完成清单版本链、树形清单、工作内容和初始导入主链，让系统具备进入正式计价前的核心业务数据能力。
+I2-EPIC-5,权限、锁定与审计,Epic,P1,,Sprint 2,,Architecture,"iteration-2,epic,permission,lock,audit-log",,"Iteration 2 下负责清单主链权限、锁定规则和审计日志。","完成后系统可在清单主链上执行权限、锁定和追溯控制",I2,权限、锁定与审计,完成清单版本链、树形清单、工作内容和初始导入主链，让系统具备进入正式计价前的核心业务数据能力。
+I2-EPIC-6,前端清单主链,Epic,P1,,Sprint 2,,Architecture,"iteration-2,epic,frontend,bill",,"Iteration 2 下负责清单树、详情侧栏和导入反馈前端。","完成后前端可使用清单版本链和导入主流程",I2,前端清单主链,完成清单版本链、树形清单、工作内容和初始导入主链，让系统具备进入正式计价前的核心业务数据能力。
+I2-01,创建清单版本与清单项基础表迁移,Story,P0,I2-EPIC-1,Sprint 2,,Backend,"iteration-2,bill,version-chain,database","I1-01,I1-18","创建 `bill_version`、`bill_item`、`bill_item_work_item` 三张核心表，并补齐主键、时间字段、唯一索引和父子外键。","三张表可完成迁移；`bill_version(project_id, stage_id, version_no)` 唯一；`bill_item_work_item(bill_item_id, sort_order)` 唯一",I2,,
+I2-02,固化清单版本与锁定枚举,Task,P0,I2-EPIC-1,Sprint 2,,Backend,"iteration-2,bill,enum,lock","I2-01","固化 `initial / reference_copy / contract_baseline / change / settlement`、`editable / submitted / approved / locked / rejected` 等枚举。","枚举值与状态机文档一致；代码侧统一引用",I2,,
+I2-03,补齐源系统兼容字段,Story,P0,I2-EPIC-1,Sprint 2,,Backend,"iteration-2,bill,import,compatibility","I2-01","给 `bill_version`、`bill_item`、`bill_item_work_item` 补齐 `source_spec_code`、`source_bill_id`、`source_level_code` 等兼容字段。","源系统主键、层级和规范编码均可保留；数据模型与源字段映射文档一致",I2,,
+I2-04,实现清单树数据层与仓储,Story,P0,I2-EPIC-2,Sprint 2,,Backend,"iteration-2,bill,tree","I2-01","完成 `bill_item` 仓储，支持父子关系查询、同级排序和版本级过滤。","可按版本返回稳定树结构；支持同级 `sort_order` 排序",I2,,
+I2-05,实现清单树规则校验,Story,P0,I2-EPIC-2,Sprint 2,,Backend,"iteration-2,bill,tree,validation","I2-04","校验循环父子关系、跨版本挂载和锁定版本树结构修改。","非法父子关系被拦截；锁定版本不能修改树结构",I2,,
+I2-06,实现工作内容子表接口,Story,P0,I2-EPIC-2,Sprint 2,,Backend,"iteration-2,bill,work-item,api","I2-01,I2-04","实现 `GET/POST/PUT /api/v1/projects/{id}/bill-items/{itemId}/work-items...`。","每个清单项可维护多条工作内容；工作内容按顺序稳定保存",I2,,
+I2-07,工作内容只读与锁定规则接入,Task,P0,I2-EPIC-2,Sprint 2,,Backend,"iteration-2,bill,work-item,lock","I2-06","当版本或父清单项锁定时，工作内容进入只读。","锁定版本下工作内容不可改；写接口统一返回受限结果",I2,,
+I2-08,实现清单版本服务,Story,P0,I2-EPIC-3,Sprint 2,,Backend,"iteration-2,bill,version-chain,api","I2-01,I2-02","支持创建空白版本、按项目和阶段查询版本列表、按版本 ID 查询详情。","可创建空白清单版本；可按项目和阶段查询版本",I2,,
+I2-09,实现版本引用与来源链,Story,P0,I2-EPIC-3,Sprint 2,,Backend,"iteration-2,bill,version-chain,source-chain","I2-08","支持从上游版本创建 `reference_copy`，记录 `source_stage_id`、`source_version_id` 和来源链。","招标清单可生成投标报价版本；任意版本可查看上游来源",I2,,
+I2-10,实现清单项读写接口,Story,P0,I2-EPIC-3,Sprint 2,,Backend,"iteration-2,bill,api","I2-04,I2-08","实现 `GET/POST/PUT /api/v1/projects/{id}/bill-items...`，支持按版本、阶段、关键字查询。","前端可按版本切换清单数据；清单项新增和修改正常",I2,,
+I2-11,增补版本链接口,Story,P1,I2-EPIC-3,Sprint 2,,Backend,"iteration-2,bill,version-chain,api","I2-08,I2-09","增加版本列表、copy-from、source-chain 接口。","可查看版本列表；可执行 copy-from；可查看来源链",I2,,
+I2-12,预留合同基线前置能力,Task,P1,I2-EPIC-3,Sprint 2,,Backend,"iteration-2,bill,contract-baseline","I2-08,I2-09","预留 `contract_baseline` 创建逻辑和锁定前状态校验。","合同基线类型可被识别；锁定前校验口径稳定",I2,,
+I2-13,实现源清单导入解析器,Story,P0,I2-EPIC-4,Sprint 2,,Backend,"iteration-2,import,bill,parser","I2-03","解析 `ZaoJia_Qd_QdList`、`ZaoJia_Qd_Qdxm`、`ZaoJia_Qd_Gznr` 三类源数据。","能读取源样本；能输出中间结构",I2,,
+I2-14,实现导入字段映射与落库,Story,P0,I2-EPIC-4,Sprint 2,,Backend,"iteration-2,import,bill,mapping","I2-13,I2-08,I2-10,I2-06","按映射规则创建 `bill_version`、`bill_item`、`bill_item_work_item`。","可导入一版完整初始清单；导入后可看到树结构和工作内容",I2,,
+I2-15,实现导入摘要与错误明细,Story,P1,I2-EPIC-4,Sprint 2,,Backend,"iteration-2,import,bill,feedback","I2-14","导入完成后生成摘要，失败时保留错误明细。","可看到导入成功数量和失败数量；失败记录可定位",I2,,
+I2-16,接入清单与工作内容权限校验,Story,P0,I2-EPIC-5,Sprint 2,,Backend,"iteration-2,bill,permission,work-item","I1-09,I2-10,I2-06","接入 `bill:view`、`bill:edit`、`bill_work_item:view`、`bill_work_item:edit`、`bill:import`。","`reviewer` 只能查看；`cost_engineer` 可维护和导入",I2,,
+I2-17,接入清单锁定前置规则,Task,P0,I2-EPIC-5,Sprint 2,,Backend,"iteration-2,bill,lock","I2-10,I2-16","锁定版本下所有清单和工作内容写接口统一返回受限结果。","锁定版本写接口统一受限",I2,,
+I2-18,接入清单主链审计日志,Story,P1,I2-EPIC-5,Sprint 2,,Backend,"iteration-2,bill,audit-log","I2-08,I2-10,I2-06,I2-14","为版本创建、导入、清单项修改、工作内容修改和版本引用写审计日志。","任意版本创建和改动可追溯",I2,,
+I2-19,清单树页面前端实现,Story,P1,I2-EPIC-6,Sprint 2,,Frontend,"iteration-2,bill,tree,frontend","I2-10","实现清单树列表、展开/折叠、版本切换和基础查询。","可按版本查看清单树；可展示层级结构",I2,,
+I2-20,清单详情侧栏与工作内容面板实现,Story,P1,I2-EPIC-6,Sprint 2,,Frontend,"iteration-2,bill,work-item,frontend","I2-06,I2-10","实现详情侧栏、工作内容区和来源信息展示。","可查看和维护工作内容；可看到来源字段和来源链摘要",I2,,
+I2-21,初始导入入口与结果反馈实现,Story,P1,I2-EPIC-6,Sprint 2,,Frontend,"iteration-2,import,bill,frontend","I2-14,I2-15","实现初始导入入口、导入结果反馈和错误明细展示。","可触发导入；可看到导入摘要和错误信息",I2,,
+I2-22,Iteration 2 集成测试与回归,Test,P0,I2-EPIC-6,Sprint 2,,QA,"iteration-2,qa,regression","I2-09,I2-10,I2-06,I2-14,I2-16,I2-17","对版本链、清单树、工作内容、导入、权限和锁定规则做联调回归。","版本链主流程通过；清单树主流程通过；导入主流程通过；权限与锁定规则通过",I2,,

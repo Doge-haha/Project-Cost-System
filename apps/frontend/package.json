@@ -1,0 +1,9 @@
+{
+  "name": "saas-pricing-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Frontend application placeholder for the SaaS pricing platform.",
+  "scripts": {
+    "lint": "node -e \"console.log('frontend scaffold pending')\""
+  }
+}

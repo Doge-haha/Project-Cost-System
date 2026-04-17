@@ -1,0 +1,1389 @@
+openapi: 3.1.0
+info:
+  title: 新点 SaaS 造价系统 API
+  version: 1.0.0
+  summary: V1 核心业务接口契约
+  description: |
+    面向项目管理、阶段配置、清单版本链、定额套用、审核流、汇总报表与过程单据的 REST API。
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: http://localhost:3000
+    description: Local
+tags:
+  - name: Auth
+  - name: Projects
+  - name: Project Stages
+  - name: Project Disciplines
+  - name: Standard Sets
+  - name: Bill Items
+  - name: Bill Item Work Items
+  - name: Quota Lines
+  - name: Review Submissions
+  - name: Change Orders
+  - name: Site Visas
+  - name: Progress Payments
+  - name: Reports
+  - name: Engine
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LineId:
+      name: lineId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    WorkItemId:
+      name: workItemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          examples: [FORBIDDEN, VALIDATION_ERROR, LOCKED]
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    Project:
+      type: object
+      required:
+        - id
+        - projectCode
+        - projectName
+        - projectType
+        - templateName
+        - status
+        - ownerUserId
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectCode:
+          type: string
+        projectName:
+          type: string
+        projectType:
+          type: string
+        templateName:
+          type: string
+        status:
+          type: string
+          enum: [draft, in_progress, under_review, archived]
+        ownerUserId:
+          type: string
+          format: uuid
+        defaultPriceVersionId:
+          type: string
+          format: uuid
+          nullable: true
+        defaultFeeTemplateId:
+          type: string
+          format: uuid
+          nullable: true
+        clientName:
+          type: string
+          nullable: true
+        locationCode:
+          type: string
+          nullable: true
+        locationText:
+          type: string
+          nullable: true
+        buildingArea:
+          type: number
+          nullable: true
+        structureType:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateProjectRequest:
+      type: object
+      required:
+        - projectCode
+        - projectName
+        - projectType
+        - templateName
+        - ownerUserId
+      properties:
+        projectCode:
+          type: string
+        projectName:
+          type: string
+        projectType:
+          type: string
+        templateName:
+          type: string
+        ownerUserId:
+          type: string
+          format: uuid
+        clientName:
+          type: string
+        locationCode:
+          type: string
+        locationText:
+          type: string
+        buildingArea:
+          type: number
+        structureType:
+          type: string
+        defaultPriceVersionId:
+          type: string
+          format: uuid
+        defaultFeeTemplateId:
+          type: string
+          format: uuid
+        description:
+          type: string
+    Stage:
+      type: object
+      required:
+        - id
+        - projectId
+        - stageCode
+        - stageName
+        - sequenceNo
+        - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        stageCode:
+          type: string
+        stageName:
+          type: string
+        sequenceNo:
+          type: integer
+        status:
+          type: string
+          enum: [not_started, in_progress, pending_review, approved, completed, skipped]
+        assigneeUserId:
+          type: string
+          format: uuid
+          nullable: true
+        reviewerUserId:
+          type: string
+          format: uuid
+          nullable: true
+        aiEnabled:
+          type: boolean
+        autoFlowMode:
+          type: string
+          enum: [manual_confirm, auto_next, auto_archive]
+        isEnabled:
+          type: boolean
+    UpdateStagesRequest:
+      type: object
+      required: [stages]
+      properties:
+        stages:
+          type: array
+          items:
+            type: object
+            required: [stageCode, sequenceNo, isEnabled]
+            properties:
+              stageCode:
+                type: string
+              sequenceNo:
+                type: integer
+              assigneeUserId:
+                type: string
+                format: uuid
+                nullable: true
+              reviewerUserId:
+                type: string
+                format: uuid
+                nullable: true
+              aiEnabled:
+                type: boolean
+              autoFlowMode:
+                type: string
+                enum: [manual_confirm, auto_next, auto_archive]
+              isEnabled:
+                type: boolean
+    ProjectDiscipline:
+      type: object
+      required: [id, projectId, disciplineCode, sortOrder, isEnabled]
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        disciplineCode:
+          type: string
+        standardSetCode:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        isEnabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateProjectDisciplinesRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [disciplineCode, sortOrder, isEnabled]
+            properties:
+              disciplineCode:
+                type: string
+              standardSetCode:
+                type: string
+                nullable: true
+              sortOrder:
+                type: integer
+              isEnabled:
+                type: boolean
+    StandardSet:
+      type: object
+      required: [id, standardSetCode, standardSetName, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        standardSetCode:
+          type: string
+        standardSetName:
+          type: string
+        disciplineCode:
+          type: string
+          nullable: true
+        versionYear:
+          type: integer
+          nullable: true
+        standardType:
+          type: string
+          nullable: true
+        regionCode:
+          type: string
+          nullable: true
+        sourceSystem:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+    BillItem:
+      type: object
+      required:
+        - id
+        - billVersionId
+        - itemLevel
+        - sortOrder
+        - itemCode
+        - itemName
+        - unit
+        - quantity
+      properties:
+        id:
+          type: string
+          format: uuid
+        billVersionId:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        itemLevel:
+          type: integer
+          enum: [1, 2, 3]
+        sortOrder:
+          type: integer
+        itemCode:
+          type: string
+        itemName:
+          type: string
+        unit:
+          type: string
+        sourceBillId:
+          type: string
+          nullable: true
+        sourceSequence:
+          type: integer
+          nullable: true
+        sourceLevelCode:
+          type: string
+          nullable: true
+        isMeasureItem:
+          type: boolean
+        quantity:
+          type: number
+        featureRuleText:
+          type: string
+          nullable: true
+        sourceReferencePrice:
+          type: number
+          nullable: true
+        sourceFeeId:
+          type: string
+          nullable: true
+        measureCategory:
+          type: string
+          nullable: true
+        measureFeeFlag:
+          type: string
+          nullable: true
+        measureCategorySubtype:
+          type: string
+          nullable: true
+        systemUnitPrice:
+          type: number
+          nullable: true
+        manualUnitPrice:
+          type: number
+          nullable: true
+        finalUnitPrice:
+          type: number
+          nullable: true
+        systemAmount:
+          type: number
+          nullable: true
+        finalAmount:
+          type: number
+          nullable: true
+        taxRate:
+          type: number
+          nullable: true
+        sourceVersionLabel:
+          type: string
+          nullable: true
+        lockStatus:
+          type: string
+          enum: [unlocked, lock_requested, locked, unlock_requested]
+        validationStatus:
+          type: string
+          enum: [normal, warning, error]
+        remark:
+          type: string
+          nullable: true
+    CreateBillItemRequest:
+      type: object
+      required: [billVersionId, itemLevel, sortOrder, itemCode, itemName, unit, quantity]
+      properties:
+        billVersionId:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+        itemLevel:
+          type: integer
+          enum: [1, 2, 3]
+        sortOrder:
+          type: integer
+        itemCode:
+          type: string
+        itemName:
+          type: string
+        unit:
+          type: string
+        sourceBillId:
+          type: string
+        sourceSequence:
+          type: integer
+        sourceLevelCode:
+          type: string
+        isMeasureItem:
+          type: boolean
+        quantity:
+          type: number
+        featureRuleText:
+          type: string
+        sourceReferencePrice:
+          type: number
+        sourceFeeId:
+          type: string
+        measureCategory:
+          type: string
+        measureFeeFlag:
+          type: string
+        measureCategorySubtype:
+          type: string
+        taxRate:
+          type: number
+        remark:
+          type: string
+    UpdateBillItemRequest:
+      type: object
+      properties:
+        itemCode:
+          type: string
+        itemName:
+          type: string
+        unit:
+          type: string
+        sourceLevelCode:
+          type: string
+        isMeasureItem:
+          type: boolean
+        quantity:
+          type: number
+        featureRuleText:
+          type: string
+        sourceReferencePrice:
+          type: number
+        manualUnitPrice:
+          type: number
+        taxRate:
+          type: number
+        measureCategory:
+          type: string
+        measureFeeFlag:
+          type: string
+        measureCategorySubtype:
+          type: string
+        remark:
+          type: string
+    BillItemWorkItem:
+      type: object
+      required: [id, billItemId, sortOrder, workContent]
+      properties:
+        id:
+          type: string
+          format: uuid
+        billItemId:
+          type: string
+          format: uuid
+        sourceSpecCode:
+          type: string
+          nullable: true
+        sourceBillId:
+          type: string
+          nullable: true
+        sortOrder:
+          type: integer
+        workContent:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    CreateBillItemWorkItemRequest:
+      type: object
+      required: [sortOrder, workContent]
+      properties:
+        sourceSpecCode:
+          type: string
+        sourceBillId:
+          type: string
+        sortOrder:
+          type: integer
+        workContent:
+          type: string
+    QuotaLine:
+      type: object
+      required:
+        - id
+        - billItemId
+        - quotaCode
+        - quotaName
+        - unit
+        - quantity
+        - sourceMode
+      properties:
+        id:
+          type: string
+          format: uuid
+        billItemId:
+          type: string
+          format: uuid
+        sourceStandardSetCode:
+          type: string
+          nullable: true
+        sourceQuotaId:
+          type: string
+          nullable: true
+        sourceSequence:
+          type: integer
+          nullable: true
+        quotaCode:
+          type: string
+        quotaName:
+          type: string
+        chapterCode:
+          type: string
+          nullable: true
+        unit:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: number
+          nullable: true
+        totalPrice:
+          type: number
+          nullable: true
+        laborFee:
+          type: number
+          nullable: true
+        materialFee:
+          type: number
+          nullable: true
+        machineFee:
+          type: number
+          nullable: true
+        contentFactor:
+          type: number
+        priceVersionId:
+          type: string
+          format: uuid
+          nullable: true
+        regionCode:
+          type: string
+          nullable: true
+        sourceMode:
+          type: string
+          enum: [manual, ai, history_reference]
+        validationStatus:
+          type: string
+          enum: [normal, warning, error]
+        remark:
+          type: string
+          nullable: true
+    CreateQuotaLineRequest:
+      type: object
+      required: [billItemId, quotaCode, quotaName, unit, quantity, sourceMode]
+      properties:
+        billItemId:
+          type: string
+          format: uuid
+        sourceStandardSetCode:
+          type: string
+        sourceQuotaId:
+          type: string
+        sourceSequence:
+          type: integer
+        quotaCode:
+          type: string
+        quotaName:
+          type: string
+        chapterCode:
+          type: string
+        unit:
+          type: string
+        quantity:
+          type: number
+        contentFactor:
+          type: number
+          default: 1
+        priceVersionId:
+          type: string
+          format: uuid
+        regionCode:
+          type: string
+        sourceMode:
+          type: string
+          enum: [manual, ai, history_reference]
+        remark:
+          type: string
+    ReviewSubmission:
+      type: object
+      required:
+        - id
+        - projectStageId
+        - resourceType
+        - resourceId
+        - submissionType
+        - status
+        - submittedBy
+        - submittedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectStageId:
+          type: string
+          format: uuid
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+          format: uuid
+        submissionType:
+          type: string
+          enum: [stage_submit, lock_request, unlock_request]
+        status:
+          type: string
+          enum: [pending, approved, rejected, cancelled]
+        submittedBy:
+          type: string
+          format: uuid
+        reviewedBy:
+          type: string
+          format: uuid
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewComment:
+          type: string
+          nullable: true
+    CreateReviewSubmissionRequest:
+      type: object
+      required: [projectStageId, resourceType, resourceId, submissionType]
+      properties:
+        projectStageId:
+          type: string
+          format: uuid
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+          format: uuid
+        submissionType:
+          type: string
+          enum: [stage_submit, lock_request, unlock_request]
+        reviewComment:
+          type: string
+          nullable: true
+    ChangeOrderRequest:
+      type: object
+      required: [changeCode, title]
+      properties:
+        changeCode:
+          type: string
+        billVersionId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        reason:
+          type: string
+    SiteVisaRequest:
+      type: object
+      required: [visaCode, title]
+      properties:
+        visaCode:
+          type: string
+        title:
+          type: string
+        reason:
+          type: string
+    ProgressPaymentRequest:
+      type: object
+      required: [paymentCode, periodStart, periodEnd, declaredAmount]
+      properties:
+        paymentCode:
+          type: string
+        stageId:
+          type: string
+          format: uuid
+        periodStart:
+          type: string
+          format: date
+        periodEnd:
+          type: string
+          format: date
+        declaredAmount:
+          type: number
+    EngineCalculateRequest:
+      type: object
+      required: [billItemId]
+      properties:
+        billItemId:
+          type: string
+          format: uuid
+        priceVersionId:
+          type: string
+          format: uuid
+        feeTemplateId:
+          type: string
+          format: uuid
+    EngineCalculateResponse:
+      type: object
+      required: [billItemId, systemUnitPrice, finalUnitPrice, systemAmount, finalAmount]
+      properties:
+        billItemId:
+          type: string
+          format: uuid
+        systemUnitPrice:
+          type: number
+        finalUnitPrice:
+          type: number
+        systemAmount:
+          type: number
+        finalAmount:
+          type: number
+        calculatedAt:
+          type: string
+          format: date-time
+    SummaryResponse:
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        stageCode:
+          type: string
+          nullable: true
+        totalAmount:
+          type: number
+        varianceRate:
+          type: number
+          nullable: true
+        disciplineSummaries:
+          type: array
+          items:
+            type: object
+            properties:
+              disciplineCode:
+                type: string
+              totalAmount:
+                type: number
+        unitSummaries:
+          type: array
+          items:
+            type: object
+            properties:
+              unitCode:
+                type: string
+              totalAmount:
+                type: number
+    AsyncTaskResponse:
+      type: object
+      required: [taskId, status]
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/projects:
+    post:
+      tags: [Projects]
+      summary: 创建项目
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '409':
+          description: 项目编号冲突
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}:
+    get:
+      tags: [Projects]
+      summary: 获取项目详情
+      operationId: getProject
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '404':
+          description: 项目不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/stages:
+    get:
+      tags: [Project Stages]
+      summary: 获取项目阶段配置
+      operationId: listProjectStages
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Stage'
+    put:
+      tags: [Project Stages]
+      summary: 更新项目阶段配置
+      operationId: updateProjectStages
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStagesRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Stage'
+        '422':
+          description: 阶段流转配置不合法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/disciplines:
+    get:
+      tags: [Project Disciplines]
+      summary: 获取项目专业配置
+      operationId: listProjectDisciplines
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectDiscipline'
+    put:
+      tags: [Project Disciplines]
+      summary: 更新项目专业配置
+      operationId: updateProjectDisciplines
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectDisciplinesRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectDiscipline'
+        '422':
+          description: 专业与定额集绑定不合法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/standard-sets:
+    get:
+      tags: [Standard Sets]
+      summary: 获取定额集列表
+      operationId: listStandardSets
+      parameters:
+        - name: disciplineCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: regionCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, inactive]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StandardSet'
+  /api/v1/projects/{id}/bill-items:
+    get:
+      tags: [Bill Items]
+      summary: 获取项目清单项
+      operationId: listBillItems
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BillItem'
+    post:
+      tags: [Bill Items]
+      summary: 新增清单项
+      operationId: createBillItem
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBillItemRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillItem'
+        '423':
+          description: 当前版本已锁定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/bill-items/{itemId}/work-items:
+    get:
+      tags: [Bill Item Work Items]
+      summary: 获取清单工作内容
+      operationId: listBillItemWorkItems
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ItemId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BillItemWorkItem'
+    post:
+      tags: [Bill Item Work Items]
+      summary: 新增清单工作内容
+      operationId: createBillItemWorkItem
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBillItemWorkItemRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillItemWorkItem'
+        '423':
+          description: 当前版本或行已锁定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/bill-items/{itemId}:
+    put:
+      tags: [Bill Items]
+      summary: 更新清单项
+      operationId: updateBillItem
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBillItemRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillItem'
+        '423':
+          description: 当前版本或行已锁定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/bill-items/{itemId}/work-items/{workItemId}:
+    put:
+      tags: [Bill Item Work Items]
+      summary: 更新清单工作内容
+      operationId: updateBillItemWorkItem
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/ItemId'
+        - $ref: '#/components/parameters/WorkItemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sortOrder:
+                  type: integer
+                workContent:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillItemWorkItem'
+        '423':
+          description: 当前版本或行已锁定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/quota-lines:
+    get:
+      tags: [Quota Lines]
+      summary: 获取项目定额明细
+      operationId: listQuotaLines
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuotaLine'
+    post:
+      tags: [Quota Lines]
+      summary: 新增定额明细
+      operationId: createQuotaLine
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuotaLineRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaLine'
+  /api/v1/projects/{id}/quota-lines/{lineId}:
+    put:
+      tags: [Quota Lines]
+      summary: 更新定额明细
+      operationId: updateQuotaLine
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/LineId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                quantity:
+                  type: number
+                contentFactor:
+                  type: number
+                priceVersionId:
+                  type: string
+                  format: uuid
+                remark:
+                  type: string
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotaLine'
+  /api/v1/projects/{id}/review-submissions:
+    post:
+      tags: [Review Submissions]
+      summary: 提交审核
+      operationId: createReviewSubmission
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewSubmissionRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSubmission'
+        '409':
+          description: 已存在待审核记录
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/projects/{id}/change-orders:
+    post:
+      tags: [Change Orders]
+      summary: 创建设计变更单
+      operationId: createChangeOrder
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeOrderRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/projects/{id}/site-visas:
+    post:
+      tags: [Site Visas]
+      summary: 创建现场签证单
+      operationId: createSiteVisa
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SiteVisaRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/projects/{id}/progress-payments:
+    post:
+      tags: [Progress Payments]
+      summary: 创建进度款申报
+      operationId: createProgressPayment
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressPaymentRequest'
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v1/engine/calculate:
+    post:
+      tags: [Engine]
+      summary: 计算单个清单项价格
+      operationId: calculateBillItem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EngineCalculateRequest'
+      responses:
+        '200':
+          description: 计算成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EngineCalculateResponse'
+        '422':
+          description: 计算输入不完整
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/reports/summary:
+    get:
+      tags: [Reports]
+      summary: 获取汇总数据
+      operationId: getSummary
+      parameters:
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: stageCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: disciplineCode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: unitCode
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+  /api/v1/reports/export:
+    post:
+      tags: [Reports]
+      summary: 发起报表导出任务
+      operationId: exportReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [projectId, reportType, exportFormat]
+              properties:
+                projectId:
+                  type: string
+                  format: uuid
+                reportType:
+                  type: string
+                exportFormat:
+                  type: string
+                  enum: [xlsx, pdf, xml]
+                stageCode:
+                  type: string
+      responses:
+        '202':
+          description: 已创建导出任务
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncTaskResponse'

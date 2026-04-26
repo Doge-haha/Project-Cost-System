@@ -223,6 +223,11 @@ export class BillVersionService {
       versionId: version.id,
       versionStatus: "submitted",
     });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      status: "submitted",
+    });
 
     await this.auditLogService.writeAuditLog({
       projectId: updated.projectId,
@@ -277,6 +282,11 @@ export class BillVersionService {
     const updated = await this.billVersionRepository.updateStatus({
       versionId: version.id,
       versionStatus: "editable",
+    });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      status: "active",
     });
 
     await this.auditLogService.writeAuditLog({

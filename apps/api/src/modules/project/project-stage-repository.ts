@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { projectStages } from "../../infrastructure/database/schema.js";
@@ -16,6 +16,11 @@ export type ProjectStageRecord = {
 
 export interface ProjectStageRepository {
   listByProjectId(projectId: string): Promise<ProjectStageRecord[]>;
+  updateStatus(input: {
+    projectId: string;
+    stageCode: string;
+    status: ProjectStageRecord["status"];
+  }): Promise<ProjectStageRecord>;
   replaceByProjectId(
     projectId: string,
     stages: Array<Omit<ProjectStageRecord, "id" | "projectId"> & { id?: string }>,
@@ -23,12 +28,33 @@ export interface ProjectStageRepository {
 }
 
 export class InMemoryProjectStageRepository implements ProjectStageRepository {
-  constructor(private readonly stages: ProjectStageRecord[]) {}
+  private readonly stages: ProjectStageRecord[];
+
+  constructor(seed: ProjectStageRecord[]) {
+    this.stages = seed.map((stage) => ({ ...stage }));
+  }
 
   async listByProjectId(projectId: string): Promise<ProjectStageRecord[]> {
     return this.stages
       .filter((stage) => stage.projectId === projectId)
       .sort((left, right) => left.sequenceNo - right.sequenceNo);
+  }
+
+  async updateStatus(input: {
+    projectId: string;
+    stageCode: string;
+    status: ProjectStageRecord["status"];
+  }): Promise<ProjectStageRecord> {
+    const target = this.stages.find(
+      (stage) =>
+        stage.projectId === input.projectId && stage.stageCode === input.stageCode,
+    );
+    if (!target) {
+      throw new Error("Project stage not found");
+    }
+
+    target.status = input.status;
+    return { ...target };
   }
 
   async replaceByProjectId(
@@ -71,6 +97,36 @@ export class DbProjectStageRepository implements ProjectStageRepository {
       status: record.status as ProjectStageRecord["status"],
       sequenceNo: record.sequenceNo,
     }));
+  }
+
+  async updateStatus(input: {
+    projectId: string;
+    stageCode: string;
+    status: ProjectStageRecord["status"];
+  }): Promise<ProjectStageRecord> {
+    const [updated] = await this.db
+      .update(projectStages)
+      .set({ status: input.status })
+      .where(
+        and(
+          eq(projectStages.projectId, input.projectId),
+          eq(projectStages.stageCode, input.stageCode),
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      throw new Error("Project stage not found");
+    }
+
+    return {
+      id: updated.id,
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      stageName: updated.stageName,
+      status: updated.status as ProjectStageRecord["status"],
+      sequenceNo: updated.sequenceNo,
+    };
   }
 
   async replaceByProjectId(

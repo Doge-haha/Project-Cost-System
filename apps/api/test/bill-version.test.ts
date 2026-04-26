@@ -369,6 +369,17 @@ test("POST /v1/projects/:id/bill-versions/:versionId/submit submits a valid vers
     sourceVersionId: null,
   });
 
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "submitted");
+
   await app.close();
 });
 
@@ -447,6 +458,17 @@ test("POST /v1/projects/:id/bill-versions/:versionId/withdraw restores a submitt
     versionStatus: "editable",
     sourceVersionId: null,
   });
+
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "active");
 
   await app.close();
 });

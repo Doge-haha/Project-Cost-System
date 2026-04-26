@@ -241,6 +241,11 @@ export class ReviewSubmissionService {
       reviewComment: null,
       rejectionReason: null,
     });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      status: "submitted",
+    });
 
     await this.auditLogService.writeAuditLog({
       projectId: input.projectId,
@@ -284,6 +289,11 @@ export class ReviewSubmissionService {
     await this.dependencies.billVersionRepository.updateStatus({
       versionId: submission.billVersionId,
       versionStatus: "locked",
+    });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: input.projectId,
+      stageCode: submission.stageCode,
+      status: "locked",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -335,6 +345,11 @@ export class ReviewSubmissionService {
     await this.dependencies.billVersionRepository.updateStatus({
       versionId: submission.billVersionId,
       versionStatus: "editable",
+    });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: input.projectId,
+      stageCode: submission.stageCode,
+      status: "active",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -399,6 +414,11 @@ export class ReviewSubmissionService {
     await this.dependencies.billVersionRepository.updateStatus({
       versionId: submission.billVersionId,
       versionStatus: "editable",
+    });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: input.projectId,
+      stageCode: submission.stageCode,
+      status: "active",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({

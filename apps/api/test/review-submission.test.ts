@@ -380,6 +380,17 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the rev
   assert.equal(versionsResponse.statusCode, 200);
   assert.equal(versionsResponse.json().items[0].versionStatus, "locked");
 
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "locked");
+
   const auditResponse = await app.inject({
     method: "GET",
     url: "/v1/projects/project-001/audit-logs?resourceType=review_submission&action=approve",
@@ -449,6 +460,17 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/reject rejects the revie
 
   assert.equal(versionsResponse.statusCode, 200);
   assert.equal(versionsResponse.json().items[0].versionStatus, "editable");
+
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "active");
 
   const auditResponse = await app.inject({
     method: "GET",
@@ -549,6 +571,17 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/cancel allows submitter 
 
   assert.equal(versionsResponse.statusCode, 200);
   assert.equal(versionsResponse.json().items[0].versionStatus, "editable");
+
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "active");
 
   const listResponse = await app.inject({
     method: "GET",

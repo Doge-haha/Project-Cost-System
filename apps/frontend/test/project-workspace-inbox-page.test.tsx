@@ -981,7 +981,9 @@ describe("ProjectWorkspaceInboxPage", () => {
       "href",
       "/projects/project-001/reviews?reviewId=review-002&action=approve",
     );
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalled();
+    });
   });
 
   test("shows recent failure-subset entries from task-status collaboration memory", async () => {

@@ -353,6 +353,76 @@ test("GET /v1/projects/:id/process-documents sorts submitted documents before dr
   await app.close();
 });
 
+test("PUT /v1/projects/:id/process-documents/:documentId/status rejects duplicate submitted process documents for the same reference", async () => {
+  const app = createProcessDocumentApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const firstDraft = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/process-documents",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      stageCode: "estimate",
+      disciplineCode: "building",
+      documentType: "change_order",
+      title: "设计变更单 001",
+      referenceNo: "CO-DUP",
+      amount: 120000,
+    },
+  });
+  const secondDraft = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/process-documents",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      stageCode: "estimate",
+      disciplineCode: "building",
+      documentType: "change_order",
+      title: "设计变更单 001 修订",
+      referenceNo: "CO-DUP",
+      amount: 130000,
+    },
+  });
+
+  const firstSubmit = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${firstDraft.json().id}/status`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      status: "submitted",
+    },
+  });
+  const duplicateSubmit = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${secondDraft.json().id}/status`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      status: "submitted",
+    },
+  });
+
+  assert.equal(firstSubmit.statusCode, 200);
+  assert.equal(duplicateSubmit.statusCode, 422);
+  assert.equal(duplicateSubmit.json().error.code, "VALIDATION_ERROR");
+
+  await app.close();
+});
+
 test("PUT /v1/projects/:id/process-documents/:documentId updates a draft process document", async () => {
   const app = createProcessDocumentApp();
   const token = await signAccessToken(

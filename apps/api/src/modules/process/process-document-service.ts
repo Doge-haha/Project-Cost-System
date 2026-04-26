@@ -304,6 +304,24 @@ export class ProcessDocumentService {
           "You do not have permission to edit this resource",
         );
       }
+      const existingSubmittedDocuments =
+        await this.processDocumentRepository.listByProjectId(input.projectId);
+      const duplicateSubmittedDocument = existingSubmittedDocuments.find(
+        (candidate) =>
+          candidate.id !== document.id &&
+          candidate.status === "submitted" &&
+          candidate.stageCode === document.stageCode &&
+          candidate.disciplineCode === document.disciplineCode &&
+          candidate.documentType === document.documentType &&
+          candidate.referenceNo === document.referenceNo,
+      );
+      if (duplicateSubmittedDocument) {
+        throw new AppError(
+          422,
+          "VALIDATION_ERROR",
+          "A submitted process document already exists for this reference",
+        );
+      }
     } else {
       if (document.status !== "submitted") {
         throw new AppError(

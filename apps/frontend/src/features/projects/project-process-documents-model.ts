@@ -1,7 +1,18 @@
 import type { ProcessDocument } from "../../lib/types";
 
-export type ProcessDocumentFilter = "all" | "draft" | "submitted" | "rejected" | "actionable";
-export type ProcessDocumentSummaryFocus = "draft" | "submitted" | "rejected" | null;
+export type ProcessDocumentFilter =
+  | "all"
+  | "draft"
+  | "submitted"
+  | "rejected"
+  | "settled"
+  | "actionable";
+export type ProcessDocumentSummaryFocus =
+  | "draft"
+  | "submitted"
+  | "rejected"
+  | "settled"
+  | null;
 
 export type CompletedProcessDocumentState = {
   documentId: string;
@@ -98,8 +109,10 @@ export function appendProcessDocumentBatchSummary(
               ? "已通过"
               : document.status === "rejected"
                 ? "已驳回"
-                : document.status === "draft"
-                  ? "已回退草稿"
+              : document.status === "draft"
+                ? "已回退草稿"
+                : document.status === "settled"
+                  ? "已结算"
                   : "已提交"
           }`,
       )
@@ -116,6 +129,7 @@ export function normalizeProcessDocumentFilter(
     value === "draft" ||
     value === "submitted" ||
     value === "rejected" ||
+    value === "settled" ||
     value === "actionable"
   ) {
     return value;
@@ -126,7 +140,12 @@ export function normalizeProcessDocumentFilter(
 export function normalizeProcessDocumentSummaryFocus(
   value: string | null,
 ): ProcessDocumentSummaryFocus {
-  if (value === "draft" || value === "submitted" || value === "rejected") {
+  if (
+    value === "draft" ||
+    value === "submitted" ||
+    value === "rejected" ||
+    value === "settled"
+  ) {
     return value;
   }
   return null;

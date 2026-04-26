@@ -87,6 +87,9 @@ export function ProjectProcessDocumentsPage() {
     if (activeFilter === "rejected") {
       return documents.filter((document) => document.status === "rejected");
     }
+    if (activeFilter === "settled") {
+      return documents.filter((document) => document.status === "settled");
+    }
     if (activeFilter === "actionable") {
       return documents.filter(
         (document) =>
@@ -121,6 +124,10 @@ export function ProjectProcessDocumentsPage() {
     }
 
     if (summaryFocus === "rejected") {
+      return filteredDocuments[0]?.id ?? null;
+    }
+
+    if (summaryFocus === "settled") {
       return filteredDocuments[0]?.id ?? null;
     }
 
@@ -427,7 +434,9 @@ export function ProjectProcessDocumentsPage() {
             共 {state.processDocuments.length} 条，待提交{" "}
             {state.processDocuments.filter((document) => document.status === "draft").length} 条，
             待审核{" "}
-            {state.processDocuments.filter((document) => document.status === "submitted").length} 条
+            {state.processDocuments.filter((document) => document.status === "submitted").length} 条，
+            已结算{" "}
+            {state.processDocuments.filter((document) => document.status === "settled").length} 条
           </p>
           <div className="version-card-actions">
             <button
@@ -483,6 +492,16 @@ export function ProjectProcessDocumentsPage() {
             >
               已退回{" "}
               {state.processDocuments.filter((document) => document.status === "rejected").length}
+            </button>
+            <button
+              className="connection-button secondary"
+              onClick={() => {
+                applyFilter("settled");
+              }}
+              type="button"
+            >
+              已结算{" "}
+              {state.processDocuments.filter((document) => document.status === "settled").length}
             </button>
           </div>
           {activeFilter !== "all" ? (

@@ -30,8 +30,10 @@ const processDocuments = [
 describe("process document model helpers", () => {
   test("normalizes process document filters and summary focus values", () => {
     expect(normalizeProcessDocumentFilter("draft")).toBe("draft");
+    expect(normalizeProcessDocumentFilter("settled")).toBe("settled");
     expect(normalizeProcessDocumentFilter("unknown")).toBe("all");
     expect(normalizeProcessDocumentSummaryFocus("submitted")).toBe("submitted");
+    expect(normalizeProcessDocumentSummaryFocus("settled")).toBe("settled");
     expect(normalizeProcessDocumentSummaryFocus("other")).toBeNull();
   });
 
@@ -77,6 +79,24 @@ describe("process document model helpers", () => {
         },
       ]),
     ).toContain("batchCount=2");
+    expect(
+      appendProcessDocumentBatchSummary(query, [
+        {
+          documentId: "document-003",
+          title: "进度款 C",
+          status: "settled",
+          detail: "",
+        },
+        {
+          documentId: "document-004",
+          title: "现场签证 D",
+          status: "submitted",
+          detail: "",
+        },
+      ]),
+    ).toContain(
+      "batchSummary=%E8%BF%9B%E5%BA%A6%E6%AC%BE+C%E5%B7%B2%E7%BB%93%E7%AE%97",
+    );
   });
 
   test("picks the next actionable process document after one is completed", () => {

@@ -131,6 +131,6 @@ export const decideReviewToolSchema = z
 export const updateProcessDocumentStatusToolSchema = z.object({
   projectId: z.string().min(1),
   documentId: z.string().min(1),
-  status: z.enum(["submitted", "approved", "rejected"]),
+  status: z.enum(["draft", "submitted", "approved", "rejected"]),
   comment: z.string().min(1).optional(),
 });

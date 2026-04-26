@@ -11,7 +11,7 @@ export type CompletedProcessDocumentState = {
 };
 
 export type ProcessDocumentActionState = {
-  mode: "submit" | "approve" | "reject";
+  mode: "submit" | "approve" | "reject" | "reopen";
   documentId: string;
 };
 
@@ -55,6 +55,9 @@ export function buildProcessDocumentStatusHint(document: ProcessDocumentStatusHi
   if (document.status === "approved") {
     return "单据已通过，可回到工作台继续跟进后续联动。";
   }
+  if (document.isEditable) {
+    return "单据已退回，当前角色可回退草稿补充后重新提交。";
+  }
   return "单据已退回，建议先根据备注补充后再重新提交。";
 }
 
@@ -87,7 +90,15 @@ export function appendProcessDocumentBatchSummary(
     completedDocuments
       .map(
         (document) =>
-          `${document.title}${document.status === "approved" ? "已通过" : document.status === "rejected" ? "已驳回" : "已提交"}`,
+          `${document.title}${
+            document.status === "approved"
+              ? "已通过"
+              : document.status === "rejected"
+                ? "已驳回"
+                : document.status === "draft"
+                  ? "已回退草稿"
+                  : "已提交"
+          }`,
       )
       .join("、"),
   );
@@ -126,6 +137,7 @@ export function buildNextProcessDocumentActionState(
     (document) =>
       document.id !== excludeDocumentId &&
       ((document.isEditable && document.status === "draft") ||
+        (document.isEditable && document.status === "rejected") ||
         (document.isReviewable && document.status === "submitted")),
   );
 
@@ -138,7 +150,9 @@ export function buildNextProcessDocumentActionState(
     mode:
       nextDocument.isEditable && nextDocument.status === "draft"
         ? ("submit" as const)
-        : ("approve" as const),
+        : nextDocument.isEditable && nextDocument.status === "rejected"
+          ? ("reopen" as const)
+          : ("approve" as const),
     comment: nextDocument.lastComment ?? "",
   };
 }

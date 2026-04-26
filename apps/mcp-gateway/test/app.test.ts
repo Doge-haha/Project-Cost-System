@@ -254,7 +254,7 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         name: "update-process-document-status",
         uri: "/v1/tools/update-process-document-status",
         mode: "invoke",
-        description: "Submit, approve, or reject a process document",
+        description: "Submit, approve, reject, or reopen a process document as draft",
         parameters: ["projectId", "documentId", "status", "comment?"],
       },
     ],
@@ -1487,6 +1487,56 @@ test("POST /v1/tools/update-process-document-status proxies document workflow st
       documentId: "process-document-001",
       status: "approved",
       comment: "通过",
+    },
+  ]);
+
+  await app.close();
+});
+
+test("POST /v1/tools/update-process-document-status proxies process document draft reopen", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      updateProcessDocumentStatus: async (input, bearerToken) => {
+        requests.push({ token: bearerToken, ...input });
+        return {
+          id: input.documentId,
+          status: "draft",
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/tools/update-process-document-status",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      documentId: "process-document-001",
+      status: "draft",
+      comment: "退回草稿补充材料",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().target.status, "draft");
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      documentId: "process-document-001",
+      status: "draft",
+      comment: "退回草稿补充材料",
     },
   ]);
 

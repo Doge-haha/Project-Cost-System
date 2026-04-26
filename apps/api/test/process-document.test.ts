@@ -811,3 +811,102 @@ test("PUT /v1/projects/:id/process-documents/:documentId/status rejects self-rev
 
   await app.close();
 });
+
+test("PUT /v1/projects/:id/process-documents/:documentId/status allows submitter to reopen rejected process documents as draft", async () => {
+  const app = createProcessDocumentApp();
+  const engineerToken = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+  const reviewerToken = await signAccessToken(
+    {
+      sub: "reviewer-001",
+      roleCodes: ["reviewer"],
+      displayName: "Reviewer",
+    },
+    jwtSecret,
+  );
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/process-documents",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      stageCode: "estimate",
+      disciplineCode: "building",
+      documentType: "change_order",
+      title: "设计变更单 003",
+      referenceNo: "CO-003",
+      amount: 76000,
+    },
+  });
+  const documentId = createResponse.json().id;
+
+  await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      status: "submitted",
+    },
+  });
+  await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+    payload: {
+      status: "rejected",
+      comment: "金额依据不足",
+    },
+  });
+  const rejectedListResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/process-documents?status=rejected",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+
+  const reopenResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      status: "draft",
+      comment: "补充依据后重提",
+    },
+  });
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      title: "设计变更单 003 修订",
+      referenceNo: "CO-003",
+      amount: 78000,
+    },
+  });
+
+  assert.equal(rejectedListResponse.statusCode, 200);
+  assert.equal(rejectedListResponse.json().items[0].isEditable, true);
+  assert.equal(reopenResponse.statusCode, 200);
+  assert.equal(reopenResponse.json().status, "draft");
+  assert.equal(updateResponse.statusCode, 200);
+  assert.equal(updateResponse.json().title, "设计变更单 003 修订");
+
+  await app.close();
+});

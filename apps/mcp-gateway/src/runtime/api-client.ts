@@ -98,7 +98,7 @@ export type DecideReviewInput = {
 export type UpdateProcessDocumentStatusInput = {
   projectId: string;
   documentId: string;
-  status: "submitted" | "approved" | "rejected";
+  status: "draft" | "submitted" | "approved" | "rejected";
   comment?: string;
 };
 

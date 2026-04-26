@@ -164,7 +164,7 @@ export const TOOL_DEFINITIONS = [
     name: "update-process-document-status",
     uri: "/v1/tools/update-process-document-status",
     mode: "invoke",
-    description: "Submit, approve, or reject a process document",
+    description: "Submit, approve, reject, or reopen a process document as draft",
     parameters: ["projectId", "documentId", "status", "comment?"],
   },
 ] as const;

@@ -79,4 +79,22 @@ describe("process document model helpers", () => {
       comment: "请补齐附件",
     });
   });
+
+  test("picks rejected editable process documents for draft reopening", () => {
+    expect(
+      buildNextProcessDocumentActionState([
+        {
+          id: "document-003",
+          status: "rejected",
+          isEditable: true,
+          isReviewable: false,
+          lastComment: "补充依据",
+        },
+      ]),
+    ).toEqual({
+      documentId: "document-003",
+      mode: "reopen",
+      comment: "补充依据",
+    });
+  });
 });

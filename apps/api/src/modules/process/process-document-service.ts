@@ -24,7 +24,7 @@ export const createProcessDocumentSchema = z.object({
 });
 
 export const updateProcessDocumentStatusSchema = z.object({
-  status: z.enum(["submitted", "approved", "rejected"]),
+  status: z.enum(["draft", "submitted", "approved", "rejected"]),
   comment: z.string().max(500).optional(),
 });
 
@@ -152,7 +152,7 @@ export class ProcessDocumentService {
         disciplineByCode.get(document.disciplineCode)?.disciplineName ??
         document.disciplineCode,
       isEditable:
-        document.status === "draft" &&
+        (document.status === "draft" || document.status === "rejected") &&
         authorizationService.canEditContext({
           projectId: input.projectId,
           stageCode: document.stageCode,
@@ -272,7 +272,7 @@ export class ProcessDocumentService {
   async updateProcessDocumentStatus(input: {
     projectId: string;
     documentId: string;
-    status: "submitted" | "approved" | "rejected";
+    status: "draft" | "submitted" | "approved" | "rejected";
     comment?: string;
     userId: string;
   }): Promise<ProcessDocumentRecord> {
@@ -282,7 +282,29 @@ export class ProcessDocumentService {
       input.projectId,
     );
 
-    if (input.status === "submitted") {
+    if (input.status === "draft") {
+      if (document.status !== "rejected") {
+        throw new AppError(
+          422,
+          "VALIDATION_ERROR",
+          "Only rejected process documents can be reopened as draft",
+        );
+      }
+      if (
+        !authorizationService.canEditContext({
+          projectId: input.projectId,
+          stageCode: document.stageCode,
+          disciplineCode: document.disciplineCode,
+          userId: input.userId,
+        })
+      ) {
+        throw new AppError(
+          403,
+          "FORBIDDEN",
+          "You do not have permission to edit this resource",
+        );
+      }
+    } else if (input.status === "submitted") {
       if (document.status !== "draft") {
         throw new AppError(
           422,

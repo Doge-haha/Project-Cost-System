@@ -244,19 +244,26 @@ export function ProjectProcessDocumentsPage() {
     }
 
     const preferredMode =
-      focusedAction === "submit" || focusedAction === "approve" || focusedAction === "reject"
+      focusedAction === "submit" ||
+      focusedAction === "approve" ||
+      focusedAction === "reject" ||
+      focusedAction === "reopen"
         ? focusedAction
         : null;
 
     const nextMode =
       preferredMode === "submit" && target.isEditable && target.status === "draft"
         ? "submit"
+        : preferredMode === "reopen" && target.isEditable && target.status === "rejected"
+          ? "reopen"
         : preferredMode === "approve" && target.isReviewable && target.status === "submitted"
           ? "approve"
           : preferredMode === "reject" && target.isReviewable && target.status === "submitted"
             ? "reject"
             : target.isEditable && target.status === "draft"
               ? "submit"
+              : target.isEditable && target.status === "rejected"
+                ? "reopen"
               : target.isReviewable && target.status === "submitted"
                 ? "approve"
                 : null;
@@ -287,7 +294,9 @@ export function ProjectProcessDocumentsPage() {
           ? "submitted"
           : actionState.mode === "approve"
             ? "approved"
-            : "rejected";
+            : actionState.mode === "reopen"
+              ? "draft"
+              : "rejected";
 
       await apiClient.updateProcessDocumentStatus(
         projectId,
@@ -549,6 +558,20 @@ export function ProjectProcessDocumentsPage() {
                         type="button"
                       >
                         驳回
+                      </button>
+                    ) : null}
+                    {document.isEditable && document.status === "rejected" ? (
+                      <button
+                        className="connection-button primary"
+                        onClick={() => {
+                          openDocumentAction(
+                            { mode: "reopen", documentId: document.id },
+                            document.lastComment ?? "",
+                          );
+                        }}
+                        type="button"
+                      >
+                        回退草稿
                       </button>
                     ) : null}
                   </div>

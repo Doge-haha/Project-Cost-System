@@ -451,6 +451,30 @@ select {
   margin-top: 14px;
 }
 
+.summary-actions,
+.compare-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.summary-actions .connection-button.secondary,
+.version-card-actions .connection-button.secondary {
+  background: rgba(24, 92, 71, 0.1);
+  color: var(--accent);
+}
+
+.summary-actions .connection-button:disabled,
+.version-card-actions .connection-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.export-task-list {
+  margin-top: 16px;
+}
+
 .bill-table-shell {
   overflow-x: auto;
 }

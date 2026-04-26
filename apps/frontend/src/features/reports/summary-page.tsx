@@ -5,6 +5,7 @@ import { apiClient, ApiError } from "../../lib/api";
 import type {
   BillVersion,
   ProjectListItem,
+  ReportExportTask,
   SummaryDetailItem,
   SummaryResponse,
   VersionCompareResponse,
@@ -39,6 +40,23 @@ function formatMoney(value: number | string | null | undefined) {
   }).format(normalized);
 }
 
+function formatExportStatus(status: ReportExportTask["status"]) {
+  if (status === "completed") {
+    return "已完成";
+  }
+  if (status === "failed") {
+    return "失败";
+  }
+  if (status === "processing") {
+    return "处理中";
+  }
+  return "排队中";
+}
+
+function formatReportType(reportType: ReportExportTask["reportType"]) {
+  return reportType === "variance" ? "偏差明细" : "汇总";
+}
+
 export function SummaryPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -56,6 +74,14 @@ export function SummaryPage() {
   const [versionCompare, setVersionCompare] = useState<VersionCompareResponse | null>(
     null,
   );
+  const [exportTask, setExportTask] = useState<ReportExportTask | null>(null);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportingReportType, setExportingReportType] = useState<
+    ReportExportTask["reportType"] | null
+  >(null);
+  const [refreshingExportTask, setRefreshingExportTask] = useState(false);
+  const [downloadingExportTask, setDownloadingExportTask] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -116,6 +142,74 @@ export function SummaryPage() {
   useEffect(() => {
     void loadSummary();
   }, [projectId, billVersionId, compareBaseBillVersionId, compareTargetBillVersionId]);
+
+  async function createExportTask(reportType: ReportExportTask["reportType"]) {
+    if (!projectId) {
+      return;
+    }
+    setExportingReportType(reportType);
+    setExportMessage(null);
+    try {
+      const response = await apiClient.createReportExportTask({
+        projectId,
+        reportType,
+        stageCode: selectedVersion?.stageCode,
+        disciplineCode: selectedVersion?.disciplineCode,
+      });
+      setExportTask(response.result);
+      setExportJobId(response.job.id);
+      setExportMessage(`已创建${formatReportType(reportType)}导出任务。`);
+    } catch (createError) {
+      setExportMessage(
+        createError instanceof ApiError
+          ? createError.message
+          : "创建导出任务失败。",
+      );
+    } finally {
+      setExportingReportType(null);
+    }
+  }
+
+  async function refreshExportTask() {
+    if (!exportTask) {
+      return;
+    }
+    setRefreshingExportTask(true);
+    setExportMessage(null);
+    try {
+      const refreshed = await apiClient.getReportExportTask(exportTask.id);
+      setExportTask(refreshed);
+      setExportMessage(`导出任务状态：${formatExportStatus(refreshed.status)}。`);
+    } catch (refreshError) {
+      setExportMessage(
+        refreshError instanceof ApiError
+          ? refreshError.message
+          : "刷新导出任务失败。",
+      );
+    } finally {
+      setRefreshingExportTask(false);
+    }
+  }
+
+  async function downloadExportTask() {
+    if (!exportTask) {
+      return;
+    }
+    setDownloadingExportTask(true);
+    setExportMessage(null);
+    try {
+      await apiClient.downloadReportExportTask(exportTask.id);
+      setExportMessage("导出文件已开始下载。");
+    } catch (downloadError) {
+      setExportMessage(
+        downloadError instanceof ApiError
+          ? downloadError.message
+          : "下载导出文件失败。",
+      );
+    } finally {
+      setDownloadingExportTask(false);
+    }
+  }
 
   if (loading) {
     return <LoadingState title="正在加载汇总页" />;
@@ -345,6 +439,84 @@ export function SummaryPage() {
           )}
         </section>
       ) : null}
+
+      <section className={exportTask ? "panel panel-focus" : "panel"}>
+        <div className="page-header">
+          <div>
+            <h3>报表导出</h3>
+            <p className="page-description">
+              按当前项目与版本上下文创建异步导出任务。
+            </p>
+          </div>
+          <div className="summary-actions">
+            <button
+              className="connection-button primary"
+              disabled={exportingReportType !== null}
+              onClick={() => {
+                void createExportTask("summary");
+              }}
+              type="button"
+            >
+              {exportingReportType === "summary" ? "创建中" : "导出汇总"}
+            </button>
+            <button
+              className="connection-button secondary"
+              disabled={exportingReportType !== null}
+              onClick={() => {
+                void createExportTask("variance");
+              }}
+              type="button"
+            >
+              {exportingReportType === "variance" ? "创建中" : "导出偏差"}
+            </button>
+          </div>
+        </div>
+        {exportTask ? (
+          <div className="bill-list export-task-list">
+            <article className="bill-link">
+              <h3>
+                {formatReportType(exportTask.reportType)}导出 · {formatExportStatus(exportTask.status)}
+              </h3>
+              <div className="bill-meta">
+                <span>任务 {exportTask.id}</span>
+                {exportJobId ? <span>后台任务 {exportJobId}</span> : null}
+                {exportTask.downloadFileName ? (
+                  <span>文件 {exportTask.downloadFileName}</span>
+                ) : null}
+                {exportTask.downloadContentLength ? (
+                  <span>{exportTask.downloadContentLength} bytes</span>
+                ) : null}
+              </div>
+              {exportTask.failureMessage ? (
+                <p className="page-description">{exportTask.failureMessage}</p>
+              ) : null}
+              <div className="version-card-actions">
+                <button
+                  className="connection-button secondary"
+                  disabled={refreshingExportTask}
+                  onClick={() => {
+                    void refreshExportTask();
+                  }}
+                  type="button"
+                >
+                  {refreshingExportTask ? "刷新中" : "刷新状态"}
+                </button>
+                <button
+                  className="connection-button primary"
+                  disabled={!exportTask.isDownloadReady || downloadingExportTask}
+                  onClick={() => {
+                    void downloadExportTask();
+                  }}
+                  type="button"
+                >
+                  {downloadingExportTask ? "下载中" : "下载文件"}
+                </button>
+              </div>
+            </article>
+          </div>
+        ) : null}
+        {exportMessage ? <p className="page-description">{exportMessage}</p> : null}
+      </section>
 
       <section className="summary-grid">
         <article className="stat-card">

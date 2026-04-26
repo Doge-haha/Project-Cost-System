@@ -4,6 +4,7 @@ import type {
   BackgroundJobListResponse,
   BillItem,
   BillVersion,
+  CreateReportExportResponse,
   ImportTaskListResponse,
   ProcessDocumentListResponse,
   ProjectDiscipline,
@@ -11,6 +12,7 @@ import type {
   ProjectMember,
   ProjectStage,
   ProjectWorkspace,
+  ReportExportTask,
   ReviewSubmissionListResponse,
   SummaryDetailItem,
   SummaryResponse,
@@ -396,5 +398,23 @@ export const apiClient = {
       baseBillVersionId,
       targetBillVersionId,
     });
+  },
+  createReportExportTask(input: {
+    projectId: string;
+    reportType: "summary" | "variance";
+    stageCode?: string;
+    disciplineCode?: string;
+  }) {
+    return request<CreateReportExportResponse>("/v1/reports/export", undefined, {
+      method: "POST",
+      body: input,
+    });
+  },
+  getReportExportTask(taskId: string) {
+    return request<ReportExportTask>(`/v1/reports/export/${taskId}`);
+  },
+  async downloadReportExportTask(taskId: string) {
+    const download = await requestBlob(`/v1/reports/export/${taskId}/download`);
+    triggerBlobDownload(download);
   },
 };

@@ -279,3 +279,32 @@ export type VersionCompareResponse = {
   itemCount: number;
   items: VersionCompareItem[];
 };
+
+export type ReportExportTask = {
+  id: string;
+  projectId: string;
+  reportType: "summary" | "variance";
+  status: "queued" | "processing" | "completed" | "failed";
+  requestedBy: string;
+  stageCode?: string | null;
+  disciplineCode?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+  errorMessage?: string | null;
+  downloadFileName?: string | null;
+  downloadContentType?: string | null;
+  downloadContentLength?: number | null;
+  isDownloadReady?: boolean;
+  isTerminal?: boolean;
+  hasFailed?: boolean;
+  failureMessage?: string | null;
+};
+
+export type CreateReportExportResponse = {
+  job: {
+    id: string;
+    jobType: "report_export";
+    status: "queued" | "processing" | "completed" | "failed";
+  };
+  result: ReportExportTask;
+};

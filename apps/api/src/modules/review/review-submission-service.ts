@@ -288,12 +288,12 @@ export class ReviewSubmissionService {
 
     await this.dependencies.billVersionRepository.updateStatus({
       versionId: submission.billVersionId,
-      versionStatus: "locked",
+      versionStatus: "approved",
     });
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: input.projectId,
       stageCode: submission.stageCode,
-      status: "locked",
+      status: "approved",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({

@@ -12,7 +12,7 @@ export type BillVersionRecord = {
   disciplineCode: string;
   versionNo: number;
   versionName: string;
-  versionStatus: "editable" | "submitted" | "locked";
+  versionStatus: "editable" | "submitted" | "approved" | "locked" | "rejected";
   sourceVersionId: string | null;
 };
 

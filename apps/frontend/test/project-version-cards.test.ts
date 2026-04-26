@@ -29,6 +29,7 @@ describe("project version cards", () => {
   test("formatBillVersionStatus returns user-facing labels", () => {
     expect(formatBillVersionStatus("editable")).toBe("可编辑");
     expect(formatBillVersionStatus("submitted")).toBe("已提交");
+    expect(formatBillVersionStatus("approved")).toBe("已通过");
     expect(formatBillVersionStatus("locked")).toBe("已锁定");
     expect(formatBillVersionStatus("draft")).toBe("draft");
   });

@@ -133,7 +133,7 @@ describe("ProjectReviewsPage", () => {
               billVersionSummary: {
                 versionName: "估算版 V1",
                 versionNo: 1,
-                versionStatus: reviewStatus === "approved" ? "locked" : "submitted",
+                versionStatus: reviewStatus === "approved" ? "approved" : "submitted",
               },
               canApprove: reviewStatus === "pending",
               canReject: reviewStatus === "pending",
@@ -912,7 +912,7 @@ describe("ProjectReviewsPage", () => {
             billVersionSummary: {
               versionName: review.versionName,
               versionNo: index + 1,
-              versionStatus: review.status === "approved" ? "locked" : "submitted",
+              versionStatus: review.status === "approved" ? "approved" : "submitted",
             },
             canApprove: review.canApprove,
             canReject: review.canReject,

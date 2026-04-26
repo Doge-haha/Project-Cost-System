@@ -16,7 +16,7 @@ const updateProjectPricingDefaultsSchema = z.object({
 const projectStageSetupSchema = z.object({
   stageCode: z.string().min(1),
   stageName: z.string().min(1),
-  status: z.enum(["draft", "active", "submitted", "locked"]).default("draft"),
+  status: z.enum(["draft", "active", "submitted", "approved", "locked"]).default("draft"),
   sequenceNo: z.coerce.number().int().positive(),
 });
 

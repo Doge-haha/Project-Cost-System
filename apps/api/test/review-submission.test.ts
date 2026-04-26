@@ -326,7 +326,7 @@ test("GET /v1/projects/:id/reviews sorts pending reviews before completed ones a
   await app.close();
 });
 
-test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the review and locks the bill version", async () => {
+test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the review and marks the bill version approved", async () => {
   const app = createReviewApp();
   const engineerToken = await signAccessToken(
     {
@@ -378,7 +378,7 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the rev
   });
 
   assert.equal(versionsResponse.statusCode, 200);
-  assert.equal(versionsResponse.json().items[0].versionStatus, "locked");
+  assert.equal(versionsResponse.json().items[0].versionStatus, "approved");
 
   const stagesResponse = await app.inject({
     method: "GET",
@@ -389,7 +389,7 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the rev
   });
 
   assert.equal(stagesResponse.statusCode, 200);
-  assert.equal(stagesResponse.json().items[0].status, "locked");
+  assert.equal(stagesResponse.json().items[0].status, "approved");
 
   const auditResponse = await app.inject({
     method: "GET",

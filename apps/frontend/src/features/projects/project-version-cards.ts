@@ -7,6 +7,9 @@ export function formatBillVersionStatus(status: string) {
   if (status === "submitted") {
     return "已提交";
   }
+  if (status === "approved") {
+    return "已通过";
+  }
   if (status === "locked") {
     return "已锁定";
   }

@@ -571,11 +571,26 @@ export class CalculateService {
       input.feeTemplateId,
     );
     const selectedRuleByType = new Map<string, (typeof rules)[number]>();
+    const allocationMode = feeTemplate.allocationMode;
+
+    if (allocationMode === "none") {
+      return 0;
+    }
+
+    if (allocationMode !== "proportional" && allocationMode !== "by_discipline") {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Unsupported fee allocation mode",
+      );
+    }
 
     for (const rule of rules) {
       const matchesDiscipline =
-        rule.disciplineCode === null ||
-        rule.disciplineCode === input.disciplineCode;
+        allocationMode === "by_discipline"
+          ? rule.disciplineCode === input.disciplineCode
+          : rule.disciplineCode === null ||
+            rule.disciplineCode === input.disciplineCode;
       if (!matchesDiscipline) {
         continue;
       }

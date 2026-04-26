@@ -546,6 +546,72 @@ test("POST /v1/engine/calculate prefers discipline-specific fee rules over gener
   await app.close();
 });
 
+test("POST /v1/engine/calculate applies by_discipline and none allocation modes", async () => {
+  const byDisciplineApp = createPricingApp({
+    feeTemplates: [
+      {
+        ...feeTemplates[0],
+        allocationMode: "by_discipline",
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const byDisciplineResponse = await byDisciplineApp.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+      priceVersionId: "price-version-001",
+      feeTemplateId: "fee-template-001",
+    },
+  });
+
+  assert.equal(byDisciplineResponse.statusCode, 200);
+  assert.equal(byDisciplineResponse.json().appliedFeeRate, 0.08);
+  assert.equal(byDisciplineResponse.json().finalAmount, 1166.4);
+
+  await byDisciplineApp.close();
+
+  const noAllocationApp = createPricingApp({
+    feeTemplates: [
+      {
+        ...feeTemplates[0],
+        allocationMode: "none",
+      },
+    ],
+  });
+
+  const noAllocationResponse = await noAllocationApp.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+      priceVersionId: "price-version-001",
+      feeTemplateId: "fee-template-001",
+    },
+  });
+
+  assert.equal(noAllocationResponse.statusCode, 200);
+  assert.equal(noAllocationResponse.json().appliedFeeRate, 0);
+  assert.equal(noAllocationResponse.json().finalAmount, 1080);
+
+  await noAllocationApp.close();
+});
+
 test("POST /v1/engine/calculate uses project default pricing config and bill item list reflects the persisted calculation result", async () => {
   const app = createPricingApp({
     projectDefaults: {

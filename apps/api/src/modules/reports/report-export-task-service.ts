@@ -44,7 +44,7 @@ export class ReportExportTaskService {
       throw new AppError(404, "PROJECT_NOT_FOUND", "Project not found");
     }
 
-    return this.reportExportTaskRepository.create({
+    const created = await this.reportExportTaskRepository.create({
       projectId: input.projectId,
       reportType: input.reportType,
       status: "queued",
@@ -60,6 +60,21 @@ export class ReportExportTaskService {
       downloadContentLength: null,
     });
 
+    await this.auditLogService.writeAuditLog({
+      projectId: created.projectId,
+      stageCode: created.stageCode ?? null,
+      resourceType: "report_export_task",
+      resourceId: created.id,
+      action: "created",
+      operatorId: input.userId,
+      afterPayload: {
+        reportType: created.reportType,
+        status: created.status,
+        disciplineCode: created.disciplineCode,
+      },
+    });
+
+    return created;
   }
 
   async processReportExportTask(input: {

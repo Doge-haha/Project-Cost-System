@@ -2335,6 +2335,23 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   assert.equal(auditResponse.json().items.length, 1);
   assert.equal(auditResponse.json().items[0].resourceId, taskId);
 
+  const createAuditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=report_export_task&action=created",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(createAuditResponse.statusCode, 200);
+  assert.equal(createAuditResponse.json().items.length, 1);
+  assert.equal(createAuditResponse.json().items[0].resourceId, taskId);
+  assert.equal(createAuditResponse.json().items[0].afterPayload.status, "queued");
+  assert.equal(
+    createAuditResponse.json().items[0].afterPayload.disciplineCode,
+    "building",
+  );
+
   const backgroundAuditResponse = await app.inject({
     method: "GET",
     url: "/v1/projects/project-001/audit-logs?resourceType=background_job&action=completed",

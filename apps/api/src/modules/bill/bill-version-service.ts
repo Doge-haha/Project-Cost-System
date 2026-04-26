@@ -27,6 +27,10 @@ export const createBillVersionSchema = billVersionContextSchema.extend({
   versionName: z.string().min(1),
 });
 
+export const unlockBillVersionSchema = z.object({
+  reason: z.string().min(1).max(500),
+});
+
 type AuthorizationDependencies = {
   projectRepository: ProjectRepository;
   projectStageRepository: ProjectStageRepository;
@@ -298,6 +302,85 @@ export class BillVersionService {
       operatorId: input.userId,
       beforePayload: { ...version },
       afterPayload: updated,
+    });
+
+    return updated;
+  }
+
+  async lockBillVersion(input: {
+    projectId: string;
+    billVersionId: string;
+    userId: string;
+  }): Promise<BillVersionRecord> {
+    const version = await this.getAuthorizedVersion(input, "edit");
+
+    if (version.versionStatus !== "approved") {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Only approved bill versions can be locked",
+      );
+    }
+
+    const updated = await this.billVersionRepository.updateStatus({
+      versionId: version.id,
+      versionStatus: "locked",
+    });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      status: "locked",
+    });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      resourceType: "bill_version",
+      resourceId: updated.id,
+      action: "lock",
+      operatorId: input.userId,
+      beforePayload: { ...version },
+      afterPayload: updated,
+    });
+
+    return updated;
+  }
+
+  async unlockBillVersion(input: {
+    projectId: string;
+    billVersionId: string;
+    reason: string;
+    userId: string;
+  }): Promise<BillVersionRecord> {
+    const version = await this.getAuthorizedVersion(input, "edit");
+
+    if (version.versionStatus !== "locked") {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Only locked bill versions can be unlocked",
+      );
+    }
+
+    const updated = await this.billVersionRepository.updateStatus({
+      versionId: version.id,
+      versionStatus: "editable",
+    });
+    await this.dependencies.projectStageRepository.updateStatus({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      status: "active",
+    });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      resourceType: "bill_version",
+      resourceId: updated.id,
+      action: "unlock",
+      operatorId: input.userId,
+      beforePayload: { ...version },
+      afterPayload: { ...updated, reason: input.reason },
     });
 
     return updated;

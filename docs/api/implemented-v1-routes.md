@@ -11,9 +11,9 @@
 
 摘要：
 
-- 路由总数：72
+- 路由总数：74
 - 分组总数：14
-- 方法分布：GET 32 / POST 27 / PUT 9 / DELETE 4
+- 方法分布：GET 32 / POST 29 / PUT 9 / DELETE 4
 - 源文件：apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
@@ -38,9 +38,11 @@
 - `GET /v1/projects/:projectId/bill-versions`
 - `POST /v1/projects/:projectId/bill-versions`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/copy-from`
+- `POST /v1/projects/:projectId/bill-versions/:billVersionId/lock`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/recalculate`
 - `GET /v1/projects/:projectId/bill-versions/:billVersionId/source-chain`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/submit`
+- `POST /v1/projects/:projectId/bill-versions/:billVersionId/unlock`
 - `GET /v1/projects/:projectId/bill-versions/:billVersionId/validation-summary`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/withdraw`
 

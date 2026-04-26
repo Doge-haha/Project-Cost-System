@@ -134,6 +134,26 @@ const billVersions: BillVersionRecord[] = [
     versionStatus: "editable",
     sourceVersionId: null,
   },
+  {
+    id: "bill-version-012",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    versionNo: 12,
+    versionName: "已通过版本",
+    versionStatus: "approved",
+    sourceVersionId: null,
+  },
+  {
+    id: "bill-version-013",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    versionNo: 13,
+    versionName: "已锁定版本",
+    versionStatus: "locked",
+    sourceVersionId: null,
+  },
 ];
 const billItems: BillItemRecord[] = [
   {
@@ -473,6 +493,103 @@ test("POST /v1/projects/:id/bill-versions/:versionId/withdraw restores a submitt
   await app.close();
 });
 
+test("POST /v1/projects/:id/bill-versions/:versionId/lock locks an approved version", async () => {
+  const app = createBillVersionApp();
+  const token = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-012/lock",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().versionStatus, "locked");
+
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "locked");
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=bill_version&resourceId=bill-version-012&action=lock",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-versions/:versionId/unlock reopens a locked version with a reason", async () => {
+  const app = createBillVersionApp();
+  const token = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-013/unlock",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      reason: "补充审计调整",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().versionStatus, "editable");
+
+  const stagesResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/stages",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(stagesResponse.statusCode, 200);
+  assert.equal(stagesResponse.json().items[0].status, "active");
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=bill_version&resourceId=bill-version-013&action=unlock",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items[0].afterPayload.reason, "补充审计调整");
+
+  await app.close();
+});
+
 test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and work items into a new version", async () => {
   const app = createBillVersionApp();
   const token = await signAccessToken(
@@ -494,11 +611,11 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
 
   assert.equal(createResponse.statusCode, 201);
   assert.deepEqual(createResponse.json(), {
-    id: "bill-version-004",
+    id: "bill-version-006",
     projectId: "project-001",
     stageCode: "estimate",
     disciplineCode: "building",
-    versionNo: 12,
+    versionNo: 14,
     versionName: "估算版 V1 - Copy",
     versionStatus: "editable",
     sourceVersionId: "bill-version-001",
@@ -506,7 +623,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
 
   const itemsResponse = await app.inject({
     method: "GET",
-    url: "/v1/projects/project-001/bill-versions/bill-version-004/items",
+    url: "/v1/projects/project-001/bill-versions/bill-version-006/items",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -517,7 +634,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
     items: [
       {
         id: "bill-item-005",
-        billVersionId: "bill-version-004",
+        billVersionId: "bill-version-006",
         parentId: null,
         itemCode: "A.1",
         itemName: "土石方工程",
@@ -527,7 +644,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
       },
         {
           id: "bill-item-006",
-          billVersionId: "bill-version-004",
+          billVersionId: "bill-version-006",
           parentId: "bill-item-005",
           itemCode: "A.1.1",
           itemName: "机械挖土方",
@@ -546,7 +663,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
 
   const workItemsResponse = await app.inject({
     method: "GET",
-    url: "/v1/projects/project-001/bill-versions/bill-version-004/items/bill-item-005/work-items",
+    url: "/v1/projects/project-001/bill-versions/bill-version-006/items/bill-item-005/work-items",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -658,11 +775,11 @@ test("POST /v1/projects/:id/bill-versions creates a new version for an authorize
 
   assert.equal(response.statusCode, 201);
   assert.deepEqual(response.json(), {
-    id: "bill-version-004",
+    id: "bill-version-006",
     projectId: "project-001",
     stageCode: "estimate",
     disciplineCode: "building",
-    versionNo: 12,
+    versionNo: 14,
     versionName: "估算版 V2",
     versionStatus: "editable",
     sourceVersionId: null,

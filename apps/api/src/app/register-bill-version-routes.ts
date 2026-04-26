@@ -4,6 +4,7 @@ import type { TransactionRunner } from "../shared/tx/transaction.js";
 import {
   billVersionContextSchema,
   createBillVersionSchema,
+  unlockBillVersionSchema,
   type BillVersionService,
 } from "../modules/bill/bill-version-service.js";
 
@@ -135,6 +136,44 @@ export function registerBillVersionRoutes(
         billVersionService.withdrawBillVersion({
           projectId,
           billVersionId,
+          userId: request.currentUser!.id,
+        }),
+      );
+    },
+  );
+
+  app.post(
+    "/v1/projects/:projectId/bill-versions/:billVersionId/lock",
+    async (request) => {
+      const { projectId, billVersionId } = request.params as {
+        projectId: string;
+        billVersionId: string;
+      };
+
+      return transactionRunner.runInTransaction(async () =>
+        billVersionService.lockBillVersion({
+          projectId,
+          billVersionId,
+          userId: request.currentUser!.id,
+        }),
+      );
+    },
+  );
+
+  app.post(
+    "/v1/projects/:projectId/bill-versions/:billVersionId/unlock",
+    async (request) => {
+      const { projectId, billVersionId } = request.params as {
+        projectId: string;
+        billVersionId: string;
+      };
+      const payload = unlockBillVersionSchema.parse(request.body);
+
+      return transactionRunner.runInTransaction(async () =>
+        billVersionService.unlockBillVersion({
+          projectId,
+          billVersionId,
+          reason: payload.reason,
           userId: request.currentUser!.id,
         }),
       );

@@ -16,14 +16,14 @@ export type ProcessDocumentActionState = {
 };
 
 type ProcessDocumentStatusHintInput = {
-  status: "draft" | "submitted" | "approved" | "rejected";
+  status: "draft" | "submitted" | "approved" | "rejected" | "settled";
   isEditable: boolean;
   isReviewable: boolean;
 };
 
 type ProcessDocumentActionCandidate = {
   id: string;
-  status: "draft" | "submitted" | "approved" | "rejected";
+  status: "draft" | "submitted" | "approved" | "rejected" | "settled";
   isEditable: boolean;
   isReviewable: boolean;
   lastComment?: string | null;
@@ -54,6 +54,9 @@ export function buildProcessDocumentStatusHint(document: ProcessDocumentStatusHi
   }
   if (document.status === "approved") {
     return "单据已通过，可回到工作台继续跟进后续联动。";
+  }
+  if (document.status === "settled") {
+    return "单据已计入结算，金额类字段已锁定。";
   }
   if (document.isEditable) {
     return "单据已退回，当前角色可回退草稿补充后重新提交。";

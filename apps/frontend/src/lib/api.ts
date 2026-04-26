@@ -267,7 +267,7 @@ export const apiClient = {
   updateProcessDocumentStatus(
     projectId: string,
     documentId: string,
-    status: "draft" | "submitted" | "approved" | "rejected",
+    status: "draft" | "submitted" | "approved" | "rejected" | "settled",
     comment?: string,
   ) {
     return request(

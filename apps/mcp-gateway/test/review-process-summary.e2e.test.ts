@@ -220,6 +220,7 @@ test("review and process-document summaries stay aligned over HTTP", async () =>
             submitted: 1,
             approved: 0,
             rejected: 0,
+            settled: 0,
           },
           documentTypeCounts: {
             change_order: 1,

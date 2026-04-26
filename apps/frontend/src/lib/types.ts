@@ -131,7 +131,7 @@ export type ProcessDocument = {
   stageCode: string;
   disciplineCode: string;
   documentType: "change_order" | "site_visa" | "progress_payment";
-  status: "draft" | "submitted" | "approved" | "rejected";
+  status: "draft" | "submitted" | "approved" | "rejected" | "settled";
   title: string;
   referenceNo: string;
   amount: number;

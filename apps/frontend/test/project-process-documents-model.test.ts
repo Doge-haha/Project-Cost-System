@@ -45,6 +45,13 @@ describe("process document model helpers", () => {
         isReviewable: true,
       }),
     ).toBe("已提交，当前角色可直接审核。");
+    expect(
+      buildProcessDocumentStatusHint({
+        status: "settled",
+        isEditable: false,
+        isReviewable: false,
+      }),
+    ).toBe("单据已计入结算，金额类字段已锁定。");
   });
 
   test("builds process document return query and batch summary", () => {

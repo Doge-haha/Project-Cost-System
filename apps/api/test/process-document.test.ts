@@ -630,6 +630,121 @@ test("PUT /v1/projects/:id/process-documents/:documentId/status allows reviewer 
   await app.close();
 });
 
+test("PUT /v1/projects/:id/process-documents/:documentId/status settles only approved documents and locks amount edits", async () => {
+  const app = createProcessDocumentApp();
+  const engineerToken = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+  const reviewerToken = await signAccessToken(
+    {
+      sub: "reviewer-001",
+      roleCodes: ["reviewer"],
+      displayName: "Reviewer",
+    },
+    jwtSecret,
+  );
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/process-documents",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      stageCode: "estimate",
+      disciplineCode: "building",
+      documentType: "progress_payment",
+      title: "进度款申报 003",
+      referenceNo: "PP-003",
+      amount: 88000,
+    },
+  });
+  const documentId = createResponse.json().id as string;
+
+  const earlySettleResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      status: "settled",
+    },
+  });
+
+  await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      status: "submitted",
+    },
+  });
+  await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+    payload: {
+      status: "approved",
+      comment: "审核通过",
+    },
+  });
+
+  const settleResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}/status`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      status: "settled",
+      comment: "已纳入结算",
+    },
+  });
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      title: "不允许修改",
+      referenceNo: "PP-003",
+      amount: 90000,
+    },
+  });
+  const settledListResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/process-documents?status=settled",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+
+  assert.equal(earlySettleResponse.statusCode, 422);
+  assert.equal(earlySettleResponse.json().error.code, "VALIDATION_ERROR");
+  assert.equal(settleResponse.statusCode, 200);
+  assert.equal(settleResponse.json().status, "settled");
+  assert.equal(settleResponse.json().lastComment, "已纳入结算");
+  assert.equal(updateResponse.statusCode, 423);
+  assert.equal(updateResponse.json().error.code, "RESOURCE_LOCKED");
+  assert.equal(settledListResponse.statusCode, 200);
+  assert.equal(settledListResponse.json().summary.statusCounts.settled, 1);
+  assert.equal(settledListResponse.json().items[0].isEditable, false);
+  assert.equal(settledListResponse.json().items[0].isReviewable, false);
+
+  await app.close();
+});
+
 test("PUT /v1/projects/:id/process-documents/:documentId rejects updating a submitted process document", async () => {
   const app = createProcessDocumentApp();
   const token = await signAccessToken(

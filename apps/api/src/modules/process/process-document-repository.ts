@@ -14,7 +14,8 @@ export type ProcessDocumentStatus =
   | "draft"
   | "submitted"
   | "approved"
-  | "rejected";
+  | "rejected"
+  | "settled";
 
 export type ProcessDocumentRecord = {
   id: string;

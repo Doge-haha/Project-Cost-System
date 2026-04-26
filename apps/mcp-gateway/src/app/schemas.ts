@@ -62,7 +62,9 @@ export const processDocumentSummaryQuerySchema = z.object({
   documentType: z
     .enum(["change_order", "site_visa", "progress_payment"])
     .optional(),
-  status: z.enum(["draft", "submitted", "approved", "rejected"]).optional(),
+  status: z
+    .enum(["draft", "submitted", "approved", "rejected", "settled"])
+    .optional(),
 });
 
 export const reportExportStatusQuerySchema = z.object({
@@ -131,6 +133,6 @@ export const decideReviewToolSchema = z
 export const updateProcessDocumentStatusToolSchema = z.object({
   projectId: z.string().min(1),
   documentId: z.string().min(1),
-  status: z.enum(["draft", "submitted", "approved", "rejected"]),
+  status: z.enum(["draft", "submitted", "approved", "rejected", "settled"]),
   comment: z.string().min(1).optional(),
 });

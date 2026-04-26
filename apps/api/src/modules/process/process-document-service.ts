@@ -24,7 +24,7 @@ export const createProcessDocumentSchema = z.object({
 });
 
 export const updateProcessDocumentStatusSchema = z.object({
-  status: z.enum(["draft", "submitted", "approved", "rejected"]),
+  status: z.enum(["draft", "submitted", "approved", "rejected", "settled"]),
   comment: z.string().max(500).optional(),
 });
 
@@ -51,6 +51,7 @@ const PROCESS_DOCUMENT_STATUS_PRIORITY: Record<
   draft: 1,
   rejected: 2,
   approved: 3,
+  settled: 4,
 };
 
 export class ProcessDocumentService {
@@ -194,6 +195,7 @@ export class ProcessDocumentService {
           submitted: items.filter((item) => item.status === "submitted").length,
           approved: items.filter((item) => item.status === "approved").length,
           rejected: items.filter((item) => item.status === "rejected").length,
+          settled: items.filter((item) => item.status === "settled").length,
         },
         documentTypeCounts: {
           change_order: items.filter((item) => item.documentType === "change_order")
@@ -272,7 +274,7 @@ export class ProcessDocumentService {
   async updateProcessDocumentStatus(input: {
     projectId: string;
     documentId: string;
-    status: "draft" | "submitted" | "approved" | "rejected";
+    status: ProcessDocumentRecord["status"];
     comment?: string;
     userId: string;
   }): Promise<ProcessDocumentRecord> {
@@ -344,7 +346,7 @@ export class ProcessDocumentService {
           "A submitted process document already exists for this reference",
         );
       }
-    } else {
+    } else if (input.status === "approved" || input.status === "rejected") {
       if (document.status !== "submitted") {
         throw new AppError(
           422,
@@ -377,6 +379,28 @@ export class ProcessDocumentService {
           422,
           "VALIDATION_ERROR",
           "Reviewer cannot review a process document they submitted",
+        );
+      }
+    } else {
+      if (document.status !== "approved") {
+        throw new AppError(
+          422,
+          "VALIDATION_ERROR",
+          "Only approved process documents can be settled",
+        );
+      }
+      if (
+        !authorizationService.canEditContext({
+          projectId: input.projectId,
+          stageCode: document.stageCode,
+          disciplineCode: document.disciplineCode,
+          userId: input.userId,
+        })
+      ) {
+        throw new AppError(
+          403,
+          "FORBIDDEN",
+          "You do not have permission to settle this resource",
         );
       }
     }
@@ -418,6 +442,13 @@ export class ProcessDocumentService {
       amount: document.amount,
       comment: document.lastComment ?? null,
     };
+    if (document.status === "settled") {
+      throw new AppError(
+        423,
+        "RESOURCE_LOCKED",
+        "Settled process documents cannot be updated",
+      );
+    }
     if (document.status !== "draft" && document.status !== "rejected") {
       throw new AppError(
         422,

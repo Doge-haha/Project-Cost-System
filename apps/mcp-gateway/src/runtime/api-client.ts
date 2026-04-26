@@ -41,7 +41,7 @@ export type ProcessDocumentSummaryQuery = {
   stageCode?: string;
   disciplineCode?: string;
   documentType?: "change_order" | "site_visa" | "progress_payment";
-  status?: "draft" | "submitted" | "approved" | "rejected";
+  status?: "draft" | "submitted" | "approved" | "rejected" | "settled";
 };
 
 export type ReportExportStatusQuery = {
@@ -98,7 +98,7 @@ export type DecideReviewInput = {
 export type UpdateProcessDocumentStatusInput = {
   projectId: string;
   documentId: string;
-  status: "draft" | "submitted" | "approved" | "rejected";
+  status: "draft" | "submitted" | "approved" | "rejected" | "settled";
   comment?: string;
 };
 

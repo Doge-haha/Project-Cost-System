@@ -27,7 +27,9 @@ export function registerProcessDocumentRoutes(
         documentType: z
           .enum(["change_order", "site_visa", "progress_payment"])
           .optional(),
-        status: z.enum(["draft", "submitted", "approved", "rejected"]).optional(),
+        status: z
+          .enum(["draft", "submitted", "approved", "rejected", "settled"])
+          .optional(),
       })
       .parse(request.query);
 

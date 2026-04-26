@@ -402,6 +402,39 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items creates a child item 
   await app.close();
 });
 
+test("POST /v1/projects/:id/bill-versions/:versionId/items rejects duplicate item codes in the same version", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      parentId: null,
+      itemCode: "A.1",
+      itemName: "重复清单编码",
+      quantity: 1,
+      unit: "m3",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.equal(response.json().error.code, "VALIDATION_ERROR");
+
+  await app.close();
+});
+
 test("POST /v1/projects/:id/bill-versions/:versionId/items rejects parent items from another version", async () => {
   const app = createBillItemApp();
   const token = await signAccessToken(
@@ -560,6 +593,56 @@ test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId updates an ite
     finalAmount: null,
     calculatedAt: null,
   });
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId rejects duplicate item codes in the same version", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      parentId: null,
+      itemCode: "A.2",
+      itemName: "新增清单",
+      quantity: 12,
+      unit: "m3",
+      sortNo: 2,
+    },
+  });
+
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/bill-versions/bill-version-001/items/${createResponse.json().id}`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      parentId: null,
+      itemCode: "A.1",
+      itemName: "重复编码修改",
+      quantity: 12,
+      unit: "m3",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 201);
+  assert.equal(updateResponse.statusCode, 422);
+  assert.equal(updateResponse.json().error.code, "VALIDATION_ERROR");
 
   await app.close();
 });

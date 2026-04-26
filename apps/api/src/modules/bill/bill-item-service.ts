@@ -102,6 +102,10 @@ export class BillItemService {
         );
       }
     }
+    await this.assertUniqueItemCode({
+      billVersionId: version.id,
+      itemCode: input.itemCode,
+    });
 
     const created = await this.billItemRepository.create({
       billVersionId: version.id,
@@ -156,6 +160,11 @@ export class BillItemService {
         );
       }
     }
+    await this.assertUniqueItemCode({
+      billVersionId: version.id,
+      itemCode: input.itemCode,
+      excludeItemId: existingItem.id,
+    });
 
     const before = { ...existingItem };
     const updated = await this.billItemRepository.update(input.itemId, {
@@ -304,6 +313,27 @@ export class BillItemService {
     }
 
     return { version, billItem };
+  }
+
+  private async assertUniqueItemCode(input: {
+    billVersionId: string;
+    itemCode: string;
+    excludeItemId?: string;
+  }): Promise<void> {
+    const items = await this.billItemRepository.listByBillVersionId(
+      input.billVersionId,
+    );
+    const duplicate = items.find(
+      (item) =>
+        item.itemCode === input.itemCode && item.id !== input.excludeItemId,
+    );
+    if (duplicate) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Duplicate bill item code is not allowed in the same version",
+      );
+    }
   }
 
   private async getAuthorizedVersion(

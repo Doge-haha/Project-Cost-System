@@ -418,11 +418,11 @@ export class ProcessDocumentService {
       amount: document.amount,
       comment: document.lastComment ?? null,
     };
-    if (document.status !== "draft") {
+    if (document.status !== "draft" && document.status !== "rejected") {
       throw new AppError(
         422,
         "VALIDATION_ERROR",
-        "Only draft process documents can be updated",
+        "Only draft or rejected process documents can be updated",
       );
     }
 

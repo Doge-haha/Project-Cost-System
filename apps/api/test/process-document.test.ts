@@ -877,6 +877,20 @@ test("PUT /v1/projects/:id/process-documents/:documentId/status allows submitter
     },
   });
 
+  const rejectedUpdateResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/process-documents/${documentId}`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      title: "设计变更单 003 退回修订",
+      referenceNo: "CO-003",
+      amount: 77000,
+      comment: "退回后补充金额依据",
+    },
+  });
+
   const reopenResponse = await app.inject({
     method: "PUT",
     url: `/v1/projects/project-001/process-documents/${documentId}/status`,
@@ -903,6 +917,10 @@ test("PUT /v1/projects/:id/process-documents/:documentId/status allows submitter
 
   assert.equal(rejectedListResponse.statusCode, 200);
   assert.equal(rejectedListResponse.json().items[0].isEditable, true);
+  assert.equal(rejectedUpdateResponse.statusCode, 200);
+  assert.equal(rejectedUpdateResponse.json().status, "rejected");
+  assert.equal(rejectedUpdateResponse.json().title, "设计变更单 003 退回修订");
+  assert.equal(rejectedUpdateResponse.json().amount, 77000);
   assert.equal(reopenResponse.statusCode, 200);
   assert.equal(reopenResponse.json().status, "draft");
   assert.equal(updateResponse.statusCode, 200);

@@ -1220,4 +1220,147 @@ describe("ProjectDetailPage", () => {
 
     expect(screen.getAllByTestId("location-search").at(-1)).toHaveTextContent("");
   });
+
+  test("shows bill version lock and unlock actions from workspace status", async () => {
+    let isLocked = false;
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse({
+          project: {
+            id: "project-001",
+            code: "PRJ-001",
+            name: "新点造价项目",
+            status: "draft",
+          },
+          currentStage: {
+            id: "stage-001",
+            stageCode: "estimate",
+            stageName: "投资估算",
+            status: isLocked ? "locked" : "approved",
+            sequenceNo: 1,
+          },
+          availableStages: [],
+          disciplines: [],
+          billVersions: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              versionStatus: isLocked ? "locked" : "approved",
+            },
+          ],
+          currentUser: {
+            userId: "user-001",
+            displayName: "Owner User",
+            memberId: "member-001",
+            permissionSummary: {
+              roleCode: "project_owner",
+              roleLabel: "项目负责人",
+              canManageProject: true,
+              canEditProject: true,
+              scopeSummary: ["项目全部范围"],
+              visibleStageCodes: ["estimate"],
+              visibleDisciplineCodes: ["building"],
+            },
+          },
+          todoSummary: {
+            totalCount: 0,
+            pendingReviewCount: 0,
+            pendingProcessDocumentCount: 0,
+            draftProcessDocumentCount: 0,
+            items: [],
+          },
+          riskSummary: {
+            totalCount: 0,
+            rejectedReviewCount: 0,
+            rejectedProcessDocumentCount: 0,
+            failedJobCount: 0,
+            items: [],
+          },
+          importStatus: {
+            mode: "import_task",
+            totalCount: 0,
+            queuedCount: 0,
+            processingCount: 0,
+            completedCount: 0,
+            failedCount: 0,
+            latestTask: null,
+            note: "note",
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        return createJsonResponse({
+          totalSystemAmount: 0,
+          totalFinalAmount: 0,
+          varianceAmount: 0,
+          itemCount: 0,
+          billVersionCount: 1,
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/audit-logs") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/lock") {
+        expect(init?.method).toBe("POST");
+        isLocked = true;
+        return createJsonResponse({
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          versionStatus: "locked",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/unlock") {
+        expect(init?.method).toBe("POST");
+        expect(JSON.parse(String(init?.body))).toEqual({ reason: "项目工作台解锁" });
+        isLocked = false;
+        return createJsonResponse({
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          versionStatus: "editable",
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001"]}>
+        <Routes>
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "锁定版本" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "锁定版本" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("估算版 V1 已锁定。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("已锁定")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "解锁版本" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "解锁版本" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("估算版 V1 已解锁。")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "锁定版本" })).toBeInTheDocument();
+  });
 });

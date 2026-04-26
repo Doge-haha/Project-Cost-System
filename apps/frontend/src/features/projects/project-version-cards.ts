@@ -20,17 +20,21 @@ export function buildProjectVersionCards(input: {
   projectId: string;
   selectedBillVersionId: string | null;
   versions: BillVersion[];
+  canEditProject?: boolean;
 }) {
   return input.versions.map((version) => ({
     id: version.id,
     title: version.versionName,
     subtitle: `${version.stageCode} · ${version.disciplineCode}`,
+    status: version.status,
     statusLabel: formatBillVersionStatus(version.status),
     itemCountLabel:
       typeof version.itemCount === "number"
         ? `${version.itemCount} 条清单项`
         : "条目数待补充",
     isSelected: version.id === input.selectedBillVersionId,
+    canLock: Boolean(input.canEditProject) && version.status === "approved",
+    canUnlock: Boolean(input.canEditProject) && version.status === "locked",
     billItemsPath: `/projects/${input.projectId}/bill-versions/${version.id}/items`,
     summaryPath: `/projects/${input.projectId}/summary?billVersionId=${version.id}`,
   }));

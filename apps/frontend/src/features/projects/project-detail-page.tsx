@@ -88,6 +88,9 @@ export function ProjectDetailPage() {
   );
   const [activityCopyMessage, setActivityCopyMessage] = useState<string | null>(null);
   const [activityCopiedLinkPath, setActivityCopiedLinkPath] = useState<string | null>(null);
+  const [versionActionMessage, setVersionActionMessage] = useState<string | null>(null);
+  const [versionActionError, setVersionActionError] = useState<string | null>(null);
+  const [versionActionTargetId, setVersionActionTargetId] = useState<string | null>(null);
   const [selectedBillVersionId, setSelectedBillVersionId] = useState<string | null>(
     null,
   );
@@ -353,6 +356,43 @@ export function ProjectDetailPage() {
     }
   }
 
+  async function runBillVersionAction(input: {
+    billVersionId: string;
+    title: string;
+    action: "lock" | "unlock";
+  }) {
+    if (!projectId) {
+      return;
+    }
+
+    setVersionActionTargetId(input.billVersionId);
+    setVersionActionMessage(null);
+    setVersionActionError(null);
+
+    try {
+      if (input.action === "lock") {
+        await apiClient.lockBillVersion(projectId, input.billVersionId);
+        setVersionActionMessage(`${input.title} 已锁定。`);
+      } else {
+        await apiClient.unlockBillVersion(
+          projectId,
+          input.billVersionId,
+          "项目工作台解锁",
+        );
+        setVersionActionMessage(`${input.title} 已解锁。`);
+      }
+      await loadProjectDetail();
+    } catch (actionError) {
+      setVersionActionError(
+        actionError instanceof ApiError
+          ? actionError.message
+          : "清单版本状态更新失败，请稍后重试。",
+      );
+    } finally {
+      setVersionActionTargetId(null);
+    }
+  }
+
   if (loading) {
     return <LoadingState title="正在加载项目详情" />;
   }
@@ -378,6 +418,7 @@ export function ProjectDetailPage() {
   }
 
   const { workspace } = state;
+  const permissionSummary = workspace.currentUser.permissionSummary;
   const navigation =
     selectedBillVersion && projectId
       ? buildProjectDetailNavigation({
@@ -390,6 +431,7 @@ export function ProjectDetailPage() {
         projectId,
         selectedBillVersionId,
         versions: workspace.billVersions,
+        canEditProject: permissionSummary.canEditProject,
       })
     : [];
   const dashboardCards =
@@ -402,7 +444,6 @@ export function ProjectDetailPage() {
           permissionSummary: workspace.currentUser.permissionSummary,
         })
       : null;
-  const permissionSummary = workspace.currentUser.permissionSummary;
   const permissionHighlights = [
     `角色：${permissionSummary.roleLabel}`,
     permissionSummary.canManageProject ? "可管理项目" : "不可管理项目",
@@ -831,6 +872,12 @@ export function ProjectDetailPage() {
         </article>
         <article className="panel">
           <h3>版本工作台</h3>
+          {versionActionMessage ? (
+            <p className="page-description">{versionActionMessage}</p>
+          ) : null}
+          {versionActionError ? (
+            <p className="page-description">{versionActionError}</p>
+          ) : null}
           {workspace.billVersions.length > 0 ? (
             <div className="project-list">
               {versionCards.map((card) => (
@@ -862,6 +909,38 @@ export function ProjectDetailPage() {
                     <Link className="app-nav-link active" to={card.summaryPath}>
                       汇总页
                     </Link>
+                    {card.canLock ? (
+                      <button
+                        className="connection-button secondary"
+                        disabled={versionActionTargetId === card.id}
+                        onClick={() => {
+                          void runBillVersionAction({
+                            billVersionId: card.id,
+                            title: card.title,
+                            action: "lock",
+                          });
+                        }}
+                        type="button"
+                      >
+                        {versionActionTargetId === card.id ? "锁定中" : "锁定版本"}
+                      </button>
+                    ) : null}
+                    {card.canUnlock ? (
+                      <button
+                        className="connection-button secondary"
+                        disabled={versionActionTargetId === card.id}
+                        onClick={() => {
+                          void runBillVersionAction({
+                            billVersionId: card.id,
+                            title: card.title,
+                            action: "unlock",
+                          });
+                        }}
+                        type="button"
+                      >
+                        {versionActionTargetId === card.id ? "解锁中" : "解锁版本"}
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               ))}

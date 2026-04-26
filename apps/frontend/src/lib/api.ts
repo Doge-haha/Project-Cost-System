@@ -198,6 +198,26 @@ export const apiClient = {
       items: response.items.map((version) => normalizeBillVersion(version)),
     };
   },
+  lockBillVersion(projectId: string, billVersionId: string) {
+    return request<BillVersion>(
+      `/v1/projects/${projectId}/bill-versions/${billVersionId}/lock`,
+      undefined,
+      {
+        method: "POST",
+        body: {},
+      },
+    );
+  },
+  unlockBillVersion(projectId: string, billVersionId: string, reason: string) {
+    return request<BillVersion>(
+      `/v1/projects/${projectId}/bill-versions/${billVersionId}/unlock`,
+      undefined,
+      {
+        method: "POST",
+        body: { reason },
+      },
+    );
+  },
   listProjectReviews(projectId: string) {
     return request<ReviewSubmissionListResponse>(`/v1/projects/${projectId}/reviews`);
   },

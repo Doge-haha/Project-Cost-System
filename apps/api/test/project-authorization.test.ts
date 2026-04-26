@@ -196,3 +196,33 @@ test("unknown stages and disciplines are rejected before authorization succeeds"
     false,
   );
 });
+
+test("unknown role codes fail explicitly instead of silently denying access", () => {
+  const service = new ProjectAuthorizationService({
+    stages,
+    disciplines,
+    members: [
+      ...members,
+      {
+        id: "member-004",
+        projectId: "project-001",
+        userId: "broken-001",
+        displayName: "Broken Role User",
+        roleCode: "mystery_role",
+        scopes: [{ scopeType: "project", scopeValue: "project-001" }],
+      },
+    ],
+  });
+
+  assert.throws(
+    () =>
+      service.canViewContext({
+        projectId: "project-001",
+        userId: "broken-001",
+      }),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "INVALID_ROLE_CODE",
+  );
+});

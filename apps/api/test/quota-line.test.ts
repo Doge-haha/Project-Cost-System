@@ -382,6 +382,52 @@ test("PUT /v1/projects/:id/quota-lines/:lineId updates a quota line", async () =
   await app.close();
 });
 
+test("DELETE /v1/projects/:id/quota-lines/:lineId deletes a quota line", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "DELETE",
+    url: "/v1/projects/project-001/quota-lines/quota-line-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 204);
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/quota-lines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listResponse.json().items.length, 0);
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=quota_line&resourceId=quota-line-001&action=delete",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+
+  await app.close();
+});
+
 test("GET /v1/price-versions filters by region and discipline", async () => {
   const app = createQuotaApp();
   const token = await signAccessToken(

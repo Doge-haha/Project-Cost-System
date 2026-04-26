@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+import { requireDependency } from "../../shared/dependency/require-dependency.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import type { AuditLogService } from "../audit/audit-log-service.js";
 import type { BillItemRepository } from "../bill/bill-item-repository.js";
 import { BillItemService } from "../bill/bill-item-service.js";
 import { BillVersionService } from "../bill/bill-version-service.js";
@@ -34,10 +36,18 @@ type Dependencies = {
 };
 
 export class QuotaLineService {
+  private readonly auditLogService: AuditLogService;
+
   constructor(
     private readonly quotaLineRepository: QuotaLineRepository,
     private readonly dependencies: Dependencies,
-  ) {}
+    auditLogService?: AuditLogService,
+  ) {
+    this.auditLogService = requireDependency(
+      auditLogService,
+      "auditLogService",
+    );
+  }
 
   async listQuotaLines(input: {
     projectId: string;
@@ -68,9 +78,9 @@ export class QuotaLineService {
     sourceMode: string;
     userId: string;
   }): Promise<QuotaLineRecord> {
-    await this.assertBillItemInEditableContext(input, "edit");
+    const version = await this.assertBillItemInEditableContext(input, "edit");
 
-    return this.quotaLineRepository.create({
+    const created = await this.quotaLineRepository.create({
       billItemId: input.billItemId,
       sourceStandardSetCode: input.sourceStandardSetCode,
       sourceQuotaId: input.sourceQuotaId,
@@ -86,6 +96,18 @@ export class QuotaLineService {
       contentFactor: input.contentFactor ?? 1,
       sourceMode: input.sourceMode,
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      resourceType: "quota_line",
+      resourceId: created.id,
+      action: "create",
+      operatorId: input.userId,
+      afterPayload: created,
+    });
+
+    return created;
   }
 
   async updateQuotaLine(input: {
@@ -118,7 +140,7 @@ export class QuotaLineService {
       throw new AppError(404, "BILL_ITEM_NOT_FOUND", "Bill item not found");
     }
 
-    await this.assertBillItemInEditableContext(
+    const version = await this.assertBillItemInEditableContext(
       {
         projectId: input.projectId,
         billVersionId: billItem.billVersionId,
@@ -128,7 +150,8 @@ export class QuotaLineService {
       "edit",
     );
 
-    return this.quotaLineRepository.update(input.quotaLineId, {
+    const before = { ...existingQuotaLine };
+    const updated = await this.quotaLineRepository.update(input.quotaLineId, {
       billItemId: billItem.id,
       sourceStandardSetCode: input.sourceStandardSetCode,
       sourceQuotaId: input.sourceQuotaId,
@@ -144,6 +167,59 @@ export class QuotaLineService {
       contentFactor: input.contentFactor ?? 1,
       sourceMode: input.sourceMode,
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      resourceType: "quota_line",
+      resourceId: updated.id,
+      action: "update",
+      operatorId: input.userId,
+      beforePayload: before,
+      afterPayload: updated,
+    });
+
+    return updated;
+  }
+
+  async deleteQuotaLine(input: {
+    projectId: string;
+    quotaLineId: string;
+    userId: string;
+  }): Promise<void> {
+    const existingQuotaLine = await this.quotaLineRepository.findById(input.quotaLineId);
+    if (!existingQuotaLine) {
+      throw new AppError(404, "QUOTA_LINE_NOT_FOUND", "Quota line not found");
+    }
+
+    const billItem = await this.dependencies.billItemRepository.findById(
+      existingQuotaLine.billItemId,
+    );
+    if (!billItem) {
+      throw new AppError(404, "BILL_ITEM_NOT_FOUND", "Bill item not found");
+    }
+
+    const version = await this.assertBillItemInEditableContext(
+      {
+        projectId: input.projectId,
+        billVersionId: billItem.billVersionId,
+        billItemId: billItem.id,
+        userId: input.userId,
+      },
+      "edit",
+    );
+
+    await this.quotaLineRepository.delete(existingQuotaLine.id);
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      resourceType: "quota_line",
+      resourceId: existingQuotaLine.id,
+      action: "delete",
+      operatorId: input.userId,
+      beforePayload: existingQuotaLine,
+    });
   }
 
   private async assertBillItemInEditableContext(
@@ -154,7 +230,7 @@ export class QuotaLineService {
       userId: string;
     },
     action: "view" | "edit",
-  ): Promise<void> {
+  ): Promise<Awaited<ReturnType<BillVersionService["getAuthorizedVersion"]>>> {
     const billItem = await this.dependencies.billItemRepository.findById(
       input.billItemId,
     );
@@ -190,5 +266,7 @@ export class QuotaLineService {
         userId: input.userId,
       });
     }
+
+    return version;
   }
 }

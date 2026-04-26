@@ -41,7 +41,7 @@ Sprint 1 启动前，先确认下面这些条件已经满足：
 - [data-model.md](/Users/huahaha/Documents/New%20project/docs/architecture/data-model.md) 已作为建表基线
 - [state-machines.md](/Users/huahaha/Documents/New%20project/docs/architecture/state-machines.md) 已作为状态口径基线
 - [permission-matrix.md](/Users/huahaha/Documents/New%20project/docs/architecture/permission-matrix.md) 已作为权限口径基线
-- [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml) 已作为接口基线
+- [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml) 已作为当前 `/v1` 接口基线
 
 ### 3.2 项目工具准备
 
@@ -76,7 +76,7 @@ Sprint 1 启动前，先确认下面这些条件已经满足：
 1. `Sprint 1` 只做项目级配置底座，不碰清单正式编制和计价引擎
 2. 权限口径以 [permission-matrix.md](/Users/huahaha/Documents/New%20project/docs/architecture/permission-matrix.md) 为准
 3. 建表和枚举口径以 [data-model.md](/Users/huahaha/Documents/New%20project/docs/architecture/data-model.md) 与 [state-machines.md](/Users/huahaha/Documents/New%20project/docs/architecture/state-machines.md) 为准
-4. 接口口径以 [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml) 为准
+4. 接口口径以当前 `/v1` 生成契约 [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml) 为准
 5. 前端先做骨架和配置页，不要抢跑后续业务模块
 6. 即使 Sprint 1 不直接做 AI 功能，后端模块边界也要为后续 `MCP / Knowledge / Memory` 预留扩展点，避免把上下文聚合和知识沉淀能力写死在业务接口里
 

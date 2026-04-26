@@ -102,6 +102,16 @@ const billVersions: BillVersionRecord[] = [
     versionStatus: "submitted",
     sourceVersionId: null,
   },
+  {
+    id: "bill-version-002",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    versionNo: 2,
+    versionName: "估算版 V2",
+    versionStatus: "submitted",
+    sourceVersionId: null,
+  },
 ];
 
 function createReviewApp() {
@@ -170,6 +180,148 @@ test("POST /v1/projects/:id/bill-versions/:versionId/reviews submits a pending r
     listResponse.json().items[0].billVersionSummary.versionName,
     "估算版 V1",
   );
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/reviews supports billVersionId filtering and returns action summary flags", async () => {
+  const app = createReviewApp();
+  const engineerToken = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+  const reviewerToken = await signAccessToken(
+    {
+      sub: "reviewer-001",
+      roleCodes: ["reviewer"],
+      displayName: "Reviewer",
+    },
+    jwtSecret,
+  );
+
+  const firstReview = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/reviews",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+  const secondReview = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-002/reviews",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+
+  const reviewerList = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/reviews?billVersionId=bill-version-001&status=pending",
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+  });
+
+  assert.equal(reviewerList.statusCode, 200);
+  assert.equal(reviewerList.json().items.length, 1);
+  assert.equal(reviewerList.json().summary.totalCount, 1);
+  assert.equal(reviewerList.json().summary.statusCounts.pending, 1);
+  assert.equal(reviewerList.json().summary.actionableCount, 1);
+  assert.equal(reviewerList.json().items[0].id, firstReview.json().id);
+  assert.equal(reviewerList.json().items[0].billVersionSummary.versionName, "估算版 V1");
+  assert.equal(reviewerList.json().items[0].canApprove, true);
+  assert.equal(reviewerList.json().items[0].canReject, true);
+  assert.equal(reviewerList.json().items[0].canCancel, false);
+
+  const submitterList = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/reviews?billVersionId=bill-version-002&status=pending",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+
+  assert.equal(submitterList.statusCode, 200);
+  assert.equal(submitterList.json().items.length, 1);
+  assert.equal(submitterList.json().summary.totalCount, 1);
+  assert.equal(submitterList.json().summary.actionableCount, 1);
+  assert.equal(submitterList.json().items[0].id, secondReview.json().id);
+  assert.equal(submitterList.json().items[0].canApprove, false);
+  assert.equal(submitterList.json().items[0].canReject, false);
+  assert.equal(submitterList.json().items[0].canCancel, true);
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/reviews sorts pending reviews before completed ones and newest first within status", async () => {
+  const app = createReviewApp();
+  const engineerToken = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+  const reviewerToken = await signAccessToken(
+    {
+      sub: "reviewer-001",
+      roleCodes: ["reviewer"],
+      displayName: "Reviewer",
+    },
+    jwtSecret,
+  );
+
+  const firstReview = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/reviews",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      comment: "older pending review",
+    },
+  });
+  const secondReview = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-002/reviews",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      comment: "newer pending review",
+    },
+  });
+
+  await app.inject({
+    method: "POST",
+    url: `/v1/projects/project-001/reviews/${firstReview.json().id}/approve`,
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+    payload: {
+      comment: "approved older review",
+    },
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/reviews",
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().items.length, 2);
+  assert.equal(response.json().items[0].id, secondReview.json().id);
+  assert.equal(response.json().items[0].status, "pending");
+  assert.equal(response.json().items[1].id, firstReview.json().id);
+  assert.equal(response.json().items[1].status, "approved");
 
   await app.close();
 });

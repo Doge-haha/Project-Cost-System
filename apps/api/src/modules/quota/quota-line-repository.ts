@@ -1,3 +1,10 @@
+import { randomUUID } from "node:crypto";
+
+import { eq } from "drizzle-orm";
+
+import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
+import { quotaLines } from "../../infrastructure/database/schema.js";
+
 export type QuotaLineRecord = {
   id: string;
   billItemId: string;
@@ -24,6 +31,8 @@ export interface QuotaLineRepository {
     quotaLineId: string,
     input: Omit<QuotaLineRecord, "id">,
   ): Promise<QuotaLineRecord>;
+  delete(quotaLineId: string): Promise<void>;
+  deleteByBillItemId(billItemId: string): Promise<void>;
 }
 
 export class InMemoryQuotaLineRepository implements QuotaLineRepository {
@@ -77,4 +86,135 @@ export class InMemoryQuotaLineRepository implements QuotaLineRepository {
 
     return target;
   }
+
+  async delete(quotaLineId: string): Promise<void> {
+    const index = this.quotaLines.findIndex((quotaLine) => quotaLine.id === quotaLineId);
+    if (index === -1) {
+      throw new Error("Quota line not found");
+    }
+    this.quotaLines.splice(index, 1);
+  }
+
+  async deleteByBillItemId(billItemId: string): Promise<void> {
+    for (let index = this.quotaLines.length - 1; index >= 0; index -= 1) {
+      if (this.quotaLines[index].billItemId === billItemId) {
+        this.quotaLines.splice(index, 1);
+      }
+    }
+  }
+}
+
+export class DbQuotaLineRepository implements QuotaLineRepository {
+  constructor(private readonly db: ApiDatabase) {}
+
+  async listByBillItemId(billItemId: string): Promise<QuotaLineRecord[]> {
+    const records = await this.db.query.quotaLines.findMany({
+      where: (table, { eq: isEqual }) => isEqual(table.billItemId, billItemId),
+      orderBy: (table, { asc }) => [asc(table.quotaCode), asc(table.id)],
+    });
+
+    return records.map(mapQuotaLineRecord);
+  }
+
+  async findById(quotaLineId: string): Promise<QuotaLineRecord | null> {
+    const record = await this.db.query.quotaLines.findFirst({
+      where: (table, { eq: isEqual }) => isEqual(table.id, quotaLineId),
+    });
+
+    return record ? mapQuotaLineRecord(record) : null;
+  }
+
+  async create(input: Omit<QuotaLineRecord, "id">): Promise<QuotaLineRecord> {
+    const [created] = await this.db
+      .insert(quotaLines)
+      .values({
+        id: randomUUID(),
+        billItemId: input.billItemId,
+        sourceStandardSetCode: input.sourceStandardSetCode,
+        sourceQuotaId: input.sourceQuotaId,
+        sourceSequence: input.sourceSequence ?? null,
+        chapterCode: input.chapterCode,
+        quotaCode: input.quotaCode,
+        quotaName: input.quotaName,
+        unit: input.unit,
+        quantity: input.quantity,
+        laborFee: input.laborFee ?? null,
+        materialFee: input.materialFee ?? null,
+        machineFee: input.machineFee ?? null,
+        contentFactor: input.contentFactor,
+        sourceMode: input.sourceMode,
+      })
+      .returning();
+
+    return mapQuotaLineRecord(created);
+  }
+
+  async update(
+    quotaLineId: string,
+    input: Omit<QuotaLineRecord, "id">,
+  ): Promise<QuotaLineRecord> {
+    const [updated] = await this.db
+      .update(quotaLines)
+      .set({
+        billItemId: input.billItemId,
+        sourceStandardSetCode: input.sourceStandardSetCode,
+        sourceQuotaId: input.sourceQuotaId,
+        sourceSequence: input.sourceSequence ?? null,
+        chapterCode: input.chapterCode,
+        quotaCode: input.quotaCode,
+        quotaName: input.quotaName,
+        unit: input.unit,
+        quantity: input.quantity,
+        laborFee: input.laborFee ?? null,
+        materialFee: input.materialFee ?? null,
+        machineFee: input.machineFee ?? null,
+        contentFactor: input.contentFactor,
+        sourceMode: input.sourceMode,
+      })
+      .where(eq(quotaLines.id, quotaLineId))
+      .returning();
+
+    if (!updated) {
+      throw new Error("Quota line not found");
+    }
+
+    return mapQuotaLineRecord(updated);
+  }
+
+  async delete(quotaLineId: string): Promise<void> {
+    const [deleted] = await this.db
+      .delete(quotaLines)
+      .where(eq(quotaLines.id, quotaLineId))
+      .returning({ id: quotaLines.id });
+
+    if (!deleted) {
+      throw new Error("Quota line not found");
+    }
+  }
+
+  async deleteByBillItemId(billItemId: string): Promise<void> {
+    await this.db.delete(quotaLines).where(eq(quotaLines.billItemId, billItemId));
+  }
+}
+
+function mapQuotaLineRecord(
+  record: typeof quotaLines.$inferSelect,
+): QuotaLineRecord {
+  return {
+    id: record.id,
+    billItemId: record.billItemId,
+    sourceStandardSetCode: record.sourceStandardSetCode,
+    sourceQuotaId: record.sourceQuotaId,
+    sourceSequence: record.sourceSequence ?? null,
+    chapterCode: record.chapterCode,
+    quotaCode: record.quotaCode,
+    quotaName: record.quotaName,
+    unit: record.unit,
+    quantity: record.quantity,
+    laborFee: record.laborFee ?? null,
+    materialFee: record.materialFee ?? null,
+    machineFee: record.machineFee ?? null,
+    contentFactor: record.contentFactor,
+    sourceMode: record.sourceMode,
+  };
 }

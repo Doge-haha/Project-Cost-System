@@ -3,7 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "description": "TypeScript MCP gateway scaffold for the SaaS pricing platform.",
+  "type": "module",
+  "dependencies": {
+    "fastify": "^5.6.1",
+    "jose": "^6.1.0",
+    "zod": "^4.1.12"
+  },
   "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "description": "TypeScript worker scaffold for the SaaS pricing platform.",
+  "dependencies": {
+    "@saas-pricing/job-contracts": "0.1.0"
+  },
   "scripts": {
+    "start": "tsx src/cli.ts",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }
 }

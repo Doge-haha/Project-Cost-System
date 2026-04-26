@@ -1,6 +1,8 @@
 import { z } from "zod";
 
+import { requireDependency } from "../../shared/dependency/require-dependency.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import type { AuditLogService } from "../audit/audit-log-service.js";
 import { ProjectAuthorizationService } from "../project/project-authorization-service.js";
 import type { ProjectRepository } from "../project/project-repository.js";
 import type { ProjectStageRepository } from "../project/project-stage-repository.js";
@@ -49,10 +51,18 @@ export type BillVersionValidationSummary = {
 };
 
 export class BillVersionService {
+  private readonly auditLogService: AuditLogService;
+
   constructor(
     private readonly billVersionRepository: BillVersionRepository,
     private readonly dependencies: AuthorizationDependencies,
-  ) {}
+    auditLogService?: AuditLogService,
+  ) {
+    this.auditLogService = requireDependency(
+      auditLogService,
+      "auditLogService",
+    );
+  }
 
   async listBillVersions(input: {
     projectId: string;
@@ -76,12 +86,24 @@ export class BillVersionService {
     await this.assertProjectExists(input.projectId);
     await this.assertCanEdit(input);
 
-    return this.billVersionRepository.create({
+    const created = await this.billVersionRepository.create({
       projectId: input.projectId,
       stageCode: input.stageCode,
       disciplineCode: input.disciplineCode,
       versionName: input.versionName,
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: created.projectId,
+      stageCode: created.stageCode,
+      resourceType: "bill_version",
+      resourceId: created.id,
+      action: "create",
+      operatorId: input.userId,
+      afterPayload: created,
+    });
+
+    return created;
   }
 
   async copyFromVersion(input: {
@@ -149,6 +171,20 @@ export class BillVersionService {
       );
     }
 
+    await this.auditLogService.writeAuditLog({
+      projectId: created.projectId,
+      stageCode: created.stageCode,
+      resourceType: "bill_version",
+      resourceId: created.id,
+      action: "copy_from",
+      operatorId: input.userId,
+      afterPayload: {
+        ...created,
+        sourceVersionId: sourceVersion.id,
+        clonedItemCount: sourceItems.length,
+      },
+    });
+
     return created;
   }
 
@@ -183,10 +219,23 @@ export class BillVersionService {
       throw new AppError(422, "VALIDATION_ERROR", "Bill version cannot be submitted", summary.issues);
     }
 
-    return this.billVersionRepository.updateStatus({
+    const updated = await this.billVersionRepository.updateStatus({
       versionId: version.id,
       versionStatus: "submitted",
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      resourceType: "bill_version",
+      resourceId: updated.id,
+      action: "submit",
+      operatorId: input.userId,
+      beforePayload: { ...version },
+      afterPayload: updated,
+    });
+
+    return updated;
   }
 
   async getSourceChain(input: {
@@ -225,10 +274,23 @@ export class BillVersionService {
       );
     }
 
-    return this.billVersionRepository.updateStatus({
+    const updated = await this.billVersionRepository.updateStatus({
       versionId: version.id,
       versionStatus: "editable",
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode,
+      resourceType: "bill_version",
+      resourceId: updated.id,
+      action: "withdraw",
+      operatorId: input.userId,
+      beforePayload: { ...version },
+      afterPayload: updated,
+    });
+
+    return updated;
   }
 
   private async assertProjectExists(projectId: string): Promise<void> {

@@ -1,6 +1,12 @@
 import { z } from "zod";
 
+import { requireDependency } from "../../shared/dependency/require-dependency.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import {
+  divideDecimal,
+  multiplyDecimal,
+} from "../../shared/math/decimal-money.js";
+import type { AuditLogService } from "../audit/audit-log-service.js";
 import { ProjectAuthorizationService } from "../project/project-authorization-service.js";
 import type { ProjectRepository } from "../project/project-repository.js";
 import type { ProjectStageRepository } from "../project/project-stage-repository.js";
@@ -15,6 +21,7 @@ import type {
   BillItemRepository,
 } from "./bill-item-repository.js";
 import type { BillWorkItemRepository } from "./bill-work-item-repository.js";
+import type { QuotaLineRepository } from "../quota/quota-line-repository.js";
 
 export const createBillItemSchema = z.object({
   parentId: z.string().min(1).nullable(),
@@ -28,6 +35,7 @@ export const createBillItemSchema = z.object({
 export const updateBillItemSchema = createBillItemSchema;
 export const updateBillItemManualPricingSchema = z.object({
   manualUnitPrice: z.number().positive().nullable(),
+  reason: z.string().min(1).max(500),
 });
 
 type Dependencies = {
@@ -37,13 +45,22 @@ type Dependencies = {
   projectMemberRepository: ProjectMemberRepository;
   billVersionRepository: BillVersionRepository;
   billWorkItemRepository?: BillWorkItemRepository;
+  quotaLineRepository?: QuotaLineRepository;
 };
 
 export class BillItemService {
+  private readonly auditLogService: AuditLogService;
+
   constructor(
     private readonly billItemRepository: BillItemRepository,
     private readonly dependencies: Dependencies,
-  ) {}
+    auditLogService?: AuditLogService,
+  ) {
+    this.auditLogService = requireDependency(
+      auditLogService,
+      "auditLogService",
+    );
+  }
 
   async listBillItems(input: {
     projectId: string;
@@ -86,7 +103,7 @@ export class BillItemService {
       }
     }
 
-    return this.billItemRepository.create({
+    const created = await this.billItemRepository.create({
       billVersionId: version.id,
       parentId: input.parentId,
       itemCode: input.itemCode,
@@ -95,6 +112,18 @@ export class BillItemService {
       unit: input.unit,
       sortNo: input.sortNo,
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      resourceType: "bill_item",
+      resourceId: created.id,
+      action: "create",
+      operatorId: input.userId,
+      afterPayload: created,
+    });
+
+    return created;
   }
 
   async updateBillItem(input: {
@@ -128,7 +157,8 @@ export class BillItemService {
       }
     }
 
-    return this.billItemRepository.update(input.itemId, {
+    const before = { ...existingItem };
+    const updated = await this.billItemRepository.update(input.itemId, {
       billVersionId: version.id,
       parentId: input.parentId,
       itemCode: input.itemCode,
@@ -137,6 +167,19 @@ export class BillItemService {
       unit: input.unit,
       sortNo: input.sortNo,
     });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      resourceType: "bill_item",
+      resourceId: updated.id,
+      action: "update",
+      operatorId: input.userId,
+      beforePayload: before,
+      afterPayload: updated,
+    });
+
+    return updated;
   }
 
   async updateBillItemManualPricing(input: {
@@ -144,6 +187,7 @@ export class BillItemService {
     billVersionId: string;
     itemId: string;
     manualUnitPrice: number | null;
+    reason: string;
     userId: string;
   }): Promise<BillItemRecord> {
     const { billItem: existingItem } = await this.getEditableBillItemContext({
@@ -155,13 +199,65 @@ export class BillItemService {
 
     const baseUnitPrice = existingItem.systemUnitPrice ?? 0;
     const finalUnitPrice = input.manualUnitPrice ?? baseUnitPrice;
-    const finalAmount = Number((finalUnitPrice * existingItem.quantity).toFixed(2));
+    const finalAmount = multiplyDecimal(finalUnitPrice, existingItem.quantity, 2);
 
-    return this.billItemRepository.updateManualPricing(input.itemId, {
+    const before = { ...existingItem };
+    const updated = await this.billItemRepository.updateManualPricing(input.itemId, {
       manualUnitPrice: input.manualUnitPrice,
-      finalUnitPrice,
+      finalUnitPrice: divideDecimal(finalAmount, existingItem.quantity, 6),
       finalAmount,
       calculatedAt: new Date().toISOString(),
+    });
+
+    const version = await this.dependencies.billVersionRepository.findById(
+      existingItem.billVersionId,
+    );
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version?.stageCode ?? null,
+      resourceType: "bill_item",
+      resourceId: updated.id,
+      action: "manual_pricing",
+      operatorId: input.userId,
+      beforePayload: before,
+      afterPayload: {
+        ...updated,
+        reason: input.reason,
+      },
+    });
+
+    return updated;
+  }
+
+  async deleteBillItem(input: {
+    projectId: string;
+    billVersionId: string;
+    itemId: string;
+    userId: string;
+  }): Promise<void> {
+    const { version, billItem } = await this.getEditableBillItemContext(input);
+    const siblingItems = await this.billItemRepository.listByBillVersionId(version.id);
+    if (siblingItems.some((item) => item.parentId === billItem.id)) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Parent bill items cannot be deleted before child items",
+      );
+    }
+
+    await this.dependencies.billWorkItemRepository?.deleteByBillItemId(billItem.id);
+    await this.dependencies.quotaLineRepository?.deleteByBillItemId(billItem.id);
+    await this.billItemRepository.delete(billItem.id);
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: version.stageCode,
+      resourceType: "bill_item",
+      resourceId: billItem.id,
+      action: "delete",
+      operatorId: input.userId,
+      beforePayload: billItem,
     });
   }
 

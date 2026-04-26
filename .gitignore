@@ -11,6 +11,10 @@ node_modules/
 dist/
 .next/
 
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
 .env
 .env.*
 
@@ -20,4 +24,3 @@ apps/**/out/
 
 coverage/
 tmp/
-

@@ -728,3 +728,107 @@ test("POST /v1/projects/:id/bill-versions validates required payload fields", as
 
   await app.close();
 });
+
+test("bill version mutations write audit logs", async () => {
+  const app = createBillVersionApp();
+  const ownerToken = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+    payload: {
+      stageCode: "estimate",
+      disciplineCode: "building",
+      versionName: "审计测试版",
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 201);
+  const createdVersionId = createResponse.json().id;
+
+  const copyResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/copy-from",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(copyResponse.statusCode, 201);
+
+  const submitResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/submit",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(submitResponse.statusCode, 200);
+
+  const withdrawResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/withdraw",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(withdrawResponse.statusCode, 200);
+
+  const createAuditResponse = await app.inject({
+    method: "GET",
+    url: `/v1/projects/project-001/audit-logs?resourceType=bill_version&resourceId=${createdVersionId}&action=create`,
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(createAuditResponse.statusCode, 200);
+  assert.equal(createAuditResponse.json().items.length, 1);
+
+  const copyAuditResponse = await app.inject({
+    method: "GET",
+    url: `/v1/projects/project-001/audit-logs?resourceType=bill_version&resourceId=${copyResponse.json().id}&action=copy_from`,
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(copyAuditResponse.statusCode, 200);
+  assert.equal(copyAuditResponse.json().items.length, 1);
+
+  const submitAuditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=bill_version&resourceId=bill-version-001&action=submit",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(submitAuditResponse.statusCode, 200);
+  assert.equal(submitAuditResponse.json().items.length, 1);
+
+  const withdrawAuditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=bill_version&resourceId=bill-version-001&action=withdraw",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(withdrawAuditResponse.statusCode, 200);
+  assert.equal(withdrawAuditResponse.json().items.length, 1);
+
+  await app.close();
+});

@@ -29,15 +29,35 @@ test("repository exposes the new AI-first workspace skeleton", () => {
   }
 });
 
-test("root package.json declares the TypeScript workspace apps", () => {
+test("root package.json declares the TypeScript workspaces", () => {
   const packageJson = JSON.parse(
     fs.readFileSync(path.join(rootDir, "package.json"), "utf8"),
   );
 
   assert.deepEqual(packageJson.workspaces, [
+    "packages/job-contracts",
     "apps/frontend",
     "apps/api",
     "apps/mcp-gateway",
     "apps/worker",
   ]);
+});
+
+test("MCP Gateway docs list every exposed capability", async () => {
+  const { RESOURCE_DEFINITIONS, TOOL_DEFINITIONS } = await import(
+    "../apps/mcp-gateway/src/app/capabilities.ts"
+  );
+  const readme = fs.readFileSync(
+    path.join(rootDir, "apps/mcp-gateway/README.md"),
+    "utf8",
+  );
+  const designDoc = fs.readFileSync(
+    path.join(rootDir, "docs/architecture/mcp-capability-design.md"),
+    "utf8",
+  );
+
+  for (const capability of [...RESOURCE_DEFINITIONS, ...TOOL_DEFINITIONS]) {
+    assert.match(readme, new RegExp(`- \`${capability.name}\``));
+    assert.match(designDoc, new RegExp(`- \`${capability.name}\``));
+  }
 });

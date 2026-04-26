@@ -540,6 +540,54 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - 知识图谱查询工具
 - 记忆读写工具
 
+## 10.3 当前已落地能力（2026-04-25）
+
+当前实现位置：
+
+- `apps/mcp-gateway`
+
+已落地 resources：
+
+- `project-summary`
+- `summary-details`
+- `jobs-summary`
+- `project-context`
+- `job-status`
+- `knowledge-extraction-result`
+- `knowledge-extraction-history`
+- `review-summary`
+- `process-document-summary`
+- `report-export-status`
+- `import-failure-context`
+
+已落地 tools：
+
+- `recalculate-project`
+- `export-summary-report`
+- `extract-knowledge`
+- `preview-knowledge-extraction`
+- `extract-knowledge-from-audit`
+- `retry-import-failure-scope`
+- `decide-review`
+- `update-process-document-status`
+
+当前验证：
+
+- `npm --workspace @saas-pricing/mcp-gateway test`
+- `npm --workspace @saas-pricing/mcp-gateway run typecheck`
+
+当前 e2e 覆盖：
+
+- gateway 通过 Fastify `inject` 直连 API app
+- 覆盖 API token 透传
+- 覆盖 `resource + tool` 前后状态一致性
+- 覆盖 import failure scope retry
+- 覆盖 report export / recalculate / knowledge extraction 异步任务
+- 覆盖 review / process document 摘要
+- 覆盖 review / process document workflow tool 状态推进与失败透传
+- 覆盖 project summary / summary details / project context 聚合
+- 覆盖 capabilities URI 与 gateway route 注册一致性
+
 ## 11. 推荐代码组织
 
 后端建议新增模块：
@@ -568,4 +616,3 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 本系统的 MCP 层应该被设计成：
 
 `建立在业务服务之上的 AI 任务上下文能力层，以资源上下文打包、语义搜索和权限裁剪为核心，让 AI 能稳定、安全、高效地理解和使用造价业务主链。`
-

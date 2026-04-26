@@ -161,7 +161,7 @@ Sprint 1 建议先拉起三批卡。
 
 ### 7.4 接口口径
 
-统一以 [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml) 为准。
+统一以当前 `/v1` 生成契约 [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml) 为准。
 
 ## 8. 现在团队怎么用这些文档
 

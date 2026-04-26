@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { requireDependency } from "../../shared/dependency/require-dependency.js";
 import { AppError } from "../../shared/errors/app-error.js";
 import { ProjectAuthorizationService } from "../project/project-authorization-service.js";
 import type { ProjectDisciplineRepository } from "../project/project-discipline-repository.js";
@@ -39,35 +40,63 @@ type Dependencies = {
 };
 
 const REVIEWER_ROLES = new Set(["reviewer", "project_owner", "system_admin"]);
+const REVIEW_STATUS_PRIORITY: Record<ReviewSubmissionRecord["status"], number> = {
+  pending: 0,
+  rejected: 1,
+  approved: 2,
+  cancelled: 3,
+};
 
 export class ReviewSubmissionService {
+  private readonly auditLogService: AuditLogService;
+
   constructor(
     private readonly reviewSubmissionRepository: ReviewSubmissionRepository,
     private readonly dependencies: Dependencies,
-    private readonly auditLogService?: AuditLogService,
-  ) {}
+    auditLogService?: AuditLogService,
+  ) {
+    this.auditLogService = requireDependency(
+      auditLogService,
+      "auditLogService",
+    );
+  }
 
   async listReviewSubmissions(input: {
     projectId: string;
+    billVersionId?: string;
     stageCode?: string;
     disciplineCode?: string;
     status?: ReviewSubmissionRecord["status"];
     userId: string;
-  }): Promise<
-    Array<
+  }): Promise<{
+    items: Array<
       ReviewSubmissionRecord & {
         billVersionSummary: {
           versionName: string;
           versionNo: number;
           versionStatus: string;
         };
+        canApprove: boolean;
+        canReject: boolean;
+        canCancel: boolean;
       }
-    >
-  > {
+    >;
+    summary: {
+      totalCount: number;
+      statusCounts: Record<ReviewSubmissionRecord["status"], number>;
+      actionableCount: number;
+    };
+  }> {
     await this.assertProjectExists(input.projectId);
+    const members = await this.dependencies.projectMemberRepository.listByProjectId(
+      input.projectId,
+    );
     const authorizationService = await this.createAuthorizationService(
       input.projectId,
     );
+    const currentMember = members.find((candidate) => candidate.userId === input.userId);
+    const canReviewRole =
+      currentMember != null && REVIEWER_ROLES.has(currentMember.roleCode);
 
     if (
       !authorizationService.canViewContext({
@@ -91,10 +120,16 @@ export class ReviewSubmissionService {
       billVersions.map((billVersion) => [billVersion.id, billVersion]),
     );
 
-    return (
+    const items = (
       await this.reviewSubmissionRepository.listByProjectId(input.projectId)
     ).filter((submission) => {
       if (input.stageCode && submission.stageCode !== input.stageCode) {
+        return false;
+      }
+      if (
+        input.billVersionId &&
+        submission.billVersionId !== input.billVersionId
+      ) {
         return false;
       }
       if (
@@ -121,8 +156,50 @@ export class ReviewSubmissionService {
           versionNo: billVersion?.versionNo ?? 0,
           versionStatus: billVersion?.versionStatus ?? "unknown",
         },
+        canApprove:
+          submission.status === "pending" &&
+          canReviewRole &&
+          submission.submittedBy !== input.userId,
+        canReject:
+          submission.status === "pending" &&
+          canReviewRole &&
+          submission.submittedBy !== input.userId,
+        canCancel:
+          submission.status === "pending" &&
+          submission.submittedBy === input.userId,
       };
+    }).sort((left, right) => {
+      const statusDifference =
+        REVIEW_STATUS_PRIORITY[left.status] - REVIEW_STATUS_PRIORITY[right.status];
+      if (statusDifference !== 0) {
+        return statusDifference;
+      }
+
+      const rightActivityAt = right.reviewedAt ?? right.submittedAt;
+      const leftActivityAt = left.reviewedAt ?? left.submittedAt;
+      const activityDifference = rightActivityAt.localeCompare(leftActivityAt);
+      if (activityDifference !== 0) {
+        return activityDifference;
+      }
+
+      return right.id.localeCompare(left.id);
     });
+
+    return {
+      items,
+      summary: {
+        totalCount: items.length,
+        statusCounts: {
+          pending: items.filter((item) => item.status === "pending").length,
+          approved: items.filter((item) => item.status === "approved").length,
+          rejected: items.filter((item) => item.status === "rejected").length,
+          cancelled: items.filter((item) => item.status === "cancelled").length,
+        },
+        actionableCount: items.filter(
+          (item) => item.canApprove || item.canReject || item.canCancel,
+        ).length,
+      },
+    };
   }
 
   async submitReview(input: {
@@ -165,7 +242,7 @@ export class ReviewSubmissionService {
       rejectionReason: null,
     });
 
-    await this.auditLogService?.writeAuditLog({
+    await this.auditLogService.writeAuditLog({
       projectId: input.projectId,
       stageCode: version.stageCode,
       resourceType: "review_submission",
@@ -218,7 +295,7 @@ export class ReviewSubmissionService {
       rejectionReason: null,
     });
 
-    await this.auditLogService?.writeAuditLog({
+    await this.auditLogService.writeAuditLog({
       projectId: input.projectId,
       stageCode: submission.stageCode,
       resourceType: "review_submission",
@@ -269,7 +346,7 @@ export class ReviewSubmissionService {
       rejectionReason: input.reason,
     });
 
-    await this.auditLogService?.writeAuditLog({
+    await this.auditLogService.writeAuditLog({
       projectId: input.projectId,
       stageCode: submission.stageCode,
       resourceType: "review_submission",
@@ -333,7 +410,7 @@ export class ReviewSubmissionService {
       rejectionReason: null,
     });
 
-    await this.auditLogService?.writeAuditLog({
+    await this.auditLogService.writeAuditLog({
       projectId: input.projectId,
       stageCode: submission.stageCode,
       resourceType: "review_submission",

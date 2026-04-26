@@ -4,15 +4,24 @@
   "private": true,
   "packageManager": "npm@11.6.2",
   "workspaces": [
+    "packages/job-contracts",
     "apps/frontend",
     "apps/api",
     "apps/mcp-gateway",
     "apps/worker"
   ],
   "scripts": {
-    "test": "npm run test:workspace && pytest apps/ai-runtime/tests/test_main.py",
-    "test:workspace": "node --test tests/workspace-structure.test.mjs",
-    "test:ai-runtime": "pytest apps/ai-runtime/tests/test_main.py",
+    "dev:deps:up": "docker compose -f deploy/docker/docker-compose.dev.yml up -d --wait",
+    "dev:deps:down": "docker compose -f deploy/docker/docker-compose.dev.yml down",
+    "docs:api": "npm run docs:api-routes && npm run docs:openapi-current",
+    "docs:api-routes": "node scripts/generate-implemented-routes-doc.mjs",
+    "docs:openapi-current": "node scripts/generate-openapi-v1-current.mjs",
+    "api:test:live-db": "DATABASE_URL=postgres://postgres:postgres@localhost:5432/saas_pricing npm --workspace @saas-pricing/api run test:live-db",
+    "dev:smoke:live-db": "npm run dev:deps:up && npm run api:test:live-db",
+    "test": "npm run test:packages && npm run test:workspace && npm run test:ai-runtime",
+    "test:packages": "npm run test --workspaces --if-present",
+    "test:workspace": "node --test tests/*.test.mjs",
+    "test:ai-runtime": "pytest apps/ai-runtime/tests",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {

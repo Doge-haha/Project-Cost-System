@@ -1,3 +1,4 @@
+import { AppError } from "../../shared/errors/app-error.js";
 import type { ProjectDisciplineRecord } from "./project-discipline-repository.js";
 import type { ProjectMemberRecord } from "./project-member-repository.js";
 import type { ProjectStageRecord } from "./project-stage-repository.js";
@@ -61,7 +62,7 @@ export class ProjectAuthorizationService {
       return false;
     }
 
-    const policy = ROLE_POLICIES[member.roleCode];
+    const policy = this.getRolePolicy(member.roleCode);
     return Boolean(policy?.bypassScopeChecks);
   }
 
@@ -82,10 +83,7 @@ export class ProjectAuthorizationService {
       return false;
     }
 
-    const policy = ROLE_POLICIES[member.roleCode];
-    if (!policy) {
-      return false;
-    }
+    const policy = this.getRolePolicy(member.roleCode);
 
     if (action === "edit" && !policy.canEdit) {
       return false;
@@ -144,5 +142,18 @@ export class ProjectAuthorizationService {
     ];
 
     return scopeChecks.every(Boolean);
+  }
+
+  private getRolePolicy(roleCode: string): RolePolicy {
+    const policy = ROLE_POLICIES[roleCode];
+    if (!policy) {
+      throw new AppError(
+        500,
+        "INVALID_ROLE_CODE",
+        `Unsupported project role code: ${roleCode}`,
+      );
+    }
+
+    return policy;
   }
 }

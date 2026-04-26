@@ -12,3 +12,8 @@ export const mcpGatewayDescriptor = {
 export function describeMcpGateway(): string {
   return `${mcpGatewayDescriptor.name}:${mcpGatewayDescriptor.role}`;
 }
+
+export * from "./app/create-app.js";
+export * from "./runtime/api-client.js";
+export * from "./shared/auth.js";
+export * from "./shared/app-error.js";

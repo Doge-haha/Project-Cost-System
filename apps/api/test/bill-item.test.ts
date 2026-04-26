@@ -31,6 +31,10 @@ import {
   InMemoryBillWorkItemRepository,
   type BillWorkItemRecord,
 } from "../src/modules/bill/bill-work-item-repository.js";
+import {
+  InMemoryQuotaLineRepository,
+  type QuotaLineRecord,
+} from "../src/modules/quota/quota-line-repository.js";
 
 const jwtSecret = "bill-item-test-secret";
 
@@ -146,8 +150,43 @@ const billWorkItems: BillWorkItemRecord[] = [
     sortNo: 1,
   },
 ];
+const quotaLines: QuotaLineRecord[] = [
+  {
+    id: "quota-line-001",
+    billItemId: "bill-item-001",
+    sourceStandardSetCode: "js-2013-building",
+    sourceQuotaId: "quota-source-001",
+    sourceSequence: 1,
+    chapterCode: "01",
+    quotaCode: "010101001",
+    quotaName: "人工挖土方",
+    unit: "m3",
+    quantity: 100,
+    laborFee: 20,
+    materialFee: 10,
+    machineFee: 5,
+    contentFactor: 1,
+    sourceMode: "manual",
+  },
+];
 
-function createBillItemApp() {
+function createBillItemApp(overrides?: {
+  quotaLineRepository?: InMemoryQuotaLineRepository;
+  billVersionOverrides?: {
+    billVersionId: string;
+    versionStatus: BillVersionRecord["versionStatus"];
+  };
+}) {
+  const seededBillVersions = billVersions.map((version) =>
+    overrides?.billVersionOverrides &&
+    version.id === overrides.billVersionOverrides.billVersionId
+      ? {
+          ...version,
+          versionStatus: overrides.billVersionOverrides.versionStatus,
+        }
+      : { ...version },
+  );
+
   return createApp({
     jwtSecret,
     projectRepository: new InMemoryProjectRepository(projects),
@@ -156,9 +195,12 @@ function createBillItemApp() {
       disciplines,
     ),
     projectMemberRepository: new InMemoryProjectMemberRepository(members),
-    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billVersionRepository: new InMemoryBillVersionRepository(seededBillVersions),
     billItemRepository: new InMemoryBillItemRepository(billItems),
     billWorkItemRepository: new InMemoryBillWorkItemRepository(billWorkItems),
+    quotaLineRepository:
+      overrides?.quotaLineRepository ??
+      new InMemoryQuotaLineRepository(quotaLines),
   });
 }
 
@@ -279,6 +321,40 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items re
       code: "VALIDATION_ERROR",
       message: "Bill item must belong to the target bill version",
     },
+  });
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items/:workItemId updates a work item", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/work-items/work-item-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      workContent: "机械清底并外运",
+      sortNo: 3,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    id: "work-item-001",
+    billItemId: "bill-item-001",
+    workContent: "机械清底并外运",
+    sortNo: 3,
   });
 
   await app.close();
@@ -568,6 +644,254 @@ test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId rejects writes
       message: "Bill version is not editable in its current status",
     },
   });
+
+  await app.close();
+});
+
+test("bill item and work item creation write audit logs", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const createItemResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      parentId: null,
+      itemCode: "A.2",
+      itemName: "新建清单项",
+      quantity: 66,
+      unit: "m2",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(createItemResponse.statusCode, 201);
+
+  const createWorkItemResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/work-items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      workContent: "人工清底",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(createWorkItemResponse.statusCode, 201);
+
+  const billItemAuditResponse = await app.inject({
+    method: "GET",
+    url: `/v1/projects/project-001/audit-logs?resourceType=bill_item&resourceId=${createItemResponse.json().id}&action=create`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(billItemAuditResponse.statusCode, 200);
+  assert.equal(billItemAuditResponse.json().items.length, 1);
+
+  const workItemAuditResponse = await app.inject({
+    method: "GET",
+    url: `/v1/projects/project-001/audit-logs?resourceType=bill_work_item&resourceId=${createWorkItemResponse.json().id}&action=create`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(workItemAuditResponse.statusCode, 200);
+  assert.equal(workItemAuditResponse.json().items.length, 1);
+
+  await app.close();
+});
+
+test("DELETE /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items/:workItemId deletes a work item", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "DELETE",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/work-items/work-item-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 204);
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/work-items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listResponse.json().items.length, 0);
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=bill_work_item&resourceId=work-item-001&action=delete",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items/:workItemId rejects writes when the version is submitted", async () => {
+  const app = createBillItemApp({
+    billVersionOverrides: {
+      billVersionId: "bill-version-001",
+      versionStatus: "submitted",
+    },
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/work-items/work-item-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      workContent: "提交态修改",
+      sortNo: 4,
+    },
+  });
+
+  assert.equal(response.statusCode, 423);
+  assert.equal(response.json().error.code, "RESOURCE_LOCKED");
+
+  await app.close();
+});
+
+test("DELETE /v1/projects/:id/bill-versions/:versionId/items/:itemId rejects deleting parent items", async () => {
+  const app = createBillItemApp();
+  const ownerToken = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const createChildResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+    payload: {
+      parentId: "bill-item-001",
+      itemCode: "A.1.2",
+      itemName: "子项",
+      quantity: 10,
+      unit: "m3",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(createChildResponse.statusCode, 201);
+
+  const deleteResponse = await app.inject({
+    method: "DELETE",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(deleteResponse.statusCode, 422);
+  assert.equal(deleteResponse.json().error.code, "VALIDATION_ERROR");
+
+  await app.close();
+});
+
+test("DELETE /v1/projects/:id/bill-versions/:versionId/items/:itemId deletes a leaf item", async () => {
+  const quotaLineRepository = new InMemoryQuotaLineRepository(quotaLines);
+  const app = createBillItemApp({
+    quotaLineRepository,
+  });
+  const ownerToken = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const deleteResponse = await app.inject({
+    method: "DELETE",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(deleteResponse.statusCode, 204);
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(
+    listResponse.json().items.some((item: { id: string }) => item.id === "bill-item-001"),
+    false,
+  );
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=bill_item&resourceId=bill-item-001&action=delete",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+
+  assert.deepEqual(
+    await quotaLineRepository.listByBillItemId("bill-item-001"),
+    [],
+  );
 
   await app.close();
 });

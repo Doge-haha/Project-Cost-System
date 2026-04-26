@@ -326,6 +326,51 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines r
   await app.close();
 });
 
+test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines rejects duplicate source quota", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/quota-lines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      sourceStandardSetCode: "js-2013-building",
+      sourceQuotaId: "quota-source-001",
+      sourceSequence: 2,
+      chapterCode: "02",
+      quotaCode: "010101002",
+      quotaName: "机械挖土方",
+      unit: "m3",
+      quantity: 80,
+      laborFee: 90,
+      materialFee: 20,
+      machineFee: 60,
+      contentFactor: 1.2,
+      sourceMode: "manual",
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: {
+      code: "VALIDATION_ERROR",
+      message: "Duplicate quota source is not allowed for the same bill item",
+    },
+  });
+
+  await app.close();
+});
+
 test("PUT /v1/projects/:id/quota-lines/:lineId updates a quota line", async () => {
   const app = createQuotaApp();
   const token = await signAccessToken(
@@ -377,6 +422,76 @@ test("PUT /v1/projects/:id/quota-lines/:lineId updates a quota line", async () =
     machineFee: 40,
     contentFactor: 1.1,
     sourceMode: "manual",
+  });
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/quota-lines/:lineId rejects duplicate source quota", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/quota-lines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      sourceStandardSetCode: "js-2013-building",
+      sourceQuotaId: "quota-source-002",
+      sourceSequence: 2,
+      chapterCode: "02",
+      quotaCode: "010101002",
+      quotaName: "机械挖土方",
+      unit: "m3",
+      quantity: 80,
+      laborFee: 90,
+      materialFee: 20,
+      machineFee: 60,
+      contentFactor: 1.2,
+      sourceMode: "manual",
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 201);
+
+  const response = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/quota-lines/${createResponse.json().id}`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      sourceStandardSetCode: "js-2013-building",
+      sourceQuotaId: "quota-source-001",
+      sourceSequence: 2,
+      chapterCode: "02",
+      quotaCode: "010101002",
+      quotaName: "机械挖土方",
+      unit: "m3",
+      quantity: 80,
+      laborFee: 90,
+      materialFee: 20,
+      machineFee: 60,
+      contentFactor: 1.2,
+      sourceMode: "manual",
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: {
+      code: "VALIDATION_ERROR",
+      message: "Duplicate quota source is not allowed for the same bill item",
+    },
   });
 
   await app.close();

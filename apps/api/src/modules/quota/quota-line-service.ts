@@ -79,6 +79,11 @@ export class QuotaLineService {
     userId: string;
   }): Promise<QuotaLineRecord> {
     const version = await this.assertBillItemInEditableContext(input, "edit");
+    await this.assertUniqueSourceQuota({
+      billItemId: input.billItemId,
+      sourceStandardSetCode: input.sourceStandardSetCode,
+      sourceQuotaId: input.sourceQuotaId,
+    });
 
     const created = await this.quotaLineRepository.create({
       billItemId: input.billItemId,
@@ -149,6 +154,12 @@ export class QuotaLineService {
       },
       "edit",
     );
+    await this.assertUniqueSourceQuota({
+      billItemId: billItem.id,
+      sourceStandardSetCode: input.sourceStandardSetCode,
+      sourceQuotaId: input.sourceQuotaId,
+      excludeQuotaLineId: input.quotaLineId,
+    });
 
     const before = { ...existingQuotaLine };
     const updated = await this.quotaLineRepository.update(input.quotaLineId, {
@@ -268,5 +279,30 @@ export class QuotaLineService {
     }
 
     return version;
+  }
+
+  private async assertUniqueSourceQuota(input: {
+    billItemId: string;
+    sourceStandardSetCode: string;
+    sourceQuotaId: string;
+    excludeQuotaLineId?: string;
+  }): Promise<void> {
+    const existingQuotaLines = await this.quotaLineRepository.listByBillItemId(
+      input.billItemId,
+    );
+    const duplicate = existingQuotaLines.some(
+      (quotaLine) =>
+        quotaLine.id !== input.excludeQuotaLineId &&
+        quotaLine.sourceStandardSetCode === input.sourceStandardSetCode &&
+        quotaLine.sourceQuotaId === input.sourceQuotaId,
+    );
+
+    if (duplicate) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Duplicate quota source is not allowed for the same bill item",
+      );
+    }
   }
 }

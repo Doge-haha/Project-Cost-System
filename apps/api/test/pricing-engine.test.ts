@@ -439,6 +439,39 @@ test("POST /v1/engine/calculate rejects inactive price versions", async () => {
   await app.close();
 });
 
+test("POST /v1/engine/calculate rejects incomplete input with validation details", async () => {
+  const app = createPricingApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      priceVersionId: "",
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.equal(response.json().error.code, "VALIDATION_ERROR");
+  assert.equal(response.json().error.message, "Request validation failed");
+  assert.deepEqual(
+    response.json().error.details.map((detail: { field: string }) => detail.field),
+    ["billItemId", "priceVersionId"],
+  );
+
+  await app.close();
+});
+
 test("POST /v1/engine/calculate applies fee template rules to final price", async () => {
   const app = createPricingApp();
   const token = await signAccessToken(

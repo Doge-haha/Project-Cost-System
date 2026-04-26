@@ -19,6 +19,7 @@ export type SummaryResult = {
   billVersionId: string | null;
   stageCode: string | null;
   disciplineCode: string | null;
+  unitCode: string | null;
   versionCount: number;
   itemCount: number;
   totalSystemAmount: number;
@@ -48,6 +49,7 @@ export type SummaryDetailResult = {
   billVersionId: string | null;
   stageCode: string | null;
   disciplineCode: string | null;
+  unitCode: string | null;
   totalCount: number;
   items: SummaryDetailItem[];
 };
@@ -91,10 +93,14 @@ export class SummaryService {
     billVersionId?: string;
     stageCode?: string;
     disciplineCode?: string;
+    unitCode?: string;
     userId: string;
   }): Promise<SummaryResult> {
     const billVersions = await this.getAuthorizedBillVersions(input);
-    const allItems = await this.listBillItemsForVersions(billVersions);
+    const allItems = this.filterItemsByUnitCode(
+      await this.listBillItemsForVersions(billVersions),
+      input.unitCode,
+    );
 
     const totalSystemAmount = sumDecimal(
       allItems.map((item) => item.systemAmount ?? 0),
@@ -112,6 +118,7 @@ export class SummaryService {
       billVersionId: input.billVersionId ?? null,
       stageCode: input.stageCode ?? null,
       disciplineCode: input.disciplineCode ?? null,
+      unitCode: input.unitCode ?? null,
       versionCount: billVersions.length,
       itemCount: allItems.length,
       totalSystemAmount,
@@ -126,11 +133,15 @@ export class SummaryService {
     billVersionId?: string;
     stageCode?: string;
     disciplineCode?: string;
+    unitCode?: string;
     limit?: number;
     userId: string;
   }): Promise<SummaryDetailResult> {
     const billVersions = await this.getAuthorizedBillVersions(input);
-    const allItems = await this.listBillItemsForVersions(billVersions);
+    const allItems = this.filterItemsByUnitCode(
+      await this.listBillItemsForVersions(billVersions),
+      input.unitCode,
+    );
     const totalVariance = sumDecimal(
       allItems.map((item) =>
         absoluteDecimal(
@@ -147,7 +158,7 @@ export class SummaryService {
           const items = await this.dependencies.billItemRepository.listByBillVersionId(
             billVersion.id,
           );
-          return items.map((item) => {
+          return this.filterItemsByUnitCode(items, input.unitCode).map((item) => {
             const systemAmount = roundDecimal(item.systemAmount ?? 0, 2);
             const finalAmount = roundDecimal(item.finalAmount ?? 0, 2);
             const varianceAmount = subtractDecimal(finalAmount, systemAmount, 2);
@@ -185,6 +196,7 @@ export class SummaryService {
       billVersionId: input.billVersionId ?? null,
       stageCode: input.stageCode ?? null,
       disciplineCode: input.disciplineCode ?? null,
+      unitCode: input.unitCode ?? null,
       totalCount: details.length,
       items: details.slice(0, input.limit ?? 20),
     };
@@ -373,5 +385,17 @@ export class SummaryService {
         ),
       )
     ).flat();
+  }
+
+  private filterItemsByUnitCode<
+    Item extends {
+      unit: string;
+    },
+  >(items: Item[], unitCode?: string): Item[] {
+    if (!unitCode) {
+      return items;
+    }
+
+    return items.filter((item) => item.unit === unitCode);
   }
 }

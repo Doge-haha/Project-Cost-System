@@ -22,6 +22,7 @@ const summaryDetailQuerySchema = z.object({
   billVersionId: z.string().min(1).optional(),
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
+  unitCode: z.string().min(1).optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
@@ -56,6 +57,7 @@ export function registerReportRoutes(
         billVersionId: query.billVersionId,
         stageCode: query.stageCode,
         disciplineCode: query.disciplineCode,
+        unitCode: query.unitCode,
         userId: request.currentUser!.id,
       }),
     );
@@ -70,6 +72,7 @@ export function registerReportRoutes(
         billVersionId: query.billVersionId,
         stageCode: query.stageCode,
         disciplineCode: query.disciplineCode,
+        unitCode: query.unitCode,
         limit: query.limit,
         userId: request.currentUser!.id,
       }),

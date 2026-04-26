@@ -170,6 +170,7 @@ test("project summary, summary details and context stay aligned over HTTP", asyn
         billVersionId: "bill-version-001",
         stageCode: "estimate",
         disciplineCode: "building",
+        unitCode: null,
         versionCount: 1,
         itemCount: 2,
         totalSystemAmount: 2000,
@@ -202,6 +203,7 @@ test("project summary, summary details and context stay aligned over HTTP", asyn
         billVersionId: "bill-version-001",
         stageCode: null,
         disciplineCode: null,
+        unitCode: null,
         totalCount: 2,
         items: [
           {
@@ -247,6 +249,7 @@ test("project summary, summary details and context stay aligned over HTTP", asyn
           billVersionId: null,
           stageCode: "estimate",
           disciplineCode: "building",
+          unitCode: null,
           versionCount: 1,
           itemCount: 2,
           totalSystemAmount: 2000,

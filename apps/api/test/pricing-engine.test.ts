@@ -1286,6 +1286,7 @@ test("GET /v1/reports/summary aggregates project totals using system and final a
     billVersionId: "bill-version-001",
     stageCode: "estimate",
     disciplineCode: "building",
+    unitCode: null,
     versionCount: 1,
     itemCount: 2,
     totalSystemAmount: 1080,
@@ -1954,6 +1955,56 @@ test("GET /v1/reports/summary and /details support billVersionId filtering", asy
       .items.every((item: { billVersionId: string }) => item.billVersionId === "bill-version-001"),
     true,
   );
+
+  await app.close();
+});
+
+test("GET /v1/reports/summary and /details support unitCode filtering", async () => {
+  const app = createPricingApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const summaryResponse = await app.inject({
+    method: "GET",
+    url: "/v1/reports/summary?projectId=project-001&stageCode=estimate&disciplineCode=building&unitCode=m2",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(summaryResponse.statusCode, 200);
+  assert.deepEqual(summaryResponse.json(), {
+    projectId: "project-001",
+    billVersionId: null,
+    stageCode: "estimate",
+    disciplineCode: "building",
+    unitCode: "m2",
+    versionCount: 2,
+    itemCount: 1,
+    totalSystemAmount: 240,
+    totalFinalAmount: 300,
+    varianceAmount: 60,
+    varianceRate: 0.25,
+  });
+
+  const detailResponse = await app.inject({
+    method: "GET",
+    url: "/v1/reports/summary/details?projectId=project-001&stageCode=estimate&disciplineCode=building&unitCode=m2",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(detailResponse.statusCode, 200);
+  assert.equal(detailResponse.json().unitCode, "m2");
+  assert.equal(detailResponse.json().totalCount, 1);
+  assert.equal(detailResponse.json().items[0].itemId, "bill-item-004");
 
   await app.close();
 });

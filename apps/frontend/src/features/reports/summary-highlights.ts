@@ -22,6 +22,7 @@ export function classifyVarianceAmount(value: number | string | null | undefined
 
 export function buildSummaryHighlights(details: SummaryDetailItem[]) {
   return [...details]
+    .filter((detail) => Math.abs(Number(detail.varianceAmount ?? 0)) > 0)
     .sort(
       (left, right) =>
         Math.abs(Number(right.varianceAmount ?? 0)) -
@@ -34,5 +35,6 @@ export function buildSummaryHighlights(details: SummaryDetailItem[]) {
       itemName: detail.itemName,
       varianceLabel: formatMoney(detail.varianceAmount),
       tone: classifyVarianceAmount(detail.varianceAmount),
+      priorityLabel: "高优先级",
     }));
 }

@@ -48,6 +48,7 @@ describe("summary highlights", () => {
         itemName: "模板工程",
         varianceLabel: "-90.00",
         tone: "negative",
+        priorityLabel: "高优先级",
       },
       {
         itemId: "item-001",
@@ -55,13 +56,7 @@ describe("summary highlights", () => {
         itemName: "土方开挖",
         varianceLabel: "80.00",
         tone: "positive",
-      },
-      {
-        itemId: "item-003",
-        itemCode: "C.1",
-        itemName: "钢筋工程",
-        varianceLabel: "0.00",
-        tone: "neutral",
+        priorityLabel: "高优先级",
       },
     ]);
   });

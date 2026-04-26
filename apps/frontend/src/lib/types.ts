@@ -254,6 +254,8 @@ export type SummaryDetailItem = {
   systemAmount?: number | string | null;
   finalAmount?: number | string | null;
   varianceAmount?: number | string | null;
+  varianceRate?: number | string | null;
+  varianceShare?: number | string | null;
 };
 
 export type VersionCompareItem = {

@@ -375,14 +375,16 @@ export function SummaryPage() {
 
       {highlightCards.length > 0 ? (
         <section className="panel">
-          <h3>偏差重点项</h3>
+          <h3>高优先级偏差预警</h3>
           <div className="highlight-grid">
             {highlightCards.map((highlight) => (
               <article
                 className={`highlight-card ${highlight.tone}`}
                 key={highlight.itemId}
               >
-                <p className="stat-label">{highlight.itemCode}</p>
+                <p className="stat-label">
+                  {highlight.itemCode} · {highlight.priorityLabel}
+                </p>
                 <h4 className="highlight-title">{highlight.itemName}</h4>
                 <p className="highlight-variance">{highlight.varianceLabel}</p>
               </article>

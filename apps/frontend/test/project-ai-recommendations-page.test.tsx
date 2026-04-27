@@ -134,6 +134,7 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("新点造价项目 · 待处理 1 条 · 共 1 条")).toBeInTheDocument();
     expect(screen.getByText("定额推荐 · 待处理")).toBeInTheDocument();
     expect(screen.getByText("清单名称匹配 · 挖土方")).toBeInTheDocument();
+    expect(screen.getByText("生成人 engineer-001")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "接受" }));
 

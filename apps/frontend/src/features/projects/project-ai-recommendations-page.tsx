@@ -337,6 +337,9 @@ export function ProjectAiRecommendationsPage() {
                 <p className="page-description">
                   {formatRecommendationPayload(recommendation.outputPayload)}
                 </p>
+                <p className="page-description">
+                  生成人 {recommendation.createdBy}
+                </p>
                 {recommendation.status === "generated" ? (
                   <div className="version-card-actions">
                     <button

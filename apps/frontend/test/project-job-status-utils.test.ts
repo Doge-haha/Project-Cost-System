@@ -14,6 +14,7 @@ import {
   buildJobStatusClipboardUrl,
   buildJobStatusClipboardUnavailableError,
   buildJobStatusDownloadSuccessState,
+  buildJobStatusCopySuccessState,
   buildJobStatusSkippedDownloadState,
   buildJobStatusUploadCallout,
   buildNextJobStatusSearchParams,
@@ -112,6 +113,48 @@ describe("project-job-status-utils", () => {
     expect(buildJobStatusClipboardUnavailableError("summary")).toBe(
       "当前环境不支持复制摘要，请手动复制页面内容。",
     );
+  });
+
+  test("builds copy success state by copied target", () => {
+    const reasonTag = { code: "missing_field", label: "缺少必填字段" };
+    expect(
+      buildJobStatusCopySuccessState({
+        target: "filterLink",
+        copiedLinkPath: "/projects/project-001/jobs?failureReason=missing_field",
+        selectedFailureReasonTag: reasonTag,
+      }),
+    ).toEqual({
+      copyMessage: "已复制当前筛选链接，可直接发给协作同事。",
+      copiedLinkPath: "/projects/project-001/jobs?failureReason=missing_field",
+      copyMessageReason: reasonTag,
+      error: null,
+    });
+
+    expect(
+      buildJobStatusCopySuccessState({
+        target: "workOrder",
+        copiedLinkPath: "/projects/project-001/jobs",
+        selectedFailureReasonTag: null,
+      }),
+    ).toEqual({
+      copyMessage: "已复制当前失败子集处理单，可直接作为协作处理单元转交。",
+      copiedLinkPath: "/projects/project-001/jobs",
+      copyMessageReason: null,
+      error: null,
+    });
+
+    expect(
+      buildJobStatusCopySuccessState({
+        target: "upstreamSummary",
+        copiedLinkPath: "/unused",
+        selectedFailureReasonTag: reasonTag,
+      }),
+    ).toEqual({
+      copyMessage: "已复制上游数据方版处理摘要，可直接发给上游排查。",
+      copiedLinkPath: null,
+      copyMessageReason: reasonTag,
+      error: null,
+    });
   });
 
   test("filters import failed items by reason, resource type, and action", () => {

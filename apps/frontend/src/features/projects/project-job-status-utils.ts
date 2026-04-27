@@ -165,6 +165,36 @@ export function buildJobStatusClipboardUnavailableError(
   return "当前环境不支持复制摘要，请手动复制页面内容。";
 }
 
+export function buildJobStatusCopySuccessState(input: {
+  target:
+    | "filterLink"
+    | "processingLink"
+    | "workOrder"
+    | "teamSummary"
+    | "upstreamSummary";
+  copiedLinkPath: string | null;
+  selectedFailureReasonTag: { code: string; label: string } | null;
+}) {
+  const messages = {
+    filterLink: "已复制当前筛选链接，可直接发给协作同事。",
+    processingLink: "已复制当前处理链接，可直接发给协作同事。",
+    workOrder: "已复制当前失败子集处理单，可直接作为协作处理单元转交。",
+    teamSummary: "已复制协作同事版处理摘要，可直接发给当前跟进同事。",
+    upstreamSummary: "已复制上游数据方版处理摘要，可直接发给上游排查。",
+  };
+  const copiedLinkPath =
+    input.target === "teamSummary" || input.target === "upstreamSummary"
+      ? null
+      : input.copiedLinkPath;
+
+  return {
+    copyMessage: messages[input.target],
+    copiedLinkPath,
+    copyMessageReason: input.selectedFailureReasonTag,
+    error: null,
+  };
+}
+
 export function buildFilteredImportFailedItems(input: {
   failedItems: ParsedImportTaskFailedItem[];
   failureReasonCode: string | null;

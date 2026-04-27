@@ -33,6 +33,7 @@ import {
   buildFailureSubsetDownload,
   buildJobStatusClipboardUnavailableError,
   buildJobStatusClipboardUrl,
+  buildJobStatusCopySuccessState,
   buildJobStatusDownloadSuccessState,
   buildJobStatusErrorReportDownloadPlan,
   buildJobStatusFailureReasonTag,
@@ -722,11 +723,16 @@ export function ProjectJobStatusPage() {
         batchEntries: currentFailureSubsetBatchEntries,
         selectedFailedItem,
       });
-      setCopyMessage("已复制当前筛选链接，可直接发给协作同事。");
-      setCopiedLinkPath(recentLinkInput.path);
-      setCopyMessageReason(selectedFailureReasonTag);
+      const copyState = buildJobStatusCopySuccessState({
+        target: "filterLink",
+        copiedLinkPath: recentLinkInput.path,
+        selectedFailureReasonTag,
+      });
+      setCopyMessage(copyState.copyMessage);
+      setCopiedLinkPath(copyState.copiedLinkPath);
+      setCopyMessageReason(copyState.copyMessageReason);
       setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
-      setError(null);
+      setError(copyState.error);
     } catch {
       setError("筛选链接复制失败，请稍后重试。");
     }
@@ -748,11 +754,16 @@ export function ProjectJobStatusPage() {
         selectedFailedItem,
       });
       await window.navigator.clipboard.writeText(buildCurrentViewUrl());
-      setCopyMessage("已复制当前处理链接，可直接发给协作同事。");
-      setCopiedLinkPath(recentLinkInput.path);
-      setCopyMessageReason(selectedFailureReasonTag);
+      const copyState = buildJobStatusCopySuccessState({
+        target: "processingLink",
+        copiedLinkPath: recentLinkInput.path,
+        selectedFailureReasonTag,
+      });
+      setCopyMessage(copyState.copyMessage);
+      setCopiedLinkPath(copyState.copiedLinkPath);
+      setCopyMessageReason(copyState.copyMessageReason);
       setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
-      setError(null);
+      setError(copyState.error);
     } catch {
       setError("处理链接复制失败，请稍后重试。");
     }
@@ -766,15 +777,18 @@ export function ProjectJobStatusPage() {
 
     try {
       await window.navigator.clipboard.writeText(currentFailureSubsetWorkOrder);
-      setCopyMessage("已复制当前失败子集处理单，可直接作为协作处理单元转交。");
-      setCopiedLinkPath(
-        buildJobStatusPath({
+      const copyState = buildJobStatusCopySuccessState({
+        target: "workOrder",
+        copiedLinkPath: buildJobStatusPath({
           projectId: projectId ?? "",
           search: searchParams,
         }),
-      );
-      setCopyMessageReason(selectedFailureReasonTag);
-      setError(null);
+        selectedFailureReasonTag,
+      });
+      setCopyMessage(copyState.copyMessage);
+      setCopiedLinkPath(copyState.copiedLinkPath);
+      setCopyMessageReason(copyState.copyMessageReason);
+      setError(copyState.error);
     } catch {
       setError("处理单复制失败，请稍后重试。");
     }
@@ -800,10 +814,15 @@ export function ProjectJobStatusPage() {
           currentUrl: buildCurrentViewUrl(),
         }),
       );
-      setCopyMessage("已复制协作同事版处理摘要，可直接发给当前跟进同事。");
-      setCopiedLinkPath(null);
-      setCopyMessageReason(selectedFailureReasonTag);
-      setError(null);
+      const copyState = buildJobStatusCopySuccessState({
+        target: "teamSummary",
+        copiedLinkPath: null,
+        selectedFailureReasonTag,
+      });
+      setCopyMessage(copyState.copyMessage);
+      setCopiedLinkPath(copyState.copiedLinkPath);
+      setCopyMessageReason(copyState.copyMessageReason);
+      setError(copyState.error);
     } catch {
       setError("处理摘要复制失败，请稍后重试。");
     }
@@ -830,10 +849,15 @@ export function ProjectJobStatusPage() {
           suggestedExportFileName: buildSuggestedExportFileName(),
         }),
       );
-      setCopyMessage("已复制上游数据方版处理摘要，可直接发给上游排查。");
-      setCopiedLinkPath(null);
-      setCopyMessageReason(selectedFailureReasonTag);
-      setError(null);
+      const copyState = buildJobStatusCopySuccessState({
+        target: "upstreamSummary",
+        copiedLinkPath: null,
+        selectedFailureReasonTag,
+      });
+      setCopyMessage(copyState.copyMessage);
+      setCopiedLinkPath(copyState.copiedLinkPath);
+      setCopyMessageReason(copyState.copyMessageReason);
+      setError(copyState.error);
     } catch {
       setError("处理摘要复制失败，请稍后重试。");
     }

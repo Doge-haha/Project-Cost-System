@@ -218,6 +218,23 @@ export function buildJobStatusPath(input: {
   return `/projects/${input.projectId}/jobs${searchText ? `?${searchText}` : ""}`;
 }
 
+export function buildJobStatusErrorReportDownloadPlan(input: {
+  scope: ErrorReportScope;
+  hasFailureSubsetFilters: boolean;
+  failureReasonCode: string | null;
+}) {
+  if (input.scope === "filtered" && input.hasFailureSubsetFilters) {
+    return {
+      mode: "local" as const,
+    };
+  }
+
+  return {
+    mode: "remote" as const,
+    failureReason: input.scope === "all" ? undefined : input.failureReasonCode,
+  };
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

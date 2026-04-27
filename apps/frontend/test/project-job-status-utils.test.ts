@@ -7,6 +7,7 @@ import {
   buildErrorReportActionKey,
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
+  buildJobStatusErrorReportDownloadPlan,
   buildJobStatusFailureReasonTag,
   buildJobStatusPath,
   buildJobStatusRetryPayload,
@@ -230,6 +231,40 @@ describe("project-job-status-utils", () => {
     ).toBe(
       "/projects/project-001/jobs?status=failed&failureReason=missing_field&failedLine=4",
     );
+  });
+
+  test("builds error report download plans for local subset and remote exports", () => {
+    expect(
+      buildJobStatusErrorReportDownloadPlan({
+        scope: "filtered",
+        hasFailureSubsetFilters: true,
+        failureReasonCode: "missing_field",
+      }),
+    ).toEqual({
+      mode: "local",
+    });
+
+    expect(
+      buildJobStatusErrorReportDownloadPlan({
+        scope: "filtered",
+        hasFailureSubsetFilters: false,
+        failureReasonCode: "missing_field",
+      }),
+    ).toEqual({
+      mode: "remote",
+      failureReason: "missing_field",
+    });
+
+    expect(
+      buildJobStatusErrorReportDownloadPlan({
+        scope: "all",
+        hasFailureSubsetFilters: true,
+        failureReasonCode: "missing_field",
+      }),
+    ).toEqual({
+      mode: "remote",
+      failureReason: undefined,
+    });
   });
 
   test("builds recent processing link input for copied job status links", () => {

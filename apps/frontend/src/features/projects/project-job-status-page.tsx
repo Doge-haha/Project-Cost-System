@@ -32,6 +32,7 @@ import {
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
+  buildJobStatusErrorReportDownloadPlan,
   buildJobStatusFailureReasonTag,
   buildJobStatusPath,
   buildJobStatusRetryPayload,
@@ -881,14 +882,18 @@ export function ProjectJobStatusPage() {
 
     setDownloadingErrorReports((current) => [...current, actionKey]);
     try {
-      if (scope === "filtered" && hasFailureSubsetFilters) {
+      const downloadPlan = buildJobStatusErrorReportDownloadPlan({
+        scope,
+        hasFailureSubsetFilters,
+        failureReasonCode: selectedFailureReasonCode,
+      });
+      if (downloadPlan.mode === "local") {
         downloadCurrentSubsetLocally(format);
       } else {
-        const failureReason = scope === "all" ? undefined : selectedFailureReasonCode;
         await apiClient.downloadImportTaskErrorReport(
           projectId,
           selectedImportTask.id,
-          failureReason,
+          downloadPlan.failureReason,
           format,
         );
       }

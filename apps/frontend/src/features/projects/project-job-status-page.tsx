@@ -32,6 +32,7 @@ import {
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
+  buildJobStatusRetryPayload,
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
   type ErrorReportScope,
@@ -601,17 +602,13 @@ export function ProjectJobStatusPage() {
     setError(null);
 
     try {
-      const retryContext = canRetryCurrentFailureScope
-        ? {
-            failureReason: selectedFailureReasonCode,
-            failureResourceType: selectedResourceTypeFilter,
-            failureAction: selectedActionFilter,
-          }
-        : undefined;
       const retriedJob = await apiClient.retryBackgroundJob(selectedJob.id, {
-        failureReason: retryContext?.failureReason,
-        failureResourceType: retryContext?.failureResourceType,
-        failureAction: retryContext?.failureAction,
+        ...buildJobStatusRetryPayload({
+          canRetryCurrentFailureScope,
+          failureReasonCode: selectedFailureReasonCode,
+          resourceTypeFilter: selectedResourceTypeFilter,
+          actionFilter: selectedActionFilter,
+        }),
       });
       setRetryCompleted(true);
       await loadJobs({

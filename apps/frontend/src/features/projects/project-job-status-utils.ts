@@ -173,6 +173,23 @@ export function buildFilteredImportFailedItems(input: {
   });
 }
 
+export function buildJobStatusRetryPayload(input: {
+  canRetryCurrentFailureScope: boolean;
+  failureReasonCode: string | null;
+  resourceTypeFilter: string | null;
+  actionFilter: string | null;
+}) {
+  if (!input.canRetryCurrentFailureScope) {
+    return {};
+  }
+
+  return {
+    failureReason: input.failureReasonCode,
+    failureResourceType: input.resourceTypeFilter,
+    failureAction: input.actionFilter,
+  };
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

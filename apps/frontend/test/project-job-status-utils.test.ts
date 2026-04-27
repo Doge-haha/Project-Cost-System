@@ -7,6 +7,7 @@ import {
   buildErrorReportActionKey,
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
+  buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
@@ -147,6 +148,30 @@ describe("project-job-status-utils", () => {
         actionFilter: "未提供",
       }),
     ).toEqual([failedItems[1]]);
+  });
+
+  test("builds retry payload only when scoped retry is available", () => {
+    expect(
+      buildJobStatusRetryPayload({
+        canRetryCurrentFailureScope: true,
+        failureReasonCode: "missing_field",
+        resourceTypeFilter: "bill_item",
+        actionFilter: "create",
+      }),
+    ).toEqual({
+      failureReason: "missing_field",
+      failureResourceType: "bill_item",
+      failureAction: "create",
+    });
+
+    expect(
+      buildJobStatusRetryPayload({
+        canRetryCurrentFailureScope: false,
+        failureReasonCode: "missing_field",
+        resourceTypeFilter: "bill_item",
+        actionFilter: "create",
+      }),
+    ).toEqual({});
   });
 
   test("builds recent processing link input for copied job status links", () => {

@@ -32,6 +32,7 @@ import {
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
+  buildJobStatusDownloadSuccessState,
   buildJobStatusErrorReportDownloadPlan,
   buildJobStatusFailureReasonTag,
   buildJobStatusPath,
@@ -898,17 +899,16 @@ export function ProjectJobStatusPage() {
         );
       }
       setError(null);
-      if (scope === "all") {
-        setLastDownloadedScopeLabel("全部失败条目");
-        setDownloadMessage(`已导出整批失败条目（${format.toUpperCase()}）。`);
-        setDownloadMessageReason(selectedFailureReasonTag);
-      } else {
-        setLastDownloadedScopeLabel(currentFailureSubsetLabel);
-        setDownloadMessage(
-          `已导出当前${hasFailureSubsetFilters ? "子集" : "筛选"}（${currentFailureSubsetLabel}，${format.toUpperCase()}）。`,
-        );
-        setDownloadMessageReason(selectedFailureReasonTag);
-      }
+      const successState = buildJobStatusDownloadSuccessState({
+        scope,
+        format,
+        hasFailureSubsetFilters,
+        currentFailureSubsetLabel,
+        selectedFailureReasonTag,
+      });
+      setLastDownloadedScopeLabel(successState.lastDownloadedScopeLabel);
+      setDownloadMessage(successState.downloadMessage);
+      setDownloadMessageReason(successState.downloadMessageReason);
     } catch (downloadError) {
       setError(
         downloadError instanceof ApiError

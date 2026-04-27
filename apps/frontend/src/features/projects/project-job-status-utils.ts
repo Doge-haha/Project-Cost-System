@@ -235,6 +235,30 @@ export function buildJobStatusErrorReportDownloadPlan(input: {
   };
 }
 
+export function buildJobStatusDownloadSuccessState(input: {
+  scope: ErrorReportScope;
+  format: ErrorReportFormat;
+  hasFailureSubsetFilters: boolean;
+  currentFailureSubsetLabel: string;
+  selectedFailureReasonTag: { code: string; label: string } | null;
+}) {
+  if (input.scope === "all") {
+    return {
+      lastDownloadedScopeLabel: "全部失败条目",
+      downloadMessage: `已导出整批失败条目（${input.format.toUpperCase()}）。`,
+      downloadMessageReason: input.selectedFailureReasonTag,
+    };
+  }
+
+  return {
+    lastDownloadedScopeLabel: input.currentFailureSubsetLabel,
+    downloadMessage: `已导出当前${
+      input.hasFailureSubsetFilters ? "子集" : "筛选"
+    }（${input.currentFailureSubsetLabel}，${input.format.toUpperCase()}）。`,
+    downloadMessageReason: input.selectedFailureReasonTag,
+  };
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

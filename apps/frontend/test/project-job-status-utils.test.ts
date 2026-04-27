@@ -12,6 +12,7 @@ import {
   buildJobStatusPath,
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
+  buildJobStatusDownloadSuccessState,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
@@ -264,6 +265,50 @@ describe("project-job-status-utils", () => {
     ).toEqual({
       mode: "remote",
       failureReason: undefined,
+    });
+  });
+
+  test("builds download success state for all, filtered, and subset reports", () => {
+    expect(
+      buildJobStatusDownloadSuccessState({
+        scope: "all",
+        format: "json",
+        hasFailureSubsetFilters: true,
+        currentFailureSubsetLabel: "缺少必填字段 / bill_item",
+        selectedFailureReasonTag: { code: "missing_field", label: "缺少必填字段" },
+      }),
+    ).toEqual({
+      lastDownloadedScopeLabel: "全部失败条目",
+      downloadMessage: "已导出整批失败条目（JSON）。",
+      downloadMessageReason: { code: "missing_field", label: "缺少必填字段" },
+    });
+
+    expect(
+      buildJobStatusDownloadSuccessState({
+        scope: "filtered",
+        format: "csv",
+        hasFailureSubsetFilters: false,
+        currentFailureSubsetLabel: "缺少必填字段",
+        selectedFailureReasonTag: { code: "missing_field", label: "缺少必填字段" },
+      }),
+    ).toEqual({
+      lastDownloadedScopeLabel: "缺少必填字段",
+      downloadMessage: "已导出当前筛选（缺少必填字段，CSV）。",
+      downloadMessageReason: { code: "missing_field", label: "缺少必填字段" },
+    });
+
+    expect(
+      buildJobStatusDownloadSuccessState({
+        scope: "filtered",
+        format: "json",
+        hasFailureSubsetFilters: true,
+        currentFailureSubsetLabel: "缺少必填字段 / bill_item",
+        selectedFailureReasonTag: null,
+      }),
+    ).toEqual({
+      lastDownloadedScopeLabel: "缺少必填字段 / bill_item",
+      downloadMessage: "已导出当前子集（缺少必填字段 / bill_item，JSON）。",
+      downloadMessageReason: null,
     });
   });
 

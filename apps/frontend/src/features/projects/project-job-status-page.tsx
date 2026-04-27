@@ -8,10 +8,7 @@ import { EmptyState } from "../shared/empty-state";
 import { ErrorState } from "../shared/error-state";
 import { LoadingState } from "../shared/loading-state";
 import { normalizeFailureReason } from "./failure-reason-label";
-import {
-  buildFailureSubsetExportPayload,
-  parseImportTaskFailedItems,
-} from "./import-task-failure-snapshots";
+import { parseImportTaskFailedItems } from "./import-task-failure-snapshots";
 import {
   formatDetectedFormat,
   parseFailureSummary,
@@ -31,8 +28,8 @@ import {
 } from "./project-job-status-model";
 import {
   buildCurrentJobStatusViewUrl,
-  buildCsvLine,
   buildErrorReportActionKey,
+  buildFailureSubsetDownload,
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
   type ErrorReportScope,
@@ -949,64 +946,15 @@ export function ProjectJobStatusPage() {
       return;
     }
 
-    const fileNameSegments = [selectedImportTask.id, "error-report", "current-subset"];
-    if (selectedFailureReasonCode) {
-      fileNameSegments.push(selectedFailureReasonCode);
-    }
-    if (selectedResourceTypeFilter) {
-      fileNameSegments.push(`resource-${selectedResourceTypeFilter}`);
-    }
-    if (selectedActionFilter) {
-      fileNameSegments.push(`action-${selectedActionFilter}`);
-    }
-
-    const fileName = `${fileNameSegments.join("-")}.${format}`;
-    if (format === "json") {
-      triggerClientDownload({
-        content: JSON.stringify(
-          buildFailureSubsetExportPayload({
-            taskId: selectedImportTask.id,
-            failureReason: selectedFailureReasonCode,
-            failureResourceType: selectedResourceTypeFilter,
-            failureAction: selectedActionFilter,
-            failedItems: filteredImportFailedItems,
-          }),
-          null,
-          2,
-        ),
-        fileName,
-        mimeType: "application/json; charset=utf-8",
-      });
-      return;
-    }
-
-    const rows = [
-      [
-        "lineNo",
-        "reasonCode",
-        "reasonLabel",
-        "errorMessage",
-        "projectId",
-        "resourceType",
-        "action",
-        "keys",
-      ],
-      ...filteredImportFailedItems.map((item) => [
-        item.lineNo === null ? "" : String(item.lineNo),
-        item.reasonCode,
-        item.reasonLabel,
-        item.errorMessage,
-        item.projectId ?? "",
-        item.resourceType ?? "",
-        item.action ?? "",
-        item.keys.join("|"),
-      ]),
-    ];
-
     triggerClientDownload({
-      content: rows.map((row) => buildCsvLine(row)).join("\n"),
-      fileName,
-      mimeType: "text/csv; charset=utf-8",
+      ...buildFailureSubsetDownload({
+        taskId: selectedImportTask.id,
+        format,
+        failureReasonCode: selectedFailureReasonCode,
+        failureResourceType: selectedResourceTypeFilter,
+        failureAction: selectedActionFilter,
+        failedItems: filteredImportFailedItems,
+      }),
     });
   }
 

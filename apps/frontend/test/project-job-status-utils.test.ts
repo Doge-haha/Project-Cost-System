@@ -5,6 +5,7 @@ import {
   buildCurrentJobStatusViewUrl,
   buildCsvLine,
   buildErrorReportActionKey,
+  buildFailureSubsetDownload,
   buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
@@ -78,6 +79,51 @@ describe("project-job-status-utils", () => {
       "import-task-001-error-report-current-subset-missing_field-resource-bill_item-action-create.json",
     );
     expect(buildErrorReportActionKey("filtered", "csv")).toBe("filtered:csv");
+  });
+
+  test("builds current failure subset download content", () => {
+    const failedItems = [
+      {
+        lineNo: 4,
+        reasonCode: "missing_field",
+        reasonLabel: "缺少必填字段",
+        errorMessage: "缺少工程量",
+        projectId: "project-001",
+        resourceType: "bill_item",
+        action: "create",
+        keys: ["projectId", "resourceType"],
+        retryEventSnapshot: { projectId: "project-001" },
+      },
+    ];
+
+    const jsonDownload = buildFailureSubsetDownload({
+      taskId: "import-task-001",
+      format: "json",
+      failureReasonCode: "missing_field",
+      failureResourceType: "bill_item",
+      failureAction: "create",
+      failedItems,
+    });
+    expect(jsonDownload.fileName).toBe(
+      "import-task-001-error-report-current-subset-missing_field-resource-bill_item-action-create.json",
+    );
+    expect(jsonDownload.mimeType).toBe("application/json; charset=utf-8");
+    expect(JSON.parse(jsonDownload.content).failureSnapshots).toHaveLength(1);
+
+    const csvDownload = buildFailureSubsetDownload({
+      taskId: "import-task-001",
+      format: "csv",
+      failureReasonCode: "missing_field",
+      failureResourceType: null,
+      failureAction: null,
+      failedItems,
+    });
+    expect(csvDownload.fileName).toBe(
+      "import-task-001-error-report-current-subset-missing_field.csv",
+    );
+    expect(csvDownload.mimeType).toBe("text/csv; charset=utf-8");
+    expect(csvDownload.content).toContain("lineNo,reasonCode");
+    expect(csvDownload.content).toContain("4,missing_field");
   });
 
   test("matches import tasks and jobs by latestJobId or payload importTaskId", () => {

@@ -1,4 +1,8 @@
 import type { BackgroundJob, ImportTask } from "../../lib/types";
+import {
+  buildFailureSubsetExportPayload,
+  type ParsedImportTaskFailedItem,
+} from "./import-task-failure-snapshots";
 
 export type JobStatusFilter = "all" | "queued" | "processing" | "completed" | "failed";
 export type ErrorReportScope = "filtered" | "all";
@@ -145,6 +149,74 @@ export function buildErrorReportActionKey(
   format: ErrorReportFormat,
 ) {
   return `${scope}:${format}`;
+}
+
+export function buildFailureSubsetDownload(input: {
+  taskId: string;
+  format: ErrorReportFormat;
+  failureReasonCode: string | null;
+  failureResourceType: string | null;
+  failureAction: string | null;
+  failedItems: ParsedImportTaskFailedItem[];
+}) {
+  const fileNameSegments = [input.taskId, "error-report", "current-subset"];
+  if (input.failureReasonCode) {
+    fileNameSegments.push(input.failureReasonCode);
+  }
+  if (input.failureResourceType) {
+    fileNameSegments.push(`resource-${input.failureResourceType}`);
+  }
+  if (input.failureAction) {
+    fileNameSegments.push(`action-${input.failureAction}`);
+  }
+
+  const fileName = `${fileNameSegments.join("-")}.${input.format}`;
+  if (input.format === "json") {
+    return {
+      content: JSON.stringify(
+        buildFailureSubsetExportPayload({
+          taskId: input.taskId,
+          failureReason: input.failureReasonCode,
+          failureResourceType: input.failureResourceType,
+          failureAction: input.failureAction,
+          failedItems: input.failedItems,
+        }),
+        null,
+        2,
+      ),
+      fileName,
+      mimeType: "application/json; charset=utf-8",
+    };
+  }
+
+  const rows = [
+    [
+      "lineNo",
+      "reasonCode",
+      "reasonLabel",
+      "errorMessage",
+      "projectId",
+      "resourceType",
+      "action",
+      "keys",
+    ],
+    ...input.failedItems.map((item) => [
+      item.lineNo === null ? "" : String(item.lineNo),
+      item.reasonCode,
+      item.reasonLabel,
+      item.errorMessage,
+      item.projectId ?? "",
+      item.resourceType ?? "",
+      item.action ?? "",
+      item.keys.join("|"),
+    ]),
+  ];
+
+  return {
+    content: rows.map((row) => buildCsvLine(row)).join("\n"),
+    fileName,
+    mimeType: "text/csv; charset=utf-8",
+  };
 }
 
 export function triggerClientDownload(input: {

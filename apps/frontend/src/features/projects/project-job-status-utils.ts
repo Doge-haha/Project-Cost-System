@@ -1,6 +1,8 @@
 import type { BackgroundJob, ImportTask } from "../../lib/types";
 
 export type JobStatusFilter = "all" | "queued" | "processing" | "completed" | "failed";
+export type ErrorReportScope = "filtered" | "all";
+export type ErrorReportFormat = "json" | "csv";
 
 export function parseStatusFilter(value: string | null): JobStatusFilter {
   if (
@@ -76,6 +78,73 @@ function escapeCsvValue(value: string) {
 
 export function buildCsvLine(values: string[]) {
   return values.map(escapeCsvValue).join(",");
+}
+
+export function buildCurrentJobStatusViewUrl(input: {
+  origin: string;
+  projectId: string | null | undefined;
+  statusFilter: JobStatusFilter;
+  failureReasonCode: string | null;
+  failureResourceType: string | null;
+  failureAction: string | null;
+  failedLine: number | null;
+}) {
+  const path = input.projectId ? `/projects/${input.projectId}/jobs` : "/projects";
+  const params = new URLSearchParams();
+  if (input.statusFilter !== "all") {
+    params.set("status", input.statusFilter);
+  }
+  if (input.failureReasonCode) {
+    params.set("failureReason", input.failureReasonCode);
+  }
+  if (input.failureResourceType) {
+    params.set("failureResourceType", input.failureResourceType);
+  }
+  if (input.failureAction) {
+    params.set("failureAction", input.failureAction);
+  }
+  if (input.failedLine) {
+    params.set("failedLine", String(input.failedLine));
+  }
+  const query = params.toString();
+  return `${input.origin}${path}${query ? `?${query}` : ""}`;
+}
+
+export function buildSuggestedErrorReportFileName(input: {
+  importTaskId: string | null | undefined;
+  failureReasonCode: string | null;
+  failureResourceType: string | null;
+  failureAction: string | null;
+  hasFailureSubsetFilters: boolean;
+}) {
+  if (!input.importTaskId || !input.failureReasonCode) {
+    return null;
+  }
+
+  if (input.hasFailureSubsetFilters) {
+    const fileNameSegments = [
+      input.importTaskId,
+      "error-report",
+      "current-subset",
+      input.failureReasonCode,
+    ];
+    if (input.failureResourceType) {
+      fileNameSegments.push(`resource-${input.failureResourceType}`);
+    }
+    if (input.failureAction) {
+      fileNameSegments.push(`action-${input.failureAction}`);
+    }
+    return `${fileNameSegments.join("-")}.json`;
+  }
+
+  return `${input.importTaskId}-error-report-current-filter-${input.failureReasonCode}.json`;
+}
+
+export function buildErrorReportActionKey(
+  scope: ErrorReportScope,
+  format: ErrorReportFormat,
+) {
+  return `${scope}:${format}`;
 }
 
 export function triggerClientDownload(input: {

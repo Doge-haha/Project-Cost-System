@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { BackgroundJob, ImportTask } from "../src/lib/types";
 import {
+  buildCurrentJobStatusViewUrl,
   buildCsvLine,
+  buildErrorReportActionKey,
+  buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
   parseFailedLine,
@@ -46,6 +49,35 @@ describe("project-job-status-utils", () => {
     expect(parseFailedLine("0")).toBeNull();
     expect(parseOptionalFilterValue("bill_item")).toBe("bill_item");
     expect(parseOptionalFilterValue("")).toBeNull();
+  });
+
+  test("builds job status view urls and suggested report filenames", () => {
+    expect(
+      buildCurrentJobStatusViewUrl({
+        origin: "http://localhost",
+        projectId: "project-001",
+        statusFilter: "failed",
+        failureReasonCode: "missing_field",
+        failureResourceType: "bill_item",
+        failureAction: "create",
+        failedLine: 4,
+      }),
+    ).toBe(
+      "http://localhost/projects/project-001/jobs?status=failed&failureReason=missing_field&failureResourceType=bill_item&failureAction=create&failedLine=4",
+    );
+
+    expect(
+      buildSuggestedErrorReportFileName({
+        importTaskId: "import-task-001",
+        failureReasonCode: "missing_field",
+        failureResourceType: "bill_item",
+        failureAction: "create",
+        hasFailureSubsetFilters: true,
+      }),
+    ).toBe(
+      "import-task-001-error-report-current-subset-missing_field-resource-bill_item-action-create.json",
+    );
+    expect(buildErrorReportActionKey("filtered", "csv")).toBe("filtered:csv");
   });
 
   test("matches import tasks and jobs by latestJobId or payload importTaskId", () => {

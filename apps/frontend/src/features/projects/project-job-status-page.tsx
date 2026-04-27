@@ -30,7 +30,12 @@ import {
   buildUpstreamHandoffSummary,
 } from "./project-job-status-model";
 import {
+  buildCurrentJobStatusViewUrl,
   buildCsvLine,
+  buildErrorReportActionKey,
+  buildSuggestedErrorReportFileName,
+  type ErrorReportFormat,
+  type ErrorReportScope,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
   parseFailedLine,
@@ -62,9 +67,6 @@ type ProjectJobStatusState = {
   importTasks: ImportTask[];
   jobs: BackgroundJob[];
 };
-
-type ErrorReportScope = "filtered" | "all";
-type ErrorReportFormat = "json" | "csv";
 
 const RETRY_INPUT_INCOMPLETE_ERROR_MESSAGE =
   "当前失败范围中有条目缺少可重建输入，请先导出当前范围或回源修数后再重新导入。";
@@ -518,45 +520,25 @@ export function ProjectJobStatusPage() {
 
   function buildCurrentViewUrl() {
     const origin = typeof window === "undefined" ? "" : window.location.origin;
-    const path = projectId ? `/projects/${projectId}/jobs` : "/projects";
-    const params = new URLSearchParams();
-    if (statusFilter !== "all") {
-      params.set("status", statusFilter);
-    }
-    if (selectedFailureReasonCode) {
-      params.set("failureReason", selectedFailureReasonCode);
-    }
-    if (selectedResourceTypeFilter) {
-      params.set("failureResourceType", selectedResourceTypeFilter);
-    }
-    if (selectedActionFilter) {
-      params.set("failureAction", selectedActionFilter);
-    }
-    if (selectedFailedLine) {
-      params.set("failedLine", String(selectedFailedLine));
-    }
-    const query = params.toString();
-    return `${origin}${path}${query ? `?${query}` : ""}`;
+    return buildCurrentJobStatusViewUrl({
+      origin,
+      projectId,
+      statusFilter,
+      failureReasonCode: selectedFailureReasonCode,
+      failureResourceType: selectedResourceTypeFilter,
+      failureAction: selectedActionFilter,
+      failedLine: selectedFailedLine,
+    });
   }
 
   function buildSuggestedExportFileName() {
-    if (!selectedImportTask || !selectedFailureReasonCode) {
-      return null;
-    }
-
-    if (hasFailureSubsetFilters) {
-      const fileNameSegments = [selectedImportTask.id, "error-report", "current-subset"];
-      fileNameSegments.push(selectedFailureReasonCode);
-      if (selectedResourceTypeFilter) {
-        fileNameSegments.push(`resource-${selectedResourceTypeFilter}`);
-      }
-      if (selectedActionFilter) {
-        fileNameSegments.push(`action-${selectedActionFilter}`);
-      }
-      return `${fileNameSegments.join("-")}.json`;
-    }
-
-    return `${selectedImportTask.id}-error-report-current-filter-${selectedFailureReasonCode}.json`;
+    return buildSuggestedErrorReportFileName({
+      importTaskId: selectedImportTask?.id,
+      failureReasonCode: selectedFailureReasonCode,
+      failureResourceType: selectedResourceTypeFilter,
+      failureAction: selectedActionFilter,
+      hasFailureSubsetFilters,
+    });
   }
 
   function setFailedItemFocus(lineNo: number | null) {
@@ -955,7 +937,7 @@ export function ProjectJobStatusPage() {
   }
 
   function getErrorReportActionKey(scope: ErrorReportScope, format: ErrorReportFormat) {
-    return `${scope}:${format}`;
+    return buildErrorReportActionKey(scope, format);
   }
 
   function isDownloadingErrorReport(scope: ErrorReportScope, format: ErrorReportFormat) {

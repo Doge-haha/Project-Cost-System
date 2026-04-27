@@ -9,6 +9,7 @@ import type {
   ReportExportTask,
   SummaryDetailItem,
   SummaryResponse,
+  VarianceBreakdownItem,
   VersionCompareResponse,
 } from "../../lib/types";
 import { EmptyState } from "../shared/empty-state";
@@ -62,6 +63,38 @@ function formatPayloadText(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function formatPercent(value: number | string | null | undefined) {
+  if (value === undefined || value === null || value === "") {
+    return "-";
+  }
+  const normalized = Number(value);
+  if (Number.isNaN(normalized)) {
+    return String(value);
+  }
+  return `${(normalized * 100).toFixed(2)}%`;
+}
+
+function renderVarianceBreakdownItems(items: VarianceBreakdownItem[]) {
+  return items.slice(0, 4).map((item) => (
+    <article className="highlight-card" key={item.groupKey}>
+      <p className="stat-label">
+        {item.itemCount} 项 · {item.versionCount} 版
+      </p>
+      <h4 className="highlight-title">{item.groupLabel || item.groupKey}</h4>
+      <p
+        className={`highlight-variance ${
+          Number(item.varianceAmount) >= 0 ? "money-positive" : "money-negative"
+        }`}
+      >
+        {formatMoney(item.varianceAmount)}
+      </p>
+      <p className="page-description">
+        占比 {formatPercent(item.varianceShare)} · 偏差率 {formatPercent(item.varianceRate)}
+      </p>
+    </article>
+  ));
+}
+
 export function SummaryPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -87,6 +120,12 @@ export function SummaryPage() {
   const [versionCompare, setVersionCompare] = useState<VersionCompareResponse | null>(
     null,
   );
+  const [disciplineVarianceBreakdown, setDisciplineVarianceBreakdown] = useState<
+    VarianceBreakdownItem[]
+  >([]);
+  const [unitVarianceBreakdown, setUnitVarianceBreakdown] = useState<
+    VarianceBreakdownItem[]
+  >([]);
   const [aiVarianceWarnings, setAiVarianceWarnings] = useState<AiRecommendation[]>([]);
   const [canExportReports, setCanExportReports] = useState(false);
   const [exportTask, setExportTask] = useState<ReportExportTask | null>(null);
@@ -133,6 +172,8 @@ export function SummaryPage() {
         versionsResponse,
         workspaceResponse,
         aiVarianceWarningsResponse,
+        disciplineBreakdownResponse,
+        unitBreakdownResponse,
       ] =
         await Promise.all([
           apiClient.getProject(projectId),
@@ -157,6 +198,18 @@ export function SummaryPage() {
             status: "generated",
             limit: 5,
           }),
+          apiClient.getVarianceBreakdown(projectId, "discipline", {
+            billVersionId,
+            stageCode,
+            disciplineCode,
+            unitCode,
+          }),
+          apiClient.getVarianceBreakdown(projectId, "unit", {
+            billVersionId,
+            stageCode,
+            disciplineCode,
+            unitCode,
+          }),
         ]);
       setProject(projectResponse);
       setSummary(summaryResponse);
@@ -165,6 +218,8 @@ export function SummaryPage() {
       setCanExportReports(
         Boolean(workspaceResponse.currentUser.permissionSummary.canExportReports),
       );
+      setDisciplineVarianceBreakdown(disciplineBreakdownResponse.items);
+      setUnitVarianceBreakdown(unitBreakdownResponse.items);
       setAiVarianceWarnings(
         billVersionId
           ? aiVarianceWarningsResponse.items.filter(
@@ -749,6 +804,35 @@ export function SummaryPage() {
               </article>
             ))}
           </div>
+        </section>
+      ) : null}
+
+      {disciplineVarianceBreakdown.length > 0 || unitVarianceBreakdown.length > 0 ? (
+        <section className="panel">
+          <div className="page-header">
+            <div>
+              <h3>偏差分析聚合</h3>
+              <p className="page-description">
+                按专业和单体聚合偏差，优先展示绝对偏差最大的范围。
+              </p>
+            </div>
+          </div>
+          {disciplineVarianceBreakdown.length > 0 ? (
+            <>
+              <h4>按专业</h4>
+              <div className="highlight-grid">
+                {renderVarianceBreakdownItems(disciplineVarianceBreakdown)}
+              </div>
+            </>
+          ) : null}
+          {unitVarianceBreakdown.length > 0 ? (
+            <>
+              <h4>按单体</h4>
+              <div className="highlight-grid">
+                {renderVarianceBreakdownItems(unitVarianceBreakdown)}
+              </div>
+            </>
+          ) : null}
         </section>
       ) : null}
 

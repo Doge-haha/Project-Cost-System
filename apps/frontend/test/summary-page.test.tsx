@@ -40,6 +40,19 @@ function createEmptyAiRecommendationResponse() {
   });
 }
 
+function createEmptyVarianceBreakdownResponse(groupBy: "discipline" | "unit") {
+  return createJsonResponse({
+    projectId: "project-001",
+    groupBy,
+    billVersionId: null,
+    stageCode: null,
+    disciplineCode: null,
+    unitCode: null,
+    totalCount: 0,
+    items: [],
+  });
+}
+
 function createWorkspaceResponse(options?: {
   canExportReports?: boolean;
   versions?: Array<{
@@ -154,6 +167,12 @@ describe("SummaryPage", () => {
         return createEmptyAiRecommendationResponse();
       }
 
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -239,6 +258,12 @@ describe("SummaryPage", () => {
 
       if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
         return createEmptyAiRecommendationResponse();
+      }
+
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
       }
 
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
@@ -345,6 +370,15 @@ describe("SummaryPage", () => {
         return createEmptyAiRecommendationResponse();
       }
 
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        expect(url.searchParams.get("stageCode")).toBe("estimate");
+        expect(url.searchParams.get("disciplineCode")).toBe("building");
+        expect(url.searchParams.get("unitCode")).toBe("unit-001");
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -367,6 +401,150 @@ describe("SummaryPage", () => {
     });
     expect(screen.getByRole("combobox", { name: "专业" })).toHaveValue("building");
     expect(screen.getByRole("textbox", { name: "单体" })).toHaveValue("unit-001");
+  });
+
+  test("renders variance breakdown grouped by discipline and unit", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse();
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        return createJsonResponse({
+          totalSystemAmount: 1500,
+          totalFinalAmount: 1800,
+          varianceAmount: 300,
+          itemCount: 3,
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary/details") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        if (url.searchParams.get("groupBy") === "discipline") {
+          return createJsonResponse({
+            projectId: "project-001",
+            groupBy: "discipline",
+            billVersionId: null,
+            stageCode: null,
+            disciplineCode: null,
+            unitCode: null,
+            totalCount: 2,
+            items: [
+              {
+                groupKey: "building",
+                groupLabel: "building",
+                versionCount: 2,
+                itemCount: 4,
+                totalSystemAmount: 1440,
+                totalFinalAmount: 1620,
+                varianceAmount: 180,
+                varianceRate: 0.125,
+                varianceShare: 0.545455,
+              },
+              {
+                groupKey: "install",
+                groupLabel: "install",
+                versionCount: 1,
+                itemCount: 1,
+                totalSystemAmount: 500,
+                totalFinalAmount: 650,
+                varianceAmount: 150,
+                varianceRate: 0.3,
+                varianceShare: 0.454545,
+              },
+            ],
+          });
+        }
+        return createJsonResponse({
+          projectId: "project-001",
+          groupBy: "unit",
+          billVersionId: null,
+          stageCode: null,
+          disciplineCode: null,
+          unitCode: null,
+          totalCount: 2,
+          items: [
+            {
+              groupKey: "m3",
+              groupLabel: "m3",
+              versionCount: 1,
+              itemCount: 2,
+              totalSystemAmount: 1000,
+              totalFinalAmount: 1200,
+              varianceAmount: 200,
+              varianceRate: 0.2,
+              varianceShare: 0.571429,
+            },
+            {
+              groupKey: "set",
+              groupLabel: "set",
+              versionCount: 1,
+              itemCount: 1,
+              totalSystemAmount: 500,
+              totalFinalAmount: 650,
+              varianceAmount: 150,
+              varianceRate: 0.3,
+              varianceShare: 0.428571,
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/summary"]}>
+        <Routes>
+          <Route path="/projects/:projectId/summary" element={<SummaryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "偏差分析聚合" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("按专业")).toBeInTheDocument();
+    expect(screen.getAllByText("building").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("install")).toBeInTheDocument();
+    expect(screen.getByText("按单体")).toBeInTheDocument();
+    expect(screen.getByText("m3")).toBeInTheDocument();
+    expect(screen.getByText("set")).toBeInTheDocument();
+    expect(screen.getAllByText("180.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("200.00").length).toBeGreaterThanOrEqual(1);
   });
 
   test("renders full version compare table when compare query is present", async () => {
@@ -459,6 +637,12 @@ describe("SummaryPage", () => {
             },
           ],
         });
+      }
+
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
       }
 
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
@@ -577,6 +761,12 @@ describe("SummaryPage", () => {
         });
       }
 
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -661,6 +851,12 @@ describe("SummaryPage", () => {
 
       if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
         return createEmptyAiRecommendationResponse();
+      }
+
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
       }
 
       if (url.pathname === "/v1/reports/export" && init?.method === "POST") {
@@ -799,6 +995,12 @@ describe("SummaryPage", () => {
 
       if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
         return createEmptyAiRecommendationResponse();
+      }
+
+      if (url.pathname === "/v1/reports/variance-breakdown") {
+        return createEmptyVarianceBreakdownResponse(
+          url.searchParams.get("groupBy") === "unit" ? "unit" : "discipline",
+        );
       }
 
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);

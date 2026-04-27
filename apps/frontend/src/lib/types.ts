@@ -428,6 +428,31 @@ export type SummaryDetailItem = {
   taxAmount?: number | string | null;
 };
 
+export type VarianceBreakdownGroupBy = "discipline" | "unit";
+
+export type VarianceBreakdownItem = {
+  groupKey: string;
+  groupLabel: string;
+  versionCount: number;
+  itemCount: number;
+  totalSystemAmount: number;
+  totalFinalAmount: number;
+  varianceAmount: number;
+  varianceRate: number;
+  varianceShare: number;
+};
+
+export type VarianceBreakdownResponse = {
+  projectId: string;
+  groupBy: VarianceBreakdownGroupBy;
+  billVersionId: string | null;
+  stageCode: string | null;
+  disciplineCode: string | null;
+  unitCode: string | null;
+  totalCount: number;
+  items: VarianceBreakdownItem[];
+};
+
 export type VersionCompareItem = {
   itemCode: string;
   itemNameBase: string | null;

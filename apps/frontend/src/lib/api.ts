@@ -28,6 +28,8 @@ import type {
   ReviewSubmissionListResponse,
   SummaryDetailItem,
   SummaryResponse,
+  VarianceBreakdownGroupBy,
+  VarianceBreakdownResponse,
   VersionCompareResponse,
 } from "./types";
 
@@ -729,6 +731,25 @@ export const apiClient = {
       unitCode: query?.unitCode,
       taxMode: query?.taxMode,
       limit: 10,
+    });
+  },
+  getVarianceBreakdown(
+    projectId: string,
+    groupBy: VarianceBreakdownGroupBy,
+    query?: {
+      billVersionId?: string;
+      stageCode?: string;
+      disciplineCode?: string;
+      unitCode?: string;
+    },
+  ) {
+    return request<VarianceBreakdownResponse>("/v1/reports/variance-breakdown", {
+      projectId,
+      groupBy,
+      billVersionId: query?.billVersionId,
+      stageCode: query?.stageCode,
+      disciplineCode: query?.disciplineCode,
+      unitCode: query?.unitCode,
     });
   },
   getVersionCompare(

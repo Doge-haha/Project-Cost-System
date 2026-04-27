@@ -30,6 +30,7 @@ import {
   buildCurrentJobStatusViewUrl,
   buildErrorReportActionKey,
   buildFailureSubsetDownload,
+  buildJobStatusClipboardUrl,
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
   type ErrorReportScope,
@@ -700,9 +701,12 @@ export function ProjectJobStatusPage() {
     }
 
     try {
-      const url = new URL(window.location.href);
-      url.search = searchParams.toString();
-      await window.navigator.clipboard.writeText(url.toString());
+      await window.navigator.clipboard.writeText(
+        buildJobStatusClipboardUrl({
+          currentHref: window.location.href,
+          search: searchParams,
+        }),
+      );
       const recentLinkInput = buildRecentJobStatusProcessingLinkInput({
         projectId: projectId ?? "",
         search: searchParams,

@@ -6,6 +6,7 @@ import {
   buildCsvLine,
   buildErrorReportActionKey,
   buildFailureSubsetDownload,
+  buildJobStatusClipboardUrl,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
@@ -80,6 +81,15 @@ describe("project-job-status-utils", () => {
         action: "clearFailureSubfilters",
       }).toString(),
     ).toBe("status=failed&failureReason=missing_field");
+  });
+
+  test("builds job status clipboard urls from the current browser URL", () => {
+    expect(
+      buildJobStatusClipboardUrl({
+        currentHref: "http://localhost/projects/project-001/jobs?status=queued",
+        search: "status=failed&failureReason=missing_field",
+      }),
+    ).toBe("http://localhost/projects/project-001/jobs?status=failed&failureReason=missing_field");
   });
 
   test("builds recent processing link input for copied job status links", () => {

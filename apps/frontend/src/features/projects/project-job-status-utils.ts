@@ -138,6 +138,15 @@ export function buildRecentJobStatusProcessingLinkInput(input: {
   };
 }
 
+export function buildJobStatusClipboardUrl(input: {
+  currentHref: string;
+  search: string | URLSearchParams;
+}) {
+  const url = new URL(input.currentHref);
+  url.search = input.search.toString();
+  return url.toString();
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

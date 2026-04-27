@@ -36,6 +36,7 @@ import {
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
+  buildUploadReturnToFailureContext,
   parseFailedLine,
   parseOptionalFilterValue,
   parseStatusFilter,
@@ -648,20 +649,14 @@ export function ProjectJobStatusPage() {
     setError(null);
 
     try {
-      const returnToFailurePath =
-        projectId && selectedImportTask?.status === "failed"
-          ? `/projects/${projectId}/jobs?${(() => {
-              const next = new URLSearchParams(searchParams);
-              next.set("importTaskId", selectedImportTask.id);
-              return next.toString();
-            })()}`
-          : null;
-      const returnToFailureLabel =
-        selectedImportTask?.status === "failed"
-          ? selectedFailureReasonCode
-            ? currentFailureSubsetLabel
-            : "全部失败条目"
-          : null;
+      const { returnToFailurePath, returnToFailureLabel } =
+        buildUploadReturnToFailureContext({
+          projectId,
+          search: searchParams,
+          selectedImportTask,
+          failureReasonCode: selectedFailureReasonCode,
+          currentFailureSubsetLabel,
+        });
       const result = await apiClient.uploadProjectImportFile({
         projectId,
         fileName: uploadFileName.trim(),

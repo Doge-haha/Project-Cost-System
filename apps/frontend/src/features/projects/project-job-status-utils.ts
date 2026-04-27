@@ -153,6 +153,31 @@ export function buildJobStatusReturnParams(input: {
   return params.toString();
 }
 
+export function buildUploadReturnToFailureContext(input: {
+  projectId: string | null | undefined;
+  search: string | URLSearchParams;
+  selectedImportTask: { id: string; status: string } | null | undefined;
+  failureReasonCode: string | null;
+  currentFailureSubsetLabel: string;
+}) {
+  if (!input.projectId || input.selectedImportTask?.status !== "failed") {
+    return {
+      returnToFailurePath: null,
+      returnToFailureLabel: null,
+    };
+  }
+
+  const next = new URLSearchParams(input.search);
+  next.set("importTaskId", input.selectedImportTask.id);
+
+  return {
+    returnToFailurePath: `/projects/${input.projectId}/jobs?${next.toString()}`,
+    returnToFailureLabel: input.failureReasonCode
+      ? input.currentFailureSubsetLabel
+      : "全部失败条目",
+  };
+}
+
 export function findMatchingJobIdForImportTask(
   task: ImportTask | null,
   jobs: BackgroundJob[],

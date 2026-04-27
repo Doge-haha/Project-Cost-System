@@ -9,6 +9,7 @@ import {
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
+  buildUploadReturnToFailureContext,
   buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
@@ -122,6 +123,35 @@ describe("project-job-status-utils", () => {
         failureReasonCode: "missing_field",
       }),
     ).toBe("refresh=jobs&failureReason=missing_field");
+  });
+
+  test("builds upload return context only for failed import tasks", () => {
+    expect(
+      buildUploadReturnToFailureContext({
+        projectId: "project-001",
+        search: "status=failed&failureReason=missing_field",
+        selectedImportTask: { id: "import-task-001", status: "failed" },
+        failureReasonCode: "missing_field",
+        currentFailureSubsetLabel: "缺少必填字段",
+      }),
+    ).toEqual({
+      returnToFailurePath:
+        "/projects/project-001/jobs?status=failed&failureReason=missing_field&importTaskId=import-task-001",
+      returnToFailureLabel: "缺少必填字段",
+    });
+
+    expect(
+      buildUploadReturnToFailureContext({
+        projectId: "project-001",
+        search: "status=processing",
+        selectedImportTask: { id: "import-task-001", status: "processing" },
+        failureReasonCode: null,
+        currentFailureSubsetLabel: "全部失败条目",
+      }),
+    ).toEqual({
+      returnToFailurePath: null,
+      returnToFailureLabel: null,
+    });
   });
 
   test("builds job status view urls and suggested report filenames", () => {

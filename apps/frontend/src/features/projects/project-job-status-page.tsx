@@ -33,11 +33,10 @@ import {
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
   type ErrorReportScope,
-  findMatchingImportTaskIdForJob,
-  findMatchingJobIdForImportTask,
   parseFailedLine,
   parseOptionalFilterValue,
   parseStatusFilter,
+  resolveJobStatusSelection,
   triggerClientDownload,
 } from "./project-job-status-utils";
 import {
@@ -575,48 +574,19 @@ export function ProjectJobStatusPage() {
         importTasks: importTasks.items,
         jobs: jobs.items,
       });
-      const nextSelectedImportTaskId =
-        options?.preferredImportTaskId &&
-        importTasks.items.some((task) => task.id === options.preferredImportTaskId)
-          ? options.preferredImportTaskId
-          : focusedImportTaskId &&
-              importTasks.items.some((task) => task.id === focusedImportTaskId)
-            ? focusedImportTaskId
-            : selectedImportTaskId &&
-                importTasks.items.some((task) => task.id === selectedImportTaskId)
-              ? selectedImportTaskId
-              : focusedJobId
-                ? findMatchingImportTaskIdForJob(
-                    jobs.items.find((job) => job.id === focusedJobId) ?? null,
-                    importTasks.items,
-                  )
-                : null;
-      const fallbackImportTaskId =
-        nextSelectedImportTaskId ?? importTasks.items[0]?.id ?? null;
-      const nextSelectedImportTask =
-        importTasks.items.find((task) => task.id === fallbackImportTaskId) ?? null;
+      const selection = resolveJobStatusSelection({
+        importTasks: importTasks.items,
+        jobs: jobs.items,
+        focusedImportTaskId,
+        focusedJobId,
+        selectedImportTaskId,
+        selectedJobId,
+        preferredImportTaskId: options?.preferredImportTaskId,
+        preferredJobId: options?.preferredJobId,
+      });
 
-      const nextSelectedJobId =
-        options?.preferredJobId && jobs.items.some((job) => job.id === options.preferredJobId)
-          ? options.preferredJobId
-          : focusedJobId && jobs.items.some((job) => job.id === focusedJobId)
-            ? focusedJobId
-            : selectedJobId && jobs.items.some((job) => job.id === selectedJobId)
-              ? selectedJobId
-              : focusedImportTaskId
-                ? findMatchingJobIdForImportTask(
-                    importTasks.items.find((task) => task.id === focusedImportTaskId) ?? null,
-                    jobs.items,
-                  )
-                : null;
-      const fallbackJobId =
-        nextSelectedJobId ??
-        findMatchingJobIdForImportTask(nextSelectedImportTask, jobs.items) ??
-        jobs.items[0]?.id ??
-        null;
-
-      setSelectedImportTaskId(fallbackImportTaskId);
-      setSelectedJobId(fallbackJobId);
+      setSelectedImportTaskId(selection.selectedImportTaskId);
+      setSelectedJobId(selection.selectedJobId);
     } catch (fetchError) {
       setError(
         fetchError instanceof ApiError

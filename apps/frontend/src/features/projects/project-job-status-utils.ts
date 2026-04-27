@@ -73,6 +73,65 @@ export function findMatchingImportTaskIdForJob(
   return matchedByLatestJob?.id ?? null;
 }
 
+export function resolveJobStatusSelection(input: {
+  importTasks: ImportTask[];
+  jobs: BackgroundJob[];
+  focusedImportTaskId: string | null;
+  focusedJobId: string | null;
+  selectedImportTaskId: string | null;
+  selectedJobId: string | null;
+  preferredImportTaskId?: string | null;
+  preferredJobId?: string | null;
+}) {
+  const nextSelectedImportTaskId =
+    input.preferredImportTaskId &&
+    input.importTasks.some((task) => task.id === input.preferredImportTaskId)
+      ? input.preferredImportTaskId
+      : input.focusedImportTaskId &&
+          input.importTasks.some((task) => task.id === input.focusedImportTaskId)
+        ? input.focusedImportTaskId
+        : input.selectedImportTaskId &&
+            input.importTasks.some((task) => task.id === input.selectedImportTaskId)
+          ? input.selectedImportTaskId
+          : input.focusedJobId
+            ? findMatchingImportTaskIdForJob(
+                input.jobs.find((job) => job.id === input.focusedJobId) ?? null,
+                input.importTasks,
+              )
+            : null;
+  const fallbackImportTaskId =
+    nextSelectedImportTaskId ?? input.importTasks[0]?.id ?? null;
+  const nextSelectedImportTask =
+    input.importTasks.find((task) => task.id === fallbackImportTaskId) ?? null;
+
+  const nextSelectedJobId =
+    input.preferredJobId && input.jobs.some((job) => job.id === input.preferredJobId)
+      ? input.preferredJobId
+      : input.focusedJobId && input.jobs.some((job) => job.id === input.focusedJobId)
+        ? input.focusedJobId
+        : input.selectedJobId && input.jobs.some((job) => job.id === input.selectedJobId)
+          ? input.selectedJobId
+          : input.preferredImportTaskId || input.focusedImportTaskId
+            ? findMatchingJobIdForImportTask(
+                input.importTasks.find(
+                  (task) => task.id === (input.preferredImportTaskId ?? input.focusedImportTaskId),
+                ) ??
+                  null,
+                input.jobs,
+              )
+            : null;
+  const fallbackJobId =
+    nextSelectedJobId ??
+    findMatchingJobIdForImportTask(nextSelectedImportTask, input.jobs) ??
+    input.jobs[0]?.id ??
+    null;
+
+  return {
+    selectedImportTaskId: fallbackImportTaskId,
+    selectedJobId: fallbackJobId,
+  };
+}
+
 function escapeCsvValue(value: string) {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
     return `"${value.replaceAll('"', '""')}"`;

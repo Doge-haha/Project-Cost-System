@@ -13,6 +13,7 @@ import {
   parseOptionalFilterValue,
   parseStatusFilter,
   readSelectedFile,
+  resolveJobStatusSelection,
   triggerClientDownload,
 } from "../src/features/projects/project-job-status-utils";
 
@@ -224,6 +225,67 @@ describe("project-job-status-utils", () => {
         ] as ImportTask[],
       ),
     ).toBe("import-task-002");
+  });
+
+  test("resolves selected import task and job with focused and preferred ids", () => {
+    const importTasks = [
+      {
+        id: "import-task-001",
+        latestJobId: "job-001",
+      },
+      {
+        id: "import-task-002",
+        latestJobId: "job-002",
+      },
+    ] as ImportTask[];
+    const jobs = [
+      {
+        id: "job-001",
+        jobType: "knowledge_extraction",
+        status: "failed",
+        requestedBy: "user-001",
+        payload: { importTaskId: "import-task-001" },
+        createdAt: "2026-04-24T10:00:00.000Z",
+      },
+      {
+        id: "job-002",
+        jobType: "knowledge_extraction",
+        status: "failed",
+        requestedBy: "user-001",
+        payload: { importTaskId: "import-task-002" },
+        createdAt: "2026-04-24T10:01:00.000Z",
+      },
+    ] as BackgroundJob[];
+
+    expect(
+      resolveJobStatusSelection({
+        importTasks,
+        jobs,
+        focusedImportTaskId: "import-task-001",
+        focusedJobId: null,
+        selectedImportTaskId: null,
+        selectedJobId: null,
+        preferredImportTaskId: "import-task-002",
+        preferredJobId: null,
+      }),
+    ).toEqual({
+      selectedImportTaskId: "import-task-002",
+      selectedJobId: "job-002",
+    });
+
+    expect(
+      resolveJobStatusSelection({
+        importTasks,
+        jobs,
+        focusedImportTaskId: null,
+        focusedJobId: "job-001",
+        selectedImportTaskId: null,
+        selectedJobId: null,
+      }),
+    ).toEqual({
+      selectedImportTaskId: "import-task-001",
+      selectedJobId: "job-001",
+    });
   });
 
   test("builds csv lines and triggers client downloads", () => {

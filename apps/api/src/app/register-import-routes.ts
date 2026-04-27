@@ -13,8 +13,10 @@ import {
 } from "../modules/import/import-task-service.js";
 import {
   buildFailureDetails,
-  buildGeneratedBatchNo,
   buildImportFileMetadata,
+} from "./import-file-metadata.js";
+import {
+  buildGeneratedBatchNo,
   parseImportFileContent,
   uploadImportTaskSchema,
 } from "./import-file-parser.js";

@@ -8,6 +8,7 @@ import {
   buildFailureSubsetDownload,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
+  buildJobStatusReturnParams,
   buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
@@ -105,6 +106,22 @@ describe("project-job-status-utils", () => {
       highlightedBatchEntryPath:
         "/projects/project-001/jobs?status=failed&failureReason=missing_field&failedLine=4",
     });
+  });
+
+  test("builds job status return params for retry and project links", () => {
+    expect(
+      buildJobStatusReturnParams({
+        target: "inbox",
+        failureReasonCode: "missing_field",
+      }),
+    ).toBe("focus=import&refresh=jobs&failureReason=missing_field");
+
+    expect(
+      buildJobStatusReturnParams({
+        target: "project",
+        failureReasonCode: "missing_field",
+      }),
+    ).toBe("refresh=jobs&failureReason=missing_field");
   });
 
   test("builds job status view urls and suggested report filenames", () => {

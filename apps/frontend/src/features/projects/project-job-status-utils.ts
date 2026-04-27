@@ -138,6 +138,21 @@ export function buildRecentJobStatusProcessingLinkInput(input: {
   };
 }
 
+export function buildJobStatusReturnParams(input: {
+  target: "inbox" | "project";
+  failureReasonCode: string | null;
+}) {
+  const params = new URLSearchParams();
+  if (input.target === "inbox") {
+    params.set("focus", "import");
+  }
+  params.set("refresh", "jobs");
+  if (input.failureReasonCode) {
+    params.set("failureReason", input.failureReasonCode);
+  }
+  return params.toString();
+}
+
 export function findMatchingJobIdForImportTask(
   task: ImportTask | null,
   jobs: BackgroundJob[],

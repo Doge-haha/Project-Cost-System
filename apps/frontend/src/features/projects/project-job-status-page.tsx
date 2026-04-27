@@ -35,6 +35,7 @@ import {
   type ErrorReportScope,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
+  buildJobStatusReturnParams,
   parseFailedLine,
   parseOptionalFilterValue,
   parseStatusFilter,
@@ -332,21 +333,16 @@ export function ProjectJobStatusPage() {
     ],
   );
   const retryContextParams = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("focus", "import");
-    params.set("refresh", "jobs");
-    if (selectedFailureReasonCode) {
-      params.set("failureReason", selectedFailureReasonCode);
-    }
-    return params.toString();
+    return buildJobStatusReturnParams({
+      target: "inbox",
+      failureReasonCode: selectedFailureReasonCode,
+    });
   }, [selectedFailureReasonCode]);
   const projectReturnParams = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("refresh", "jobs");
-    if (selectedFailureReasonCode) {
-      params.set("failureReason", selectedFailureReasonCode);
-    }
-    return params.toString();
+    return buildJobStatusReturnParams({
+      target: "project",
+      failureReasonCode: selectedFailureReasonCode,
+    });
   }, [selectedFailureReasonCode]);
 
   useEffect(() => {

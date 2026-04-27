@@ -168,6 +168,20 @@ export function ProjectAiRecommendationsPage() {
                 items: current.recommendations.items.map((item) =>
                   item.id === updated.id ? updated : item,
                 ),
+                summary: {
+                  ...current.recommendations.summary,
+                  statusCounts: {
+                    ...current.recommendations.summary.statusCounts,
+                    [recommendation.status]: Math.max(
+                      0,
+                      current.recommendations.summary.statusCounts[
+                        recommendation.status
+                      ] - 1,
+                    ),
+                    [updated.status]:
+                      current.recommendations.summary.statusCounts[updated.status] + 1,
+                  },
+                },
               },
             }
           : current,

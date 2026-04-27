@@ -139,6 +139,7 @@ describe("ProjectAiRecommendationsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("定额推荐已接受。")).toBeInTheDocument();
     });
+    expect(screen.getByText("新点造价项目 · 待处理 0 条 · 共 1 条")).toBeInTheDocument();
     expect(screen.getByText("定额推荐 · 已接受")).toBeInTheDocument();
     expect(screen.getByText("处理人 engineer-001 · 原因 人工确认接受")).toBeInTheDocument();
   });

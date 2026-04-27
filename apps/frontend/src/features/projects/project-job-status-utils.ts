@@ -267,6 +267,13 @@ export function buildJobStatusSkippedDownloadState() {
   };
 }
 
+export function buildJobStatusUploadCallout(input: {
+  lastDownloadedScopeLabel: string | null;
+}) {
+  const scopeLabel = input.lastDownloadedScopeLabel ?? "当前失败范围";
+  return `已定位到上传区。修复“${scopeLabel}”后，可直接上传新的 JSON/JSONL 文件重新导入。`;
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

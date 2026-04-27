@@ -39,6 +39,7 @@ import {
   buildJobStatusRetryPayload,
   buildSuggestedErrorReportFileName,
   buildJobStatusSkippedDownloadState,
+  buildJobStatusUploadCallout,
   type ErrorReportFormat,
   type ErrorReportScope,
   buildNextJobStatusSearchParams,
@@ -925,10 +926,7 @@ export function ProjectJobStatusPage() {
   }
 
   function jumpToUploadSection() {
-    const scopeLabel = lastDownloadedScopeLabel ?? "当前失败范围";
-    setUploadCallout(
-      `已定位到上传区。修复“${scopeLabel}”后，可直接上传新的 JSON/JSONL 文件重新导入。`,
-    );
+    setUploadCallout(buildJobStatusUploadCallout({ lastDownloadedScopeLabel }));
     if (typeof uploadSectionRef.current?.scrollIntoView === "function") {
       uploadSectionRef.current.scrollIntoView({
         block: "start",

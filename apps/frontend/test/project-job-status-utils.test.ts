@@ -14,6 +14,7 @@ import {
   buildJobStatusClipboardUrl,
   buildJobStatusDownloadSuccessState,
   buildJobStatusSkippedDownloadState,
+  buildJobStatusUploadCallout,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
@@ -319,6 +320,24 @@ describe("project-job-status-utils", () => {
       downloadMessage: "当前筛选下没有失败条目，已跳过导出。",
       downloadMessageReason: null,
     });
+  });
+
+  test("builds upload callout from the last downloaded scope", () => {
+    expect(
+      buildJobStatusUploadCallout({
+        lastDownloadedScopeLabel: "缺少必填字段 / bill_item",
+      }),
+    ).toBe(
+      "已定位到上传区。修复“缺少必填字段 / bill_item”后，可直接上传新的 JSON/JSONL 文件重新导入。",
+    );
+
+    expect(
+      buildJobStatusUploadCallout({
+        lastDownloadedScopeLabel: null,
+      }),
+    ).toBe(
+      "已定位到上传区。修复“当前失败范围”后，可直接上传新的 JSON/JSONL 文件重新导入。",
+    );
   });
 
   test("builds recent processing link input for copied job status links", () => {

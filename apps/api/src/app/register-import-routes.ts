@@ -18,6 +18,7 @@ import {
   parseImportFileContent,
   uploadImportTaskSchema,
 } from "./import-file-parser.js";
+import { createKnowledgeExtractionJobWithImportTask } from "./import-knowledge-extraction-jobs.js";
 
 const aiRuntimePreviewSchema = z.object({
   source: z.string().min(1),
@@ -72,52 +73,11 @@ export function registerImportRoutes(
     auditLogService,
     importTaskService,
   } = input;
-
-  async function createKnowledgeExtractionJobWithImportTask(input: {
-    projectId: string;
-    source: string;
-    sourceLabel: string;
-    sourceFileName?: string | null;
-    sourceBatchNo?: string | null;
-    events: Array<Record<string, unknown>>;
-    totalItemCount?: number;
-    failedItemCount?: number;
-    failureDetails?: string[];
-    latestErrorMessage?: string | null;
-    metadata?: Record<string, unknown>;
-    requestedBy: string;
-  }) {
-    return transactionRunner.runInTransaction(async () => {
-      const task = await importTaskService.createImportTask({
-        projectId: input.projectId,
-        sourceType: input.source,
-        sourceLabel: input.sourceLabel,
-        sourceFileName: input.sourceFileName ?? null,
-        sourceBatchNo: input.sourceBatchNo ?? null,
-        totalItemCount: input.totalItemCount ?? input.events.length,
-        failedItemCount: input.failedItemCount ?? 0,
-        failureDetails: input.failureDetails ?? [],
-        latestErrorMessage: input.latestErrorMessage ?? null,
-        metadata: input.metadata,
-        requestedBy: input.requestedBy,
-      });
-
-      const job = await backgroundJobService.enqueueJob({
-        jobType: "knowledge_extraction",
-        requestedBy: input.requestedBy,
-        projectId: input.projectId,
-        payload: {
-          projectId: input.projectId,
-          source: input.source,
-          sourceLabel: input.sourceLabel,
-          importTaskId: task.id,
-          events: input.events,
-        },
-      });
-
-      return { task, job };
-    });
-  }
+  const knowledgeExtractionJobDependencies = {
+    transactionRunner,
+    backgroundJobService,
+    importTaskService,
+  };
 
   app.post("/v1/ai-runtime/extract-preview", async (request) => {
     assertCanPreviewAiRuntime(request.currentUser!);
@@ -133,18 +93,21 @@ export function registerImportRoutes(
     assertCanPreviewAiRuntime(request.currentUser!);
     const payload = enqueueKnowledgeExtractionSchema.parse(request.body);
 
-    const created = await createKnowledgeExtractionJobWithImportTask({
-      projectId: payload.projectId,
-      source: payload.source,
-      sourceLabel: payload.source,
-      sourceFileName: payload.sourceFileName,
-      sourceBatchNo: payload.sourceBatchNo,
-      events: payload.events,
-      metadata: {
-        createdFrom: "extract_jobs",
+    const created = await createKnowledgeExtractionJobWithImportTask(
+      knowledgeExtractionJobDependencies,
+      {
+        projectId: payload.projectId,
+        source: payload.source,
+        sourceLabel: payload.source,
+        sourceFileName: payload.sourceFileName,
+        sourceBatchNo: payload.sourceBatchNo,
+        events: payload.events,
+        metadata: {
+          createdFrom: "extract_jobs",
+        },
+        requestedBy: request.currentUser!.id,
       },
-      requestedBy: request.currentUser!.id,
-    });
+    );
 
     reply.status(202);
     return created;
@@ -184,18 +147,21 @@ export function registerImportRoutes(
         afterPayload: log.afterPayload ?? null,
         createdAt: log.createdAt,
       }));
-      const created = await createKnowledgeExtractionJobWithImportTask({
-        projectId,
-        source: payload.source,
-        sourceLabel: "审计日志筛选导入",
-        sourceBatchNo: `audit-${Date.now()}`,
-        events,
-        metadata: {
-          createdFrom: "audit_log",
-          filters: payload,
+      const created = await createKnowledgeExtractionJobWithImportTask(
+        knowledgeExtractionJobDependencies,
+        {
+          projectId,
+          source: payload.source,
+          sourceLabel: "审计日志筛选导入",
+          sourceBatchNo: `audit-${Date.now()}`,
+          events,
+          metadata: {
+            createdFrom: "audit_log",
+            filters: payload,
+          },
+          requestedBy: request.currentUser!.id,
         },
-        requestedBy: request.currentUser!.id,
-      });
+      );
 
       reply.status(202);
       return {
@@ -249,18 +215,21 @@ export function registerImportRoutes(
     const { projectId } = request.params as { projectId: string };
     const payload = createImportTaskSchema.parse(request.body);
 
-    const created = await createKnowledgeExtractionJobWithImportTask({
-      projectId,
-      source: payload.source,
-      sourceLabel: payload.sourceLabel ?? payload.source,
-      sourceFileName: payload.sourceFileName,
-      sourceBatchNo: payload.sourceBatchNo,
-      events: payload.events,
-      metadata: {
-        createdFrom: "project_import_task",
+    const created = await createKnowledgeExtractionJobWithImportTask(
+      knowledgeExtractionJobDependencies,
+      {
+        projectId,
+        source: payload.source,
+        sourceLabel: payload.sourceLabel ?? payload.source,
+        sourceFileName: payload.sourceFileName,
+        sourceBatchNo: payload.sourceBatchNo,
+        events: payload.events,
+        metadata: {
+          createdFrom: "project_import_task",
+        },
+        requestedBy: request.currentUser!.id,
       },
-      requestedBy: request.currentUser!.id,
-    });
+    );
 
     reply.status(202);
     return created;
@@ -272,23 +241,26 @@ export function registerImportRoutes(
     const payload = uploadImportTaskSchema.parse(request.body);
     const parsed = parseImportFileContent(payload.fileName, payload.fileContent);
 
-    const created = await createKnowledgeExtractionJobWithImportTask({
-      projectId,
-      source: payload.sourceType,
-      sourceLabel: payload.sourceLabel ?? `文件导入：${payload.fileName}`,
-      sourceFileName: payload.fileName,
-      sourceBatchNo: buildGeneratedBatchNo("upload"),
-      events: parsed.events,
-      totalItemCount: parsed.totalItemCount,
-      failedItemCount: parsed.failedItems.length,
-      failureDetails: buildFailureDetails(parsed.failedItems),
-      latestErrorMessage: parsed.failedItems[0]?.errorMessage ?? null,
-      metadata: {
-        createdFrom: "project_file_upload",
-        ...buildImportFileMetadata(parsed),
+    const created = await createKnowledgeExtractionJobWithImportTask(
+      knowledgeExtractionJobDependencies,
+      {
+        projectId,
+        source: payload.sourceType,
+        sourceLabel: payload.sourceLabel ?? `文件导入：${payload.fileName}`,
+        sourceFileName: payload.fileName,
+        sourceBatchNo: buildGeneratedBatchNo("upload"),
+        events: parsed.events,
+        totalItemCount: parsed.totalItemCount,
+        failedItemCount: parsed.failedItems.length,
+        failureDetails: buildFailureDetails(parsed.failedItems),
+        latestErrorMessage: parsed.failedItems[0]?.errorMessage ?? null,
+        metadata: {
+          createdFrom: "project_file_upload",
+          ...buildImportFileMetadata(parsed),
+        },
+        requestedBy: request.currentUser!.id,
       },
-      requestedBy: request.currentUser!.id,
-    });
+    );
 
     reply.status(202);
     return {

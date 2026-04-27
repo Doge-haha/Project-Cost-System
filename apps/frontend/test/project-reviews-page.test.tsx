@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { ProjectReviewsPage } from "../src/features/projects/project-reviews-page";
+import { formatProjectDateTime } from "../src/features/projects/project-date-utils";
 import { saveRecentProcessingLink } from "../src/features/projects/recent-processing-link";
 
 function createJsonResponse(body: unknown) {
@@ -194,6 +195,11 @@ describe("ProjectReviewsPage", () => {
     expect(screen.queryByRole("link", { name: "打开最近协作入口" })).not.toBeInTheDocument();
     expect(screen.getByText("待审核，可由当前角色执行通过或驳回。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "通过" }));
+    expect(screen.getByText("提交对象：估算版 V1 · estimate · building")).toBeInTheDocument();
+    expect(screen.getByText("提交人：user-002")).toBeInTheDocument();
+    expect(
+      screen.getByText(`提交时间：${formatProjectDateTime("2026-04-18T11:00:00.000Z")}`),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "复制当前处理链接" }));
     await waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(

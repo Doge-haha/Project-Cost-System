@@ -537,6 +537,16 @@ export function ProjectReviewsPage() {
               <p className="page-description">
                 当前处理：{activeReview.billVersionSummary.versionName} · {actionState.mode}
               </p>
+              <div className="page-stack">
+                <p className="page-description">
+                  提交对象：{activeReview.billVersionSummary.versionName} · {activeReview.stageCode} ·{" "}
+                  {activeReview.disciplineCode}
+                </p>
+                <p className="page-description">提交人：{activeReview.submittedBy}</p>
+                <p className="page-description">
+                  提交时间：{formatProjectDateTime(activeReview.submittedAt)}
+                </p>
+              </div>
               {actionState.mode === "reject" ? (
                 <label className="connection-label">
                   驳回原因

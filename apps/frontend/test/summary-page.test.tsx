@@ -267,6 +267,108 @@ describe("SummaryPage", () => {
     expect(screen.getByText("税金 32.40")).toBeInTheDocument();
   });
 
+  test("passes stage discipline and unit filters to summary APIs", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse({
+          versions: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+            {
+              id: "version-002",
+              versionName: "安装版 V1",
+              stageCode: "budget",
+              disciplineCode: "install",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        expect(url.searchParams.get("stageCode")).toBe("estimate");
+        expect(url.searchParams.get("disciplineCode")).toBe("building");
+        expect(url.searchParams.get("unitCode")).toBe("unit-001");
+        return createJsonResponse({
+          totalSystemAmount: 1000,
+          totalFinalAmount: 1200,
+          varianceAmount: 200,
+          itemCount: 2,
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary/details") {
+        expect(url.searchParams.get("stageCode")).toBe("estimate");
+        expect(url.searchParams.get("disciplineCode")).toBe("building");
+        expect(url.searchParams.get("unitCode")).toBe("unit-001");
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+            {
+              id: "version-002",
+              versionName: "安装版 V1",
+              stageCode: "budget",
+              disciplineCode: "install",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/projects/project-001/summary?stageCode=estimate&disciplineCode=building&unitCode=unit-001",
+        ]}
+      >
+        <Routes>
+          <Route path="/projects/:projectId/summary" element={<SummaryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "阶段" })).toHaveValue(
+        "estimate",
+      );
+    });
+    expect(screen.getByRole("combobox", { name: "专业" })).toHaveValue("building");
+    expect(screen.getByRole("textbox", { name: "单体" })).toHaveValue("unit-001");
+  });
+
   test("renders full version compare table when compare query is present", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));

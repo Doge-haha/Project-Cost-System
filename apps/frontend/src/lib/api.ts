@@ -694,24 +694,40 @@ export const apiClient = {
   },
   getSummary(
     projectId: string,
-    billVersionId?: string,
-    taxMode?: "tax_included" | "tax_excluded",
+    query?: {
+      billVersionId?: string;
+      stageCode?: string;
+      disciplineCode?: string;
+      unitCode?: string;
+      taxMode?: "tax_included" | "tax_excluded";
+    },
   ) {
     return request<SummaryResponse>("/v1/reports/summary", {
       projectId,
-      billVersionId,
-      taxMode,
+      billVersionId: query?.billVersionId,
+      stageCode: query?.stageCode,
+      disciplineCode: query?.disciplineCode,
+      unitCode: query?.unitCode,
+      taxMode: query?.taxMode,
     });
   },
   getSummaryDetails(
     projectId: string,
-    billVersionId?: string,
-    taxMode?: "tax_included" | "tax_excluded",
+    query?: {
+      billVersionId?: string;
+      stageCode?: string;
+      disciplineCode?: string;
+      unitCode?: string;
+      taxMode?: "tax_included" | "tax_excluded";
+    },
   ) {
     return request<{ items: SummaryDetailItem[] }>("/v1/reports/summary/details", {
       projectId,
-      billVersionId,
-      taxMode,
+      billVersionId: query?.billVersionId,
+      stageCode: query?.stageCode,
+      disciplineCode: query?.disciplineCode,
+      unitCode: query?.unitCode,
+      taxMode: query?.taxMode,
       limit: 10,
     });
   },

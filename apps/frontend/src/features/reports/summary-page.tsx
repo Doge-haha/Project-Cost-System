@@ -68,6 +68,9 @@ export function SummaryPage() {
   const [searchParams] = useSearchParams();
   const projectId = params.projectId;
   const billVersionId = searchParams.get("billVersionId") ?? undefined;
+  const stageCode = searchParams.get("stageCode") ?? undefined;
+  const disciplineCode = searchParams.get("disciplineCode") ?? undefined;
+  const unitCode = searchParams.get("unitCode") ?? undefined;
   const taxModeParam = searchParams.get("taxMode");
   const taxMode =
     taxModeParam === "tax_included" || taxModeParam === "tax_excluded"
@@ -101,6 +104,16 @@ export function SummaryPage() {
     () => findSelectedBillVersion(versions, billVersionId),
     [billVersionId, versions],
   );
+  const stageOptions = useMemo(
+    () => [...new Set(versions.map((version) => version.stageCode).filter(Boolean))],
+    [versions],
+  );
+  const disciplineOptions = useMemo(
+    () => [
+      ...new Set(versions.map((version) => version.disciplineCode).filter(Boolean)),
+    ],
+    [versions],
+  );
 
   async function loadSummary() {
     if (!projectId) {
@@ -123,8 +136,20 @@ export function SummaryPage() {
       ] =
         await Promise.all([
           apiClient.getProject(projectId),
-          apiClient.getSummary(projectId, billVersionId, taxMode),
-          apiClient.getSummaryDetails(projectId, billVersionId, taxMode),
+          apiClient.getSummary(projectId, {
+            billVersionId,
+            stageCode,
+            disciplineCode,
+            unitCode,
+            taxMode,
+          }),
+          apiClient.getSummaryDetails(projectId, {
+            billVersionId,
+            stageCode,
+            disciplineCode,
+            unitCode,
+            taxMode,
+          }),
           apiClient.listBillVersions(projectId),
           apiClient.getProjectWorkspace(projectId),
           apiClient.listAiRecommendations(projectId, {
@@ -179,10 +204,26 @@ export function SummaryPage() {
   }, [
     projectId,
     billVersionId,
+    stageCode,
+    disciplineCode,
+    unitCode,
     taxMode,
     compareBaseBillVersionId,
     compareTargetBillVersionId,
   ]);
+
+  function updateSummaryFilter(key: string, value: string) {
+    if (!projectId) {
+      return;
+    }
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (value) {
+      nextSearchParams.set(key, value);
+    } else {
+      nextSearchParams.delete(key);
+    }
+    void navigate(`/projects/${projectId}/summary?${nextSearchParams.toString()}`);
+  }
 
   async function createExportTask(reportType: ReportExportTask["reportType"]) {
     if (!projectId) {
@@ -196,6 +237,8 @@ export function SummaryPage() {
         reportType,
         stageCode: selectedVersion?.stageCode,
         disciplineCode: selectedVersion?.disciplineCode,
+        ...(stageCode ? { stageCode } : {}),
+        ...(disciplineCode ? { disciplineCode } : {}),
       });
       setExportTask(response.result);
       setExportJobId(response.job.id);
@@ -381,6 +424,51 @@ export function SummaryPage() {
                   <option value="tax_included">含税口径</option>
                   <option value="tax_excluded">不含税口径</option>
                 </select>
+              </label>
+              <label className="connection-label">
+                阶段
+                <select
+                  aria-label="阶段"
+                  className="version-select"
+                  onChange={(event) =>
+                    updateSummaryFilter("stageCode", event.target.value)
+                  }
+                  value={stageCode ?? ""}
+                >
+                  <option value="">全部阶段</option>
+                  {stageOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="connection-label">
+                专业
+                <select
+                  aria-label="专业"
+                  className="version-select"
+                  onChange={(event) =>
+                    updateSummaryFilter("disciplineCode", event.target.value)
+                  }
+                  value={disciplineCode ?? ""}
+                >
+                  <option value="">全部专业</option>
+                  {disciplineOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="connection-label">
+                单体
+                <input
+                  aria-label="单体"
+                  onChange={(event) => updateSummaryFilter("unitCode", event.target.value)}
+                  placeholder="unit-001"
+                  value={unitCode ?? ""}
+                />
               </label>
               {versionContext ? (
                 <Link className="app-nav-link active" to={versionContext.billItemsPath}>

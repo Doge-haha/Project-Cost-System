@@ -195,7 +195,7 @@ export function ProjectDetailPage() {
     let active = true;
 
     void apiClient
-      .getSummary(projectId, selectedBillVersionId)
+      .getSummary(projectId, { billVersionId: selectedBillVersionId })
       .then((summary) => {
         if (active) {
           setSelectedSummary(summary);

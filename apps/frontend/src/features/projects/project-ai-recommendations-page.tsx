@@ -160,31 +160,7 @@ export function ProjectAiRecommendationsPage() {
           : await apiClient.ignoreAiRecommendation(recommendation.id, reason);
 
       setState((current) =>
-        current
-          ? {
-              ...current,
-              recommendations: {
-                ...current.recommendations,
-                items: current.recommendations.items.map((item) =>
-                  item.id === updated.id ? updated : item,
-                ),
-                summary: {
-                  ...current.recommendations.summary,
-                  statusCounts: {
-                    ...current.recommendations.summary.statusCounts,
-                    [recommendation.status]: Math.max(
-                      0,
-                      current.recommendations.summary.statusCounts[
-                        recommendation.status
-                      ] - 1,
-                    ),
-                    [updated.status]:
-                      current.recommendations.summary.statusCounts[updated.status] + 1,
-                  },
-                },
-              },
-            }
-          : current,
+        updateRecommendationState(current, updated, activeQuery),
       );
       setActionMessage(
         `${formatRecommendationType(recommendation.recommendationType)}已${
@@ -412,6 +388,93 @@ function readFilters(searchParams: URLSearchParams): RecommendationFilters {
     disciplineCode:
       searchParams.get("disciplineCode") ?? defaultFilters.disciplineCode,
     limit: searchParams.get("limit") ?? defaultFilters.limit,
+  };
+}
+
+function updateRecommendationState(
+  current: RecommendationState | null,
+  updated: AiRecommendation,
+  activeQuery: Record<string, string>,
+): RecommendationState | null {
+  if (!current) {
+    return current;
+  }
+
+  const items = current.recommendations.items.flatMap((item) => {
+    if (item.id !== updated.id) {
+      return [item];
+    }
+
+    return matchesActiveRecommendationFilters(updated, activeQuery) ? [updated] : [];
+  });
+
+  return {
+    ...current,
+    recommendations: {
+      ...current.recommendations,
+      items,
+      summary: summarizeVisibleRecommendations(items),
+    },
+  };
+}
+
+function matchesActiveRecommendationFilters(
+  recommendation: AiRecommendation,
+  activeQuery: Record<string, string>,
+) {
+  if (
+    activeQuery.recommendationType &&
+    recommendation.recommendationType !== activeQuery.recommendationType
+  ) {
+    return false;
+  }
+
+  if (activeQuery.status && recommendation.status !== activeQuery.status) {
+    return false;
+  }
+
+  if (activeQuery.resourceType && recommendation.resourceType !== activeQuery.resourceType) {
+    return false;
+  }
+
+  if (activeQuery.resourceId && recommendation.resourceId !== activeQuery.resourceId) {
+    return false;
+  }
+
+  if (activeQuery.stageCode && recommendation.stageCode !== activeQuery.stageCode) {
+    return false;
+  }
+
+  if (
+    activeQuery.disciplineCode &&
+    recommendation.disciplineCode !== activeQuery.disciplineCode
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function summarizeVisibleRecommendations(items: AiRecommendation[]) {
+  return {
+    totalCount: items.length,
+    statusCounts: {
+      generated: items.filter((item) => item.status === "generated").length,
+      accepted: items.filter((item) => item.status === "accepted").length,
+      ignored: items.filter((item) => item.status === "ignored").length,
+      expired: items.filter((item) => item.status === "expired").length,
+    },
+    typeCounts: {
+      bill_recommendation: items.filter(
+        (item) => item.recommendationType === "bill_recommendation",
+      ).length,
+      quota_recommendation: items.filter(
+        (item) => item.recommendationType === "quota_recommendation",
+      ).length,
+      variance_warning: items.filter(
+        (item) => item.recommendationType === "variance_warning",
+      ).length,
+    },
   };
 }
 

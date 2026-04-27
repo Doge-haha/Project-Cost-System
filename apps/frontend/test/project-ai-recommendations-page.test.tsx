@@ -144,6 +144,99 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("处理人 engineer-001 · 原因 人工确认接受")).toBeInTheDocument();
   });
 
+  test("removes handled recommendation from generated status filter", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "ai-recommendation-001",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "bill_item",
+              resourceId: "bill-item-001",
+              recommendationType: "quota_recommendation",
+              inputPayload: {},
+              outputPayload: {
+                quotaName: "挖土方",
+                reason: "清单名称匹配",
+              },
+              status: "generated",
+              createdBy: "engineer-001",
+              handledBy: null,
+              handledAt: null,
+              statusReason: null,
+              createdAt: "2026-04-18T11:00:00.000Z",
+              updatedAt: "2026-04-18T11:00:00.000Z",
+            },
+          ],
+          summary: {
+            totalCount: 1,
+            statusCounts: {
+              generated: 1,
+              accepted: 0,
+              ignored: 0,
+              expired: 0,
+            },
+            typeCounts: {
+              bill_recommendation: 0,
+              quota_recommendation: 1,
+              variance_warning: 0,
+            },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/ai/recommendations/ai-recommendation-001/ignore") {
+        expect(init?.method).toBe("POST");
+        return createJsonResponse({
+          id: "ai-recommendation-001",
+          projectId: "project-001",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          resourceType: "bill_item",
+          resourceId: "bill-item-001",
+          recommendationType: "quota_recommendation",
+          inputPayload: {},
+          outputPayload: {
+            quotaName: "挖土方",
+            reason: "清单名称匹配",
+          },
+          status: "ignored",
+          createdBy: "engineer-001",
+          handledBy: "engineer-001",
+          handledAt: "2026-04-18T11:05:00.000Z",
+          statusReason: "人工确认忽略",
+          createdAt: "2026-04-18T11:00:00.000Z",
+          updatedAt: "2026-04-18T11:05:00.000Z",
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage("/projects/project-001/ai-recommendations?status=generated");
+
+    await waitFor(() => {
+      expect(screen.getByText("定额推荐 · 待处理")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "忽略" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("定额推荐已忽略。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("没有匹配推荐")).toBeInTheDocument();
+    expect(screen.queryByText("定额推荐 · 已忽略")).not.toBeInTheDocument();
+  });
+
   test("applies recommendation filters", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));

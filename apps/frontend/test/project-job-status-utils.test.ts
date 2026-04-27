@@ -5,6 +5,7 @@ import {
   buildCurrentJobStatusViewUrl,
   buildCsvLine,
   buildErrorReportActionKey,
+  buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
   buildNextJobStatusSearchParams,
@@ -90,6 +91,62 @@ describe("project-job-status-utils", () => {
         search: "status=failed&failureReason=missing_field",
       }),
     ).toBe("http://localhost/projects/project-001/jobs?status=failed&failureReason=missing_field");
+  });
+
+  test("filters import failed items by reason, resource type, and action", () => {
+    const failedItems = [
+      {
+        lineNo: 1,
+        reasonCode: "missing_field",
+        reasonLabel: "缺少必填字段",
+        errorMessage: "缺少工程量",
+        projectId: "project-001",
+        resourceType: "bill_item",
+        action: "create",
+        keys: [],
+        retryEventSnapshot: null,
+      },
+      {
+        lineNo: 2,
+        reasonCode: "missing_field",
+        reasonLabel: "缺少必填字段",
+        errorMessage: "缺少名称",
+        projectId: "project-001",
+        resourceType: null,
+        action: null,
+        keys: [],
+        retryEventSnapshot: null,
+      },
+      {
+        lineNo: 3,
+        reasonCode: "invalid_unit",
+        reasonLabel: "单位不匹配",
+        errorMessage: "单位不一致",
+        projectId: "project-001",
+        resourceType: "quota_line",
+        action: "update",
+        keys: [],
+        retryEventSnapshot: null,
+      },
+    ];
+
+    expect(
+      buildFilteredImportFailedItems({
+        failedItems,
+        failureReasonCode: "missing_field",
+        resourceTypeFilter: "bill_item",
+        actionFilter: "create",
+      }),
+    ).toEqual([failedItems[0]]);
+
+    expect(
+      buildFilteredImportFailedItems({
+        failedItems,
+        failureReasonCode: "missing_field",
+        resourceTypeFilter: "未提供",
+        actionFilter: "未提供",
+      }),
+    ).toEqual([failedItems[1]]);
   });
 
   test("builds recent processing link input for copied job status links", () => {

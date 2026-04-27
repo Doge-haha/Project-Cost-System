@@ -29,6 +29,7 @@ import {
 import {
   buildCurrentJobStatusViewUrl,
   buildErrorReportActionKey,
+  buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
   buildSuggestedErrorReportFileName,
@@ -162,28 +163,21 @@ export function ProjectJobStatusPage() {
   );
   const failureReasonFilteredItems = useMemo(
     () =>
-      selectedFailureReasonCode
-        ? selectedImportFailedItems.filter(
-            (item) => item.reasonCode === selectedFailureReasonCode,
-          )
-        : selectedImportFailedItems,
+      buildFilteredImportFailedItems({
+        failedItems: selectedImportFailedItems,
+        failureReasonCode: selectedFailureReasonCode,
+        resourceTypeFilter: null,
+        actionFilter: null,
+      }),
     [selectedFailureReasonCode, selectedImportFailedItems],
   );
   const filteredImportFailedItems = useMemo(
     () =>
-      failureReasonFilteredItems.filter((item) => {
-        const resourceType = item.resourceType ?? "未提供";
-        const action = item.action ?? "未提供";
-
-        if (selectedResourceTypeFilter && resourceType !== selectedResourceTypeFilter) {
-          return false;
-        }
-
-        if (selectedActionFilter && action !== selectedActionFilter) {
-          return false;
-        }
-
-        return true;
+      buildFilteredImportFailedItems({
+        failedItems: failureReasonFilteredItems,
+        failureReasonCode: null,
+        resourceTypeFilter: selectedResourceTypeFilter,
+        actionFilter: selectedActionFilter,
       }),
     [failureReasonFilteredItems, selectedActionFilter, selectedResourceTypeFilter],
   );

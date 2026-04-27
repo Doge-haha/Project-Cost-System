@@ -147,6 +147,32 @@ export function buildJobStatusClipboardUrl(input: {
   return url.toString();
 }
 
+export function buildFilteredImportFailedItems(input: {
+  failedItems: ParsedImportTaskFailedItem[];
+  failureReasonCode: string | null;
+  resourceTypeFilter: string | null;
+  actionFilter: string | null;
+}) {
+  return input.failedItems.filter((item) => {
+    if (input.failureReasonCode && item.reasonCode !== input.failureReasonCode) {
+      return false;
+    }
+
+    const resourceType = item.resourceType ?? "未提供";
+    const action = item.action ?? "未提供";
+
+    if (input.resourceTypeFilter && resourceType !== input.resourceTypeFilter) {
+      return false;
+    }
+
+    if (input.actionFilter && action !== input.actionFilter) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

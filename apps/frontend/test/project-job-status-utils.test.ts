@@ -13,6 +13,7 @@ import {
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
   buildJobStatusDownloadSuccessState,
+  buildJobStatusSkippedDownloadState,
   buildNextJobStatusSearchParams,
   buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
@@ -308,6 +309,14 @@ describe("project-job-status-utils", () => {
     ).toEqual({
       lastDownloadedScopeLabel: "缺少必填字段 / bill_item",
       downloadMessage: "已导出当前子集（缺少必填字段 / bill_item，JSON）。",
+      downloadMessageReason: null,
+    });
+  });
+
+  test("builds skipped download state for empty filtered reports", () => {
+    expect(buildJobStatusSkippedDownloadState()).toEqual({
+      error: null,
+      downloadMessage: "当前筛选下没有失败条目，已跳过导出。",
       downloadMessageReason: null,
     });
   });

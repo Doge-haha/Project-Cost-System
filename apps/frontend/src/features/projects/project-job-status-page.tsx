@@ -38,6 +38,7 @@ import {
   buildJobStatusPath,
   buildJobStatusRetryPayload,
   buildSuggestedErrorReportFileName,
+  buildJobStatusSkippedDownloadState,
   type ErrorReportFormat,
   type ErrorReportScope,
   buildNextJobStatusSearchParams,
@@ -875,9 +876,10 @@ export function ProjectJobStatusPage() {
       return;
     }
     if (scope === "filtered" && filteredImportFailedItems.length === 0) {
-      setError(null);
-      setDownloadMessage("当前筛选下没有失败条目，已跳过导出。");
-      setDownloadMessageReason(null);
+      const skippedState = buildJobStatusSkippedDownloadState();
+      setError(skippedState.error);
+      setDownloadMessage(skippedState.downloadMessage);
+      setDownloadMessageReason(skippedState.downloadMessageReason);
       return;
     }
 

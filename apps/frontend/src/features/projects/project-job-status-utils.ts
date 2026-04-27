@@ -259,6 +259,14 @@ export function buildJobStatusDownloadSuccessState(input: {
   };
 }
 
+export function buildJobStatusSkippedDownloadState() {
+  return {
+    error: null,
+    downloadMessage: "当前筛选下没有失败条目，已跳过导出。",
+    downloadMessageReason: null,
+  };
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

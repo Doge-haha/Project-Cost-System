@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { requireDependency } from "../../shared/dependency/require-dependency.js";
 import { AppError } from "../../shared/errors/app-error.js";
+import {
+  multiplyDecimal,
+  roundDecimal,
+  subtractDecimal,
+  sumDecimal,
+} from "../../shared/math/decimal-money.js";
 import type { AuditLogService } from "../audit/audit-log-service.js";
 import type { BillItemRepository } from "../bill/bill-item-repository.js";
 import { BillItemService } from "../bill/bill-item-service.js";
@@ -94,7 +100,7 @@ export type QuotaSourceCandidateRecord = {
 };
 
 export type QuotaLineValidationIssue = {
-  code: "MISSING_QUOTA_LINES" | "UNIT_MISMATCH";
+  code: "MISSING_QUOTA_LINES" | "UNIT_MISMATCH" | "AMOUNT_MISMATCH";
   severity: "warning";
   message: string;
   billVersionId: string;
@@ -105,6 +111,9 @@ export type QuotaLineValidationIssue = {
   quotaCode?: string;
   billItemUnit?: string;
   quotaUnit?: string;
+  billItemSystemAmount?: number;
+  quotaLineAmountTotal?: number;
+  varianceAmount?: number;
 };
 
 export type QuotaLineValidationResult = {
@@ -317,6 +326,30 @@ export class QuotaLineService {
             });
           }
         }
+
+        if (billItem.systemAmount !== null && billItem.systemAmount !== undefined) {
+          const quotaLineAmountTotal = this.calculateQuotaLineAmountTotal(quotaLines);
+          const varianceAmount = subtractDecimal(
+            billItem.systemAmount,
+            quotaLineAmountTotal,
+            2,
+          );
+          if (Math.abs(varianceAmount) > 0.01) {
+            issues.push({
+              code: "AMOUNT_MISMATCH",
+              severity: "warning",
+              message:
+                "Bill item system amount does not match quota line amount total",
+              billVersionId: version.id,
+              billItemId: billItem.id,
+              billItemCode: billItem.itemCode,
+              billItemName: billItem.itemName,
+              billItemSystemAmount: roundDecimal(billItem.systemAmount, 2),
+              quotaLineAmountTotal,
+              varianceAmount,
+            });
+          }
+        }
       }
     }
 
@@ -325,6 +358,24 @@ export class QuotaLineService {
       issueCount: issues.length,
       issues,
     };
+  }
+
+  private calculateQuotaLineAmountTotal(quotaLines: QuotaLineRecord[]): number {
+    return sumDecimal(
+      quotaLines.map((quotaLine) => {
+        const unitAmount = sumDecimal([
+          quotaLine.laborFee ?? 0,
+          quotaLine.materialFee ?? 0,
+          quotaLine.machineFee ?? 0,
+        ]);
+        return multiplyDecimal(
+          multiplyDecimal(quotaLine.quantity, quotaLine.contentFactor, 6),
+          unitAmount,
+          6,
+        );
+      }),
+      2,
+    );
   }
 
   async createQuotaLine(input: {

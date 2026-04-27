@@ -211,7 +211,10 @@ const priceVersions: PriceVersionRecord[] = [
   },
 ];
 
-function createQuotaApp() {
+function createQuotaApp(overrides?: {
+  billItems?: typeof billItems;
+  quotaLines?: QuotaLineRecord[];
+}) {
   return createApp({
     jwtSecret,
     projectRepository: new InMemoryProjectRepository(projects),
@@ -221,8 +224,12 @@ function createQuotaApp() {
     ),
     projectMemberRepository: new InMemoryProjectMemberRepository(members),
     billVersionRepository: new InMemoryBillVersionRepository(billVersions),
-    billItemRepository: new InMemoryBillItemRepository(billItems),
-    quotaLineRepository: new InMemoryQuotaLineRepository(quotaLines),
+    billItemRepository: new InMemoryBillItemRepository(
+      overrides?.billItems ?? billItems,
+    ),
+    quotaLineRepository: new InMemoryQuotaLineRepository(
+      overrides?.quotaLines ?? quotaLines,
+    ),
     priceVersionRepository: new InMemoryPriceVersionRepository(priceVersions),
   });
 }
@@ -476,6 +483,56 @@ test("POST /v1/projects/:id/quota-lines/validate reports visible bill items with
         billItemId: "bill-item-003",
         billItemCode: "A.2",
         billItemName: "混凝土工程",
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/quota-lines/validate reports bill item and quota amount mismatch", async () => {
+  const app = createQuotaApp({
+    billItems: [
+      {
+        ...billItems[0],
+        systemAmount: 17001,
+      },
+      billItems[1],
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/quota-lines/validate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    passed: false,
+    issueCount: 1,
+    issues: [
+      {
+        code: "AMOUNT_MISMATCH",
+        severity: "warning",
+        message: "Bill item system amount does not match quota line amount total",
+        billVersionId: "bill-version-001",
+        billItemId: "bill-item-001",
+        billItemCode: "A.1",
+        billItemName: "土石方工程",
+        billItemSystemAmount: 17001,
+        quotaLineAmountTotal: 20000,
+        varianceAmount: -2999,
       },
     ],
   });

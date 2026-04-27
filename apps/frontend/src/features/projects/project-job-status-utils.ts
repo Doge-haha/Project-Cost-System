@@ -153,6 +153,18 @@ export function buildJobStatusClipboardUrl(input: {
   return url.toString();
 }
 
+export function buildJobStatusClipboardUnavailableError(
+  target: "link" | "workOrder" | "summary",
+) {
+  if (target === "link") {
+    return "当前环境不支持复制链接，请手动复制地址栏。";
+  }
+  if (target === "workOrder") {
+    return "当前环境不支持复制处理单，请手动复制页面内容。";
+  }
+  return "当前环境不支持复制摘要，请手动复制页面内容。";
+}
+
 export function buildFilteredImportFailedItems(input: {
   failedItems: ParsedImportTaskFailedItem[];
   failureReasonCode: string | null;

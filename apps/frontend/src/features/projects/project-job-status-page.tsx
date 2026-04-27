@@ -31,6 +31,7 @@ import {
   buildErrorReportActionKey,
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
+  buildJobStatusClipboardUnavailableError,
   buildJobStatusClipboardUrl,
   buildJobStatusDownloadSuccessState,
   buildJobStatusErrorReportDownloadPlan,
@@ -702,7 +703,7 @@ export function ProjectJobStatusPage() {
 
   async function copyCurrentFilterLink() {
     if (typeof window === "undefined" || !window.navigator?.clipboard?.writeText) {
-      setError("当前环境不支持复制链接，请手动复制地址栏。");
+      setError(buildJobStatusClipboardUnavailableError("link"));
       return;
     }
 
@@ -733,7 +734,7 @@ export function ProjectJobStatusPage() {
 
   async function copyCurrentProcessingLink() {
     if (typeof window === "undefined" || !window.navigator?.clipboard?.writeText) {
-      setError("当前环境不支持复制链接，请手动复制地址栏。");
+      setError(buildJobStatusClipboardUnavailableError("link"));
       return;
     }
 
@@ -759,7 +760,7 @@ export function ProjectJobStatusPage() {
 
   async function copyCurrentFailureSubsetWorkOrder() {
     if (typeof window === "undefined" || !window.navigator?.clipboard?.writeText) {
-      setError("当前环境不支持复制处理单，请手动复制页面内容。");
+      setError(buildJobStatusClipboardUnavailableError("workOrder"));
       return;
     }
 
@@ -781,7 +782,7 @@ export function ProjectJobStatusPage() {
 
   async function copyTeamHandoffSummary() {
     if (typeof window === "undefined" || !window.navigator?.clipboard?.writeText) {
-      setError("当前环境不支持复制摘要，请手动复制页面内容。");
+      setError(buildJobStatusClipboardUnavailableError("summary"));
       return;
     }
 
@@ -810,7 +811,7 @@ export function ProjectJobStatusPage() {
 
   async function copyUpstreamHandoffSummary() {
     if (typeof window === "undefined" || !window.navigator?.clipboard?.writeText) {
-      setError("当前环境不支持复制摘要，请手动复制页面内容。");
+      setError(buildJobStatusClipboardUnavailableError("summary"));
       return;
     }
 

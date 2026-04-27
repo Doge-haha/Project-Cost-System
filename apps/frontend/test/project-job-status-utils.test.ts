@@ -12,6 +12,7 @@ import {
   buildJobStatusPath,
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
+  buildJobStatusClipboardUnavailableError,
   buildJobStatusDownloadSuccessState,
   buildJobStatusSkippedDownloadState,
   buildJobStatusUploadCallout,
@@ -99,6 +100,18 @@ describe("project-job-status-utils", () => {
         search: "status=failed&failureReason=missing_field",
       }),
     ).toBe("http://localhost/projects/project-001/jobs?status=failed&failureReason=missing_field");
+  });
+
+  test("builds clipboard unavailable errors by copy target", () => {
+    expect(buildJobStatusClipboardUnavailableError("link")).toBe(
+      "当前环境不支持复制链接，请手动复制地址栏。",
+    );
+    expect(buildJobStatusClipboardUnavailableError("workOrder")).toBe(
+      "当前环境不支持复制处理单，请手动复制页面内容。",
+    );
+    expect(buildJobStatusClipboardUnavailableError("summary")).toBe(
+      "当前环境不支持复制摘要，请手动复制页面内容。",
+    );
   });
 
   test("filters import failed items by reason, resource type, and action", () => {

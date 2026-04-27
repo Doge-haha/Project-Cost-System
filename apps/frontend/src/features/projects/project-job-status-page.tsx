@@ -33,6 +33,7 @@ import {
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
   buildJobStatusFailureReasonTag,
+  buildJobStatusPath,
   buildJobStatusRetryPayload,
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
@@ -761,7 +762,10 @@ export function ProjectJobStatusPage() {
       await window.navigator.clipboard.writeText(currentFailureSubsetWorkOrder);
       setCopyMessage("已复制当前失败子集处理单，可直接作为协作处理单元转交。");
       setCopiedLinkPath(
-        `/projects/${projectId}/jobs${searchParams.toString() ? `?${searchParams.toString()}` : ""}`,
+        buildJobStatusPath({
+          projectId: projectId ?? "",
+          search: searchParams,
+        }),
       );
       setCopyMessageReason(selectedFailureReasonTag);
       setError(null);

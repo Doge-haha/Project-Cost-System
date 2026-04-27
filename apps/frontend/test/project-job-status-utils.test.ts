@@ -8,6 +8,7 @@ import {
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusFailureReasonTag,
+  buildJobStatusPath,
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
   buildNextJobStatusSearchParams,
@@ -199,6 +200,22 @@ describe("project-job-status-utils", () => {
         failureReasonLabel: "缺少必填字段",
       }),
     ).toBeNull();
+  });
+
+  test("builds project job status paths with optional search", () => {
+    expect(
+      buildJobStatusPath({
+        projectId: "project-001",
+        search: "status=failed&failureReason=missing_field",
+      }),
+    ).toBe("/projects/project-001/jobs?status=failed&failureReason=missing_field");
+
+    expect(
+      buildJobStatusPath({
+        projectId: "project-001",
+        search: "",
+      }),
+    ).toBe("/projects/project-001/jobs");
   });
 
   test("builds recent processing link input for copied job status links", () => {

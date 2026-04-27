@@ -112,7 +112,10 @@ export function buildRecentJobStatusProcessingLinkInput(input: {
   } | null;
 }) {
   const searchText = input.search.toString();
-  const path = `/projects/${input.projectId}/jobs${searchText ? `?${searchText}` : ""}`;
+  const path = buildJobStatusPath({
+    projectId: input.projectId,
+    search: searchText,
+  });
   const highlightedLineNo = input.selectedFailedItem?.lineNo ?? null;
   const highlightedParams = new URLSearchParams(input.search);
   if (highlightedLineNo) {
@@ -202,6 +205,14 @@ export function buildJobStatusFailureReasonTag(input: {
     code: input.failureReasonCode,
     label: input.failureReasonLabel,
   };
+}
+
+export function buildJobStatusPath(input: {
+  projectId: string;
+  search: string | URLSearchParams;
+}) {
+  const searchText = input.search.toString();
+  return `/projects/${input.projectId}/jobs${searchText ? `?${searchText}` : ""}`;
 }
 
 export function buildJobStatusReturnParams(input: {

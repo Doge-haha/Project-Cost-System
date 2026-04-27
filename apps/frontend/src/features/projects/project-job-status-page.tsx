@@ -40,6 +40,7 @@ import {
   buildSuggestedErrorReportFileName,
   buildJobStatusSkippedDownloadState,
   buildJobStatusUploadCallout,
+  isJobStatusErrorReportDownloading,
   type ErrorReportFormat,
   type ErrorReportScope,
   buildNextJobStatusSearchParams,
@@ -842,7 +843,11 @@ export function ProjectJobStatusPage() {
   }
 
   function isDownloadingErrorReport(scope: ErrorReportScope, format: ErrorReportFormat) {
-    return downloadingErrorReports.includes(getErrorReportActionKey(scope, format));
+    return isJobStatusErrorReportDownloading({
+      downloadingErrorReports,
+      scope,
+      format,
+    });
   }
 
   function downloadCurrentSubsetLocally(format: ErrorReportFormat) {

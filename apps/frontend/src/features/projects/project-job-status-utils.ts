@@ -483,6 +483,16 @@ export function buildErrorReportActionKey(
   return `${scope}:${format}`;
 }
 
+export function isJobStatusErrorReportDownloading(input: {
+  downloadingErrorReports: string[];
+  scope: ErrorReportScope;
+  format: ErrorReportFormat;
+}) {
+  return input.downloadingErrorReports.includes(
+    buildErrorReportActionKey(input.scope, input.format),
+  );
+}
+
 export function buildFailureSubsetDownload(input: {
   taskId: string;
   format: ErrorReportFormat;

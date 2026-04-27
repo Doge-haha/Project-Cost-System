@@ -22,6 +22,7 @@ import {
   buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
+  isJobStatusErrorReportDownloading,
   parseFailedLine,
   parseOptionalFilterValue,
   parseStatusFilter,
@@ -338,6 +339,24 @@ describe("project-job-status-utils", () => {
     ).toBe(
       "已定位到上传区。修复“当前失败范围”后，可直接上传新的 JSON/JSONL 文件重新导入。",
     );
+  });
+
+  test("detects active error report downloads by scope and format", () => {
+    expect(
+      isJobStatusErrorReportDownloading({
+        downloadingErrorReports: ["filtered:json", "all:csv"],
+        scope: "filtered",
+        format: "json",
+      }),
+    ).toBe(true);
+
+    expect(
+      isJobStatusErrorReportDownloading({
+        downloadingErrorReports: ["filtered:json", "all:csv"],
+        scope: "filtered",
+        format: "csv",
+      }),
+    ).toBe(false);
   });
 
   test("builds recent processing link input for copied job status links", () => {

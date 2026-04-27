@@ -190,6 +190,20 @@ export function buildJobStatusRetryPayload(input: {
   };
 }
 
+export function buildJobStatusFailureReasonTag(input: {
+  failureReasonCode: string | null;
+  failureReasonLabel: string | null;
+}) {
+  if (!input.failureReasonCode || !input.failureReasonLabel) {
+    return null;
+  }
+
+  return {
+    code: input.failureReasonCode,
+    label: input.failureReasonLabel,
+  };
+}
+
 export function buildJobStatusReturnParams(input: {
   target: "inbox" | "project";
   failureReasonCode: string | null;

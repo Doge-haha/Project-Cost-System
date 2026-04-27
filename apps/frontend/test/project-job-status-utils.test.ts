@@ -7,6 +7,7 @@ import {
   buildErrorReportActionKey,
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
+  buildJobStatusFailureReasonTag,
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
   buildNextJobStatusSearchParams,
@@ -172,6 +173,32 @@ describe("project-job-status-utils", () => {
         actionFilter: "create",
       }),
     ).toEqual({});
+  });
+
+  test("builds failure reason tags only when code and label are present", () => {
+    expect(
+      buildJobStatusFailureReasonTag({
+        failureReasonCode: "missing_field",
+        failureReasonLabel: "缺少必填字段",
+      }),
+    ).toEqual({
+      code: "missing_field",
+      label: "缺少必填字段",
+    });
+
+    expect(
+      buildJobStatusFailureReasonTag({
+        failureReasonCode: "missing_field",
+        failureReasonLabel: null,
+      }),
+    ).toBeNull();
+
+    expect(
+      buildJobStatusFailureReasonTag({
+        failureReasonCode: null,
+        failureReasonLabel: "缺少必填字段",
+      }),
+    ).toBeNull();
   });
 
   test("builds recent processing link input for copied job status links", () => {

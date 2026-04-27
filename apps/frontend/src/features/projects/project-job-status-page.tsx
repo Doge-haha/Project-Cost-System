@@ -32,6 +32,7 @@ import {
   buildFilteredImportFailedItems,
   buildFailureSubsetDownload,
   buildJobStatusClipboardUrl,
+  buildJobStatusFailureReasonTag,
   buildJobStatusRetryPayload,
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
@@ -341,6 +342,14 @@ export function ProjectJobStatusPage() {
       failureReasonCode: selectedFailureReasonCode,
     });
   }, [selectedFailureReasonCode]);
+  const selectedFailureReasonTag = useMemo(
+    () =>
+      buildJobStatusFailureReasonTag({
+        failureReasonCode: selectedFailureReasonCode,
+        failureReasonLabel: selectedFailureReasonLabel,
+      }),
+    [selectedFailureReasonCode, selectedFailureReasonLabel],
+  );
 
   useEffect(() => {
     const rawFailureReason = searchParams.get("failureReason");
@@ -708,14 +717,7 @@ export function ProjectJobStatusPage() {
       });
       setCopyMessage("已复制当前筛选链接，可直接发给协作同事。");
       setCopiedLinkPath(recentLinkInput.path);
-      setCopyMessageReason(
-        selectedFailureReasonCode && selectedFailureReasonLabel
-          ? {
-              code: selectedFailureReasonCode,
-              label: selectedFailureReasonLabel,
-            }
-          : null,
-      );
+      setCopyMessageReason(selectedFailureReasonTag);
       setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
       setError(null);
     } catch {
@@ -741,14 +743,7 @@ export function ProjectJobStatusPage() {
       await window.navigator.clipboard.writeText(buildCurrentViewUrl());
       setCopyMessage("已复制当前处理链接，可直接发给协作同事。");
       setCopiedLinkPath(recentLinkInput.path);
-      setCopyMessageReason(
-        selectedFailureReasonCode && selectedFailureReasonLabel
-          ? {
-              code: selectedFailureReasonCode,
-              label: selectedFailureReasonLabel,
-            }
-          : null,
-      );
+      setCopyMessageReason(selectedFailureReasonTag);
       setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
       setError(null);
     } catch {
@@ -768,14 +763,7 @@ export function ProjectJobStatusPage() {
       setCopiedLinkPath(
         `/projects/${projectId}/jobs${searchParams.toString() ? `?${searchParams.toString()}` : ""}`,
       );
-      setCopyMessageReason(
-        selectedFailureReasonCode && selectedFailureReasonLabel
-          ? {
-              code: selectedFailureReasonCode,
-              label: selectedFailureReasonLabel,
-            }
-          : null,
-      );
+      setCopyMessageReason(selectedFailureReasonTag);
       setError(null);
     } catch {
       setError("处理单复制失败，请稍后重试。");
@@ -804,14 +792,7 @@ export function ProjectJobStatusPage() {
       );
       setCopyMessage("已复制协作同事版处理摘要，可直接发给当前跟进同事。");
       setCopiedLinkPath(null);
-      setCopyMessageReason(
-        selectedFailureReasonCode && selectedFailureReasonLabel
-          ? {
-              code: selectedFailureReasonCode,
-              label: selectedFailureReasonLabel,
-            }
-          : null,
-      );
+      setCopyMessageReason(selectedFailureReasonTag);
       setError(null);
     } catch {
       setError("处理摘要复制失败，请稍后重试。");
@@ -841,14 +822,7 @@ export function ProjectJobStatusPage() {
       );
       setCopyMessage("已复制上游数据方版处理摘要，可直接发给上游排查。");
       setCopiedLinkPath(null);
-      setCopyMessageReason(
-        selectedFailureReasonCode && selectedFailureReasonLabel
-          ? {
-              code: selectedFailureReasonCode,
-              label: selectedFailureReasonLabel,
-            }
-          : null,
-      );
+      setCopyMessageReason(selectedFailureReasonTag);
       setError(null);
     } catch {
       setError("处理摘要复制失败，请稍后重试。");
@@ -918,27 +892,13 @@ export function ProjectJobStatusPage() {
       if (scope === "all") {
         setLastDownloadedScopeLabel("全部失败条目");
         setDownloadMessage(`已导出整批失败条目（${format.toUpperCase()}）。`);
-        setDownloadMessageReason(
-          selectedFailureReasonCode && selectedFailureReasonLabel
-            ? {
-                code: selectedFailureReasonCode,
-                label: selectedFailureReasonLabel,
-              }
-            : null,
-        );
+        setDownloadMessageReason(selectedFailureReasonTag);
       } else {
         setLastDownloadedScopeLabel(currentFailureSubsetLabel);
         setDownloadMessage(
           `已导出当前${hasFailureSubsetFilters ? "子集" : "筛选"}（${currentFailureSubsetLabel}，${format.toUpperCase()}）。`,
         );
-        setDownloadMessageReason(
-          selectedFailureReasonCode && selectedFailureReasonLabel
-            ? {
-                code: selectedFailureReasonCode,
-                label: selectedFailureReasonLabel,
-              }
-            : null,
-        );
+        setDownloadMessageReason(selectedFailureReasonTag);
       }
     } catch (downloadError) {
       setError(

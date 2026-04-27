@@ -361,10 +361,18 @@ export function ProjectAiRecommendationsPage() {
                     </button>
                   </div>
                 ) : (
-                  <p className="page-description">
-                    处理人 {recommendation.handledBy ?? "-"} · 原因{" "}
-                    {recommendation.statusReason ?? "-"}
-                  </p>
+                  <>
+                    <p className="page-description">
+                      处理人 {recommendation.handledBy ?? "-"} · 原因{" "}
+                      {recommendation.statusReason ?? "-"}
+                    </p>
+                    <p className="page-description">
+                      处理时间{" "}
+                      {recommendation.handledAt
+                        ? formatProjectDateTime(recommendation.handledAt)
+                        : "-"}
+                    </p>
+                  </>
                 )}
               </article>
             ))}

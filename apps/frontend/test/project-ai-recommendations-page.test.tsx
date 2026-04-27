@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { formatProjectDateTime } from "../src/features/projects/project-date-utils";
 import { ProjectAiRecommendationsPage } from "../src/features/projects/project-ai-recommendations-page";
 
 function createJsonResponse(body: unknown) {
@@ -142,6 +143,9 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("新点造价项目 · 待处理 0 条 · 共 1 条")).toBeInTheDocument();
     expect(screen.getByText("定额推荐 · 已接受")).toBeInTheDocument();
     expect(screen.getByText("处理人 engineer-001 · 原因 人工确认接受")).toBeInTheDocument();
+    expect(
+      screen.getByText(`处理时间 ${formatProjectDateTime("2026-04-18T11:05:00.000Z")}`),
+    ).toBeInTheDocument();
   });
 
   test("removes handled recommendation from generated status filter", async () => {

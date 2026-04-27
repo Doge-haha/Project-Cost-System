@@ -33,6 +33,7 @@ import {
   buildFailureSubsetDownload,
   buildJobStatusClipboardUnavailableError,
   buildJobStatusClipboardUrl,
+  buildJobStatusCopyFailureState,
   buildJobStatusCopySuccessState,
   buildJobStatusDownloadSuccessState,
   buildJobStatusErrorReportDownloadPlan,
@@ -734,7 +735,7 @@ export function ProjectJobStatusPage() {
       setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
       setError(copyState.error);
     } catch {
-      setError("筛选链接复制失败，请稍后重试。");
+      setError(buildJobStatusCopyFailureState("filterLink").error);
     }
   }
 
@@ -765,7 +766,7 @@ export function ProjectJobStatusPage() {
       setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
       setError(copyState.error);
     } catch {
-      setError("处理链接复制失败，请稍后重试。");
+      setError(buildJobStatusCopyFailureState("processingLink").error);
     }
   }
 
@@ -790,7 +791,7 @@ export function ProjectJobStatusPage() {
       setCopyMessageReason(copyState.copyMessageReason);
       setError(copyState.error);
     } catch {
-      setError("处理单复制失败，请稍后重试。");
+      setError(buildJobStatusCopyFailureState("workOrder").error);
     }
   }
 
@@ -824,7 +825,7 @@ export function ProjectJobStatusPage() {
       setCopyMessageReason(copyState.copyMessageReason);
       setError(copyState.error);
     } catch {
-      setError("处理摘要复制失败，请稍后重试。");
+      setError(buildJobStatusCopyFailureState("teamSummary").error);
     }
   }
 
@@ -859,7 +860,7 @@ export function ProjectJobStatusPage() {
       setCopyMessageReason(copyState.copyMessageReason);
       setError(copyState.error);
     } catch {
-      setError("处理摘要复制失败，请稍后重试。");
+      setError(buildJobStatusCopyFailureState("upstreamSummary").error);
     }
   }
 

@@ -13,6 +13,7 @@ import {
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
   buildJobStatusClipboardUnavailableError,
+  buildJobStatusCopyFailureState,
   buildJobStatusDownloadSuccessState,
   buildJobStatusCopySuccessState,
   buildJobStatusSkippedDownloadState,
@@ -154,6 +155,24 @@ describe("project-job-status-utils", () => {
       copiedLinkPath: null,
       copyMessageReason: reasonTag,
       error: null,
+    });
+  });
+
+  test("builds copy failure state by copied target", () => {
+    expect(buildJobStatusCopyFailureState("filterLink")).toEqual({
+      error: "筛选链接复制失败，请稍后重试。",
+    });
+    expect(buildJobStatusCopyFailureState("processingLink")).toEqual({
+      error: "处理链接复制失败，请稍后重试。",
+    });
+    expect(buildJobStatusCopyFailureState("workOrder")).toEqual({
+      error: "处理单复制失败，请稍后重试。",
+    });
+    expect(buildJobStatusCopyFailureState("teamSummary")).toEqual({
+      error: "处理摘要复制失败，请稍后重试。",
+    });
+    expect(buildJobStatusCopyFailureState("upstreamSummary")).toEqual({
+      error: "处理摘要复制失败，请稍后重试。",
     });
   });
 

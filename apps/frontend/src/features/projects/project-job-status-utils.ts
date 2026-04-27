@@ -195,6 +195,27 @@ export function buildJobStatusCopySuccessState(input: {
   };
 }
 
+export function buildJobStatusCopyFailureState(
+  target:
+    | "filterLink"
+    | "processingLink"
+    | "workOrder"
+    | "teamSummary"
+    | "upstreamSummary",
+) {
+  const messages = {
+    filterLink: "筛选链接复制失败，请稍后重试。",
+    processingLink: "处理链接复制失败，请稍后重试。",
+    workOrder: "处理单复制失败，请稍后重试。",
+    teamSummary: "处理摘要复制失败，请稍后重试。",
+    upstreamSummary: "处理摘要复制失败，请稍后重试。",
+  };
+
+  return {
+    error: messages[target],
+  };
+}
+
 export function buildFilteredImportFailedItems(input: {
   failedItems: ParsedImportTaskFailedItem[];
   failureReasonCode: string | null;

@@ -10,6 +10,7 @@ import {
   buildJobStatusErrorReportDownloadPlan,
   buildJobStatusFailureReasonTag,
   buildJobStatusPath,
+  buildJobStatusRetryErrorMessage,
   buildJobStatusRetryPayload,
   buildJobStatusClipboardUrl,
   buildJobStatusClipboardUnavailableError,
@@ -290,6 +291,28 @@ describe("project-job-status-utils", () => {
         actionFilter: "create",
       }),
     ).toEqual({});
+  });
+
+  test("builds retry error message by backend error shape", () => {
+    expect(
+      buildJobStatusRetryErrorMessage({
+        isApiError: true,
+        code: "IMPORT_TASK_RETRY_INPUT_INCOMPLETE",
+        message: "后端原始提示",
+      }),
+    ).toBe(
+      "当前失败范围中有条目缺少可重建输入，请先导出当前范围或回源修数后再重新导入。",
+    );
+    expect(
+      buildJobStatusRetryErrorMessage({
+        isApiError: true,
+        code: "OTHER",
+        message: "任务不可重试",
+      }),
+    ).toBe("任务不可重试");
+    expect(buildJobStatusRetryErrorMessage({ isApiError: false })).toBe(
+      "任务重试失败，请稍后重试。",
+    );
   });
 
   test("builds failure reason tags only when code and label are present", () => {

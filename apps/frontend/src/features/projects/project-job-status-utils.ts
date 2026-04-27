@@ -291,6 +291,25 @@ export function buildJobStatusRetryPayload(input: {
   };
 }
 
+export const RETRY_INPUT_INCOMPLETE_ERROR_MESSAGE =
+  "当前失败范围中有条目缺少可重建输入，请先导出当前范围或回源修数后再重新导入。";
+
+export function buildJobStatusRetryErrorMessage(input: {
+  isApiError: boolean;
+  code?: string;
+  message?: string;
+}) {
+  if (!input.isApiError) {
+    return "任务重试失败，请稍后重试。";
+  }
+
+  if (input.code === "IMPORT_TASK_RETRY_INPUT_INCOMPLETE") {
+    return RETRY_INPUT_INCOMPLETE_ERROR_MESSAGE;
+  }
+
+  return input.message ?? "任务重试失败，请稍后重试。";
+}
+
 export function buildJobStatusFailureReasonTag(input: {
   failureReasonCode: string | null;
   failureReasonLabel: string | null;

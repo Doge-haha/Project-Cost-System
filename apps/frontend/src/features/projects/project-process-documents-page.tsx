@@ -612,6 +612,16 @@ export function ProjectProcessDocumentsPage() {
               <p className="page-description">
                 当前处理：{activeDocument.title} · {actionState.mode}
               </p>
+              <div className="page-stack">
+                <p className="page-description">
+                  提交对象：{activeDocument.title} · {activeDocument.referenceNo} ·{" "}
+                  {activeDocument.documentType}
+                </p>
+                <p className="page-description">提交人：{activeDocument.submittedBy}</p>
+                <p className="page-description">
+                  提交时间：{formatProjectDateTime(activeDocument.submittedAt)}
+                </p>
+              </div>
               <label className="connection-label">
                 备注
                 <textarea

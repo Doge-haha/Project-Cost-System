@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { formatProjectDateTime } from "../src/features/projects/project-date-utils";
 import { ProjectProcessDocumentsPage } from "../src/features/projects/project-process-documents-page";
 import { saveRecentProcessingLink } from "../src/features/projects/recent-processing-link";
 
@@ -204,6 +205,11 @@ describe("ProjectProcessDocumentsPage", () => {
     expect(screen.queryByRole("link", { name: "打开最近协作入口" })).not.toBeInTheDocument();
     expect(screen.getByText("已提交，当前角色可直接审核。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "通过" }));
+    expect(screen.getByText("提交对象：设计变更单 · BG-001 · change_order")).toBeInTheDocument();
+    expect(screen.getByText("提交人：user-002")).toBeInTheDocument();
+    expect(
+      screen.getByText(`提交时间：${formatProjectDateTime("2026-04-18T10:30:00.000Z")}`),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "复制当前处理链接" }));
     await waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(

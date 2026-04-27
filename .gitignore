@@ -24,3 +24,5 @@ apps/**/out/
 
 coverage/
 tmp/
+
+docs/work-log-*.md

@@ -44,6 +44,7 @@ export type ProjectWorkspacePermissionSummary = {
   roleLabel: string;
   canManageProject: boolean;
   canEditProject: boolean;
+  canExportReports: boolean;
   scopeSummary: string[];
   visibleStageCodes: string[];
   visibleDisciplineCodes: string[];
@@ -731,6 +732,7 @@ export class ProjectService {
         roleLabel: "系统管理员",
         canManageProject: true,
         canEditProject: true,
+        canExportReports: true,
         scopeSummary: ["项目全部范围"],
         visibleStageCodes: input.stages.map((stage) => stage.stageCode),
         visibleDisciplineCodes: input.disciplines.map(
@@ -751,6 +753,7 @@ export class ProjectService {
         userId: input.userId,
       }),
       canEditProject: this.roleCanEdit(roleCode),
+      canExportReports: this.roleCanExportReports(roleCode),
       scopeSummary: this.formatScopeSummary(input.currentMember),
       visibleStageCodes,
       visibleDisciplineCodes,
@@ -858,6 +861,14 @@ export class ProjectService {
 
   private roleCanEdit(roleCode: string): boolean {
     return roleCode === "project_owner" || roleCode === "cost_engineer";
+  }
+
+  private roleCanExportReports(roleCode: string): boolean {
+    return (
+      roleCode === "project_owner" ||
+      roleCode === "cost_engineer" ||
+      roleCode === "system_admin"
+    );
   }
 
   private async buildTodoSummary(input: {

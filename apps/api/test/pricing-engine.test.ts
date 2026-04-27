@@ -2432,6 +2432,46 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   await app.close();
 });
 
+test("POST /v1/reports/export rejects roles without report export permission", async () => {
+  const app = createPricingApp({
+    projectDefaults: {
+      defaultPriceVersionId: "price-version-001",
+      defaultFeeTemplateId: "fee-template-001",
+    },
+  });
+  const reviewerToken = await signAccessToken(
+    {
+      sub: "reviewer-001",
+      roleCodes: ["reviewer"],
+      displayName: "Reviewer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/reports/export",
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+    payload: {
+      projectId: "project-001",
+      reportType: "summary",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.json().error.code, "FORBIDDEN");
+  assert.equal(
+    response.json().error.message,
+    "You do not have permission to export reports",
+  );
+
+  await app.close();
+});
+
 test("GET /v1/jobs and GET /v1/projects/:id/audit-logs reject non-members", async () => {
   const app = createPricingApp({
     projectDefaults: {

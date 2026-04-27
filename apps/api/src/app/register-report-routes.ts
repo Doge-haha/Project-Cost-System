@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import type { TransactionRunner } from "../shared/tx/transaction.js";
+import { AppError } from "../shared/errors/app-error.js";
 import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import {
   createReportExportTaskSchema,
@@ -33,6 +34,12 @@ const versionCompareQuerySchema = z.object({
   baseBillVersionId: z.string().min(1),
   targetBillVersionId: z.string().min(1),
 });
+
+const REPORT_EXPORT_ROLES = new Set([
+  "system_admin",
+  "project_owner",
+  "cost_engineer",
+]);
 
 export function registerReportRoutes(
   app: FastifyInstance,
@@ -98,6 +105,17 @@ export function registerReportRoutes(
 
   app.post("/v1/reports/export", async (request, reply) => {
     const payload = createReportExportTaskSchema.parse(request.body);
+    if (
+      !request.currentUser!.roleCodes.some((roleCode) =>
+        REPORT_EXPORT_ROLES.has(roleCode),
+      )
+    ) {
+      throw new AppError(
+        403,
+        "FORBIDDEN",
+        "You do not have permission to export reports",
+      );
+    }
 
     const created = await transactionRunner.runInTransaction(async () => {
       const task = await reportExportTaskService.createReportExportTask({

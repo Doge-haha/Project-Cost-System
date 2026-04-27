@@ -87,6 +87,7 @@ export type ProjectWorkspace = {
       roleLabel: string;
       canManageProject: boolean;
       canEditProject: boolean;
+      canExportReports?: boolean;
       scopeSummary: string[];
       visibleStageCodes: string[];
       visibleDisciplineCodes: string[];

@@ -11,9 +11,9 @@
 
 摘要：
 
-- 路由总数：91
+- 路由总数：92
 - 分组总数：15
-- 方法分布：GET 39 / POST 37 / PUT 11 / DELETE 4
+- 方法分布：GET 40 / POST 37 / PUT 11 / DELETE 4
 - 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
@@ -110,6 +110,7 @@
 - `GET /v1/reports/export/:taskId/download`
 - `GET /v1/reports/summary`
 - `GET /v1/reports/summary/details`
+- `GET /v1/reports/variance-breakdown`
 - `GET /v1/reports/version-compare`
 
 ## Audit Logs

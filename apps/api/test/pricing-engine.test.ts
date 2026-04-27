@@ -278,6 +278,9 @@ const feeRules: FeeRuleRecord[] = [
 ];
 
 function createPricingApp(overrides?: {
+  disciplines?: ProjectDisciplineRecord[];
+  members?: ProjectMemberRecord[];
+  billVersions?: BillVersionRecord[];
   billItems?: BillItemRecord[];
   quotaLines?: QuotaLineRecord[];
   priceItems?: PriceItemRecord[];
@@ -305,10 +308,14 @@ function createPricingApp(overrides?: {
     ),
     projectStageRepository: new InMemoryProjectStageRepository(stages),
     projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
-      disciplines,
+      overrides?.disciplines ?? disciplines,
     ),
-    projectMemberRepository: new InMemoryProjectMemberRepository(members),
-    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    projectMemberRepository: new InMemoryProjectMemberRepository(
+      overrides?.members ?? members,
+    ),
+    billVersionRepository: new InMemoryBillVersionRepository(
+      overrides?.billVersions ?? billVersions,
+    ),
     billItemRepository: new InMemoryBillItemRepository(
       overrides?.billItems ?? billItems,
     ),
@@ -2166,6 +2173,128 @@ test("GET /v1/reports/summary and /details support unitCode filtering", async ()
   assert.equal(detailResponse.json().unitCode, "m2");
   assert.equal(detailResponse.json().totalCount, 1);
   assert.equal(detailResponse.json().items[0].itemId, "bill-item-004");
+
+  await app.close();
+});
+
+test("GET /v1/reports/variance-breakdown groups variance by discipline and unit", async () => {
+  const app = createPricingApp({
+    disciplines: [
+      ...disciplines,
+      {
+        id: "discipline-002",
+        projectId: "project-001",
+        disciplineCode: "install",
+        disciplineName: "安装工程",
+        defaultStandardSetCode: "js-2013-install",
+        status: "enabled",
+      },
+    ],
+    members: [
+      {
+        ...members[0],
+        scopes: [
+          { scopeType: "stage", scopeValue: "estimate" },
+          { scopeType: "discipline", scopeValue: "building" },
+          { scopeType: "discipline", scopeValue: "install" },
+        ],
+      },
+    ],
+    billVersions: [
+      ...billVersions,
+      {
+        id: "bill-version-003",
+        projectId: "project-001",
+        stageCode: "estimate",
+        disciplineCode: "install",
+        versionNo: 1,
+        versionName: "安装版 V1",
+        versionStatus: "editable",
+        sourceVersionId: null,
+      },
+    ],
+    billItems: [
+      ...billItems,
+      {
+        id: "bill-item-005",
+        billVersionId: "bill-version-003",
+        parentId: null,
+        itemCode: "I.1",
+        itemName: "安装清单项",
+        quantity: 1,
+        unit: "set",
+        sortNo: 1,
+        systemAmount: 500,
+        finalAmount: 650,
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const disciplineResponse = await app.inject({
+    method: "GET",
+    url: "/v1/reports/variance-breakdown?projectId=project-001&groupBy=discipline",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(disciplineResponse.statusCode, 200);
+  assert.deepEqual(disciplineResponse.json(), {
+    projectId: "project-001",
+    groupBy: "discipline",
+    billVersionId: null,
+    stageCode: null,
+    disciplineCode: null,
+    unitCode: null,
+    totalCount: 2,
+    items: [
+      {
+        groupKey: "building",
+        groupLabel: "building",
+        versionCount: 2,
+        itemCount: 4,
+        totalSystemAmount: 1440,
+        totalFinalAmount: 1620,
+        varianceAmount: 180,
+        varianceRate: 0.125,
+        varianceShare: 0.545455,
+      },
+      {
+        groupKey: "install",
+        groupLabel: "install",
+        versionCount: 1,
+        itemCount: 1,
+        totalSystemAmount: 500,
+        totalFinalAmount: 650,
+        varianceAmount: 150,
+        varianceRate: 0.3,
+        varianceShare: 0.454545,
+      },
+    ],
+  });
+
+  const unitResponse = await app.inject({
+    method: "GET",
+    url: "/v1/reports/variance-breakdown?projectId=project-001&groupBy=unit",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(unitResponse.statusCode, 200);
+  assert.equal(unitResponse.json().groupBy, "unit");
+  assert.deepEqual(
+    unitResponse.json().items.map((item: { groupKey: string }) => item.groupKey),
+    ["set", "m3", "m2"],
+  );
 
   await app.close();
 });

@@ -18,6 +18,7 @@ import type { FeeRuleRepository } from "../fee/fee-rule-repository.js";
 import type { FeeTemplateRepository } from "../fee/fee-template-repository.js";
 
 type SummaryTaxMode = "tax_included" | "tax_excluded";
+type VarianceBreakdownGroupBy = "discipline" | "unit";
 
 export type SummaryResult = {
   projectId: string;
@@ -61,6 +62,29 @@ export type SummaryDetailResult = {
   taxMode?: SummaryTaxMode;
   totalCount: number;
   items: SummaryDetailItem[];
+};
+
+export type VarianceBreakdownItem = {
+  groupKey: string;
+  groupLabel: string;
+  versionCount: number;
+  itemCount: number;
+  totalSystemAmount: number;
+  totalFinalAmount: number;
+  varianceAmount: number;
+  varianceRate: number;
+  varianceShare: number;
+};
+
+export type VarianceBreakdownResult = {
+  projectId: string;
+  groupBy: VarianceBreakdownGroupBy;
+  billVersionId: string | null;
+  stageCode: string | null;
+  disciplineCode: string | null;
+  unitCode: string | null;
+  totalCount: number;
+  items: VarianceBreakdownItem[];
 };
 
 export type VersionCompareItem = {
@@ -328,6 +352,108 @@ export class SummaryService {
       baseVersionName: baseVersion.versionName,
       targetVersionName: targetVersion.versionName,
       itemCount: items.length,
+      items,
+    };
+  }
+
+  async getVarianceBreakdown(input: {
+    projectId: string;
+    groupBy: VarianceBreakdownGroupBy;
+    billVersionId?: string;
+    stageCode?: string;
+    disciplineCode?: string;
+    unitCode?: string;
+    userId: string;
+  }): Promise<VarianceBreakdownResult> {
+    const billVersions = await this.getAuthorizedBillVersions(input);
+    const versionById = new Map(
+      billVersions.map((billVersion) => [billVersion.id, billVersion]),
+    );
+    const allItems = this.filterItemsByUnitCode(
+      await this.listBillItemsForVersions(billVersions),
+      input.unitCode,
+    );
+    const totalAbsoluteVariance = sumDecimal(
+      allItems.map((item) =>
+        absoluteDecimal(
+          subtractDecimal(item.finalAmount ?? 0, item.systemAmount ?? 0, 2),
+          2,
+        ),
+      ),
+      2,
+    );
+    const groups = new Map<
+      string,
+      {
+        versionIds: Set<string>;
+        itemCount: number;
+        totalSystemAmount: number;
+        totalFinalAmount: number;
+      }
+    >();
+
+    for (const item of allItems) {
+      const billVersion = versionById.get(item.billVersionId);
+      if (!billVersion) {
+        continue;
+      }
+      const groupKey =
+        input.groupBy === "discipline" ? billVersion.disciplineCode : item.unit;
+      const current =
+        groups.get(groupKey) ??
+        {
+          versionIds: new Set<string>(),
+          itemCount: 0,
+          totalSystemAmount: 0,
+          totalFinalAmount: 0,
+        };
+
+      current.versionIds.add(item.billVersionId);
+      current.itemCount += 1;
+      current.totalSystemAmount = sumDecimal(
+        [current.totalSystemAmount, item.systemAmount ?? 0],
+        2,
+      );
+      current.totalFinalAmount = sumDecimal(
+        [current.totalFinalAmount, item.finalAmount ?? 0],
+        2,
+      );
+      groups.set(groupKey, current);
+    }
+
+    const items = Array.from(groups.entries())
+      .map(([groupKey, group]) => {
+        const varianceAmount = subtractDecimal(
+          group.totalFinalAmount,
+          group.totalSystemAmount,
+          2,
+        );
+        return {
+          groupKey,
+          groupLabel: groupKey,
+          versionCount: group.versionIds.size,
+          itemCount: group.itemCount,
+          totalSystemAmount: group.totalSystemAmount,
+          totalFinalAmount: group.totalFinalAmount,
+          varianceAmount,
+          varianceRate: divideDecimal(varianceAmount, group.totalSystemAmount, 6),
+          varianceShare: divideDecimal(
+            absoluteDecimal(varianceAmount, 2),
+            totalAbsoluteVariance,
+            6,
+          ),
+        };
+      })
+      .sort((left, right) => Math.abs(right.varianceAmount) - Math.abs(left.varianceAmount));
+
+    return {
+      projectId: input.projectId,
+      groupBy: input.groupBy,
+      billVersionId: input.billVersionId ?? null,
+      stageCode: input.stageCode ?? null,
+      disciplineCode: input.disciplineCode ?? null,
+      unitCode: input.unitCode ?? null,
+      totalCount: items.length,
       items,
     };
   }

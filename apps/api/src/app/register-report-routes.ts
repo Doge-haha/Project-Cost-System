@@ -29,6 +29,10 @@ const summaryDetailQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
+const varianceBreakdownQuerySchema = summaryQuerySchema.extend({
+  groupBy: z.enum(["discipline", "unit"]),
+});
+
 const versionCompareQuerySchema = z.object({
   projectId: z.string().min(1),
   baseBillVersionId: z.string().min(1),
@@ -85,6 +89,22 @@ export function registerReportRoutes(
         unitCode: query.unitCode,
         taxMode: query.taxMode,
         limit: query.limit,
+        userId: request.currentUser!.id,
+      }),
+    );
+  });
+
+  app.get("/v1/reports/variance-breakdown", async (request) => {
+    const query = varianceBreakdownQuerySchema.parse(request.query);
+
+    return transactionRunner.runInTransaction(async () =>
+      summaryService.getVarianceBreakdown({
+        projectId: query.projectId,
+        groupBy: query.groupBy,
+        billVersionId: query.billVersionId,
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode,
+        unitCode: query.unitCode,
         userId: request.currentUser!.id,
       }),
     );

@@ -34,6 +34,7 @@ import {
   type ErrorReportFormat,
   type ErrorReportScope,
   buildNextJobStatusSearchParams,
+  buildRecentJobStatusProcessingLinkInput,
   parseFailedLine,
   parseOptionalFilterValue,
   parseStatusFilter,
@@ -711,9 +712,16 @@ export function ProjectJobStatusPage() {
       const url = new URL(window.location.href);
       url.search = searchParams.toString();
       await window.navigator.clipboard.writeText(url.toString());
-      const copiedPath = `/projects/${projectId}/jobs${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+      const recentLinkInput = buildRecentJobStatusProcessingLinkInput({
+        projectId: projectId ?? "",
+        search: searchParams,
+        label: "任务状态筛选视角",
+        collaborationUnitLabel: currentFailureSubsetLabel,
+        batchEntries: currentFailureSubsetBatchEntries,
+        selectedFailedItem,
+      });
       setCopyMessage("已复制当前筛选链接，可直接发给协作同事。");
-      setCopiedLinkPath(copiedPath);
+      setCopiedLinkPath(recentLinkInput.path);
       setCopyMessageReason(
         selectedFailureReasonCode && selectedFailureReasonLabel
           ? {
@@ -722,30 +730,7 @@ export function ProjectJobStatusPage() {
             }
           : null,
       );
-      setRecentCopiedLink(
-        saveRecentProcessingLink({
-          projectId: projectId ?? "",
-          path: copiedPath,
-          label: "任务状态筛选视角",
-          collaborationUnitLabel: currentFailureSubsetLabel,
-          sourceLabel: "任务状态页",
-          batchEntries: currentFailureSubsetBatchEntries,
-          highlightedBatchEntryId: selectedFailedItem?.lineNo
-            ? `failed-line-${selectedFailedItem.lineNo}`
-            : null,
-          highlightedBatchEntryLabel: selectedFailedItem?.lineNo
-            ? `第 ${selectedFailedItem.lineNo} 条 · ${selectedFailedItem.reasonLabel}`
-            : null,
-          highlightedBatchEntryPath:
-            selectedFailedItem?.lineNo && projectId
-              ? `/projects/${projectId}/jobs?${(() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set("failedLine", String(selectedFailedItem.lineNo));
-                  return params.toString();
-                })()}`
-              : null,
-        }),
-      );
+      setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
       setError(null);
     } catch {
       setError("筛选链接复制失败，请稍后重试。");
@@ -759,10 +744,17 @@ export function ProjectJobStatusPage() {
     }
 
     try {
-      const copiedPath = `/projects/${projectId}/jobs${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
+      const recentLinkInput = buildRecentJobStatusProcessingLinkInput({
+        projectId: projectId ?? "",
+        search: searchParams,
+        label: "任务状态处理入口",
+        collaborationUnitLabel: currentFailureSubsetLabel,
+        batchEntries: currentFailureSubsetBatchEntries,
+        selectedFailedItem,
+      });
       await window.navigator.clipboard.writeText(buildCurrentViewUrl());
       setCopyMessage("已复制当前处理链接，可直接发给协作同事。");
-      setCopiedLinkPath(copiedPath);
+      setCopiedLinkPath(recentLinkInput.path);
       setCopyMessageReason(
         selectedFailureReasonCode && selectedFailureReasonLabel
           ? {
@@ -771,30 +763,7 @@ export function ProjectJobStatusPage() {
             }
           : null,
       );
-      setRecentCopiedLink(
-        saveRecentProcessingLink({
-          projectId: projectId ?? "",
-          path: copiedPath,
-          label: "任务状态处理入口",
-          collaborationUnitLabel: currentFailureSubsetLabel,
-          sourceLabel: "任务状态页",
-          batchEntries: currentFailureSubsetBatchEntries,
-          highlightedBatchEntryId: selectedFailedItem?.lineNo
-            ? `failed-line-${selectedFailedItem.lineNo}`
-            : null,
-          highlightedBatchEntryLabel: selectedFailedItem?.lineNo
-            ? `第 ${selectedFailedItem.lineNo} 条 · ${selectedFailedItem.reasonLabel}`
-            : null,
-          highlightedBatchEntryPath:
-            selectedFailedItem?.lineNo && projectId
-              ? `/projects/${projectId}/jobs?${(() => {
-                  const params = new URLSearchParams(searchParams);
-                  params.set("failedLine", String(selectedFailedItem.lineNo));
-                  return params.toString();
-                })()}`
-              : null,
-        }),
-      );
+      setRecentCopiedLink(saveRecentProcessingLink(recentLinkInput));
       setError(null);
     } catch {
       setError("处理链接复制失败，请稍后重试。");

@@ -7,6 +7,7 @@ import {
   buildErrorReportActionKey,
   buildFailureSubsetDownload,
   buildNextJobStatusSearchParams,
+  buildRecentJobStatusProcessingLinkInput,
   buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
@@ -77,6 +78,33 @@ describe("project-job-status-utils", () => {
         action: "clearFailureSubfilters",
       }).toString(),
     ).toBe("status=failed&failureReason=missing_field");
+  });
+
+  test("builds recent processing link input for copied job status links", () => {
+    expect(
+      buildRecentJobStatusProcessingLinkInput({
+        projectId: "project-001",
+        search: "status=failed&failureReason=missing_field",
+        label: "任务状态处理入口",
+        collaborationUnitLabel: "缺少必填字段",
+        batchEntries: [{ id: "failed-line-4", label: "第 4 条", path: "/jobs" }],
+        selectedFailedItem: {
+          lineNo: 4,
+          reasonLabel: "缺少必填字段",
+        },
+      }),
+    ).toEqual({
+      projectId: "project-001",
+      path: "/projects/project-001/jobs?status=failed&failureReason=missing_field",
+      label: "任务状态处理入口",
+      collaborationUnitLabel: "缺少必填字段",
+      sourceLabel: "任务状态页",
+      batchEntries: [{ id: "failed-line-4", label: "第 4 条", path: "/jobs" }],
+      highlightedBatchEntryId: "failed-line-4",
+      highlightedBatchEntryLabel: "第 4 条 · 缺少必填字段",
+      highlightedBatchEntryPath:
+        "/projects/project-001/jobs?status=failed&failureReason=missing_field&failedLine=4",
+    });
   });
 
   test("builds job status view urls and suggested report filenames", () => {

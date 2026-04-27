@@ -3,6 +3,7 @@ import {
   buildFailureSubsetExportPayload,
   type ParsedImportTaskFailedItem,
 } from "./import-task-failure-snapshots";
+import type { RecentProcessingBatchEntry } from "./recent-processing-link";
 
 export type JobStatusFilter = "all" | "queued" | "processing" | "completed" | "failed";
 export type ErrorReportScope = "filtered" | "all";
@@ -97,6 +98,44 @@ export function buildNextJobStatusSearchParams(input: {
   next.delete("failureAction");
   next.delete("failedLine");
   return next;
+}
+
+export function buildRecentJobStatusProcessingLinkInput(input: {
+  projectId: string;
+  search: string | URLSearchParams;
+  label: string;
+  collaborationUnitLabel: string;
+  batchEntries: RecentProcessingBatchEntry[];
+  selectedFailedItem?: {
+    lineNo: number | null;
+    reasonLabel: string;
+  } | null;
+}) {
+  const searchText = input.search.toString();
+  const path = `/projects/${input.projectId}/jobs${searchText ? `?${searchText}` : ""}`;
+  const highlightedLineNo = input.selectedFailedItem?.lineNo ?? null;
+  const highlightedParams = new URLSearchParams(input.search);
+  if (highlightedLineNo) {
+    highlightedParams.set("failedLine", String(highlightedLineNo));
+  }
+
+  return {
+    projectId: input.projectId,
+    path,
+    label: input.label,
+    collaborationUnitLabel: input.collaborationUnitLabel,
+    sourceLabel: "任务状态页",
+    batchEntries: input.batchEntries,
+    highlightedBatchEntryId: highlightedLineNo
+      ? `failed-line-${highlightedLineNo}`
+      : null,
+    highlightedBatchEntryLabel: highlightedLineNo
+      ? `第 ${highlightedLineNo} 条 · ${input.selectedFailedItem?.reasonLabel ?? ""}`
+      : null,
+    highlightedBatchEntryPath: highlightedLineNo
+      ? `/projects/${input.projectId}/jobs?${highlightedParams.toString()}`
+      : null,
+  };
 }
 
 export function findMatchingJobIdForImportTask(

@@ -41,6 +41,64 @@ export function parseOptionalFilterValue(value: string | null): string | null {
   return value;
 }
 
+export function buildNextJobStatusSearchParams(input: {
+  currentSearch: string | URLSearchParams;
+  action:
+    | "setFailureReason"
+    | "setFailureResourceType"
+    | "setFailureAction"
+    | "clearFailureSubfilters"
+    | "setFailedLine";
+  value?: string | number | null;
+}) {
+  const next = new URLSearchParams(input.currentSearch);
+  if (input.action === "setFailureReason") {
+    if (input.value) {
+      next.set("failureReason", String(input.value));
+    } else {
+      next.delete("failureReason");
+    }
+    next.delete("failureResourceType");
+    next.delete("failureAction");
+    next.delete("failedLine");
+    return next;
+  }
+
+  if (input.action === "setFailureResourceType") {
+    if (input.value) {
+      next.set("failureResourceType", String(input.value));
+    } else {
+      next.delete("failureResourceType");
+    }
+    next.delete("failedLine");
+    return next;
+  }
+
+  if (input.action === "setFailureAction") {
+    if (input.value) {
+      next.set("failureAction", String(input.value));
+    } else {
+      next.delete("failureAction");
+    }
+    next.delete("failedLine");
+    return next;
+  }
+
+  if (input.action === "setFailedLine") {
+    if (input.value) {
+      next.set("failedLine", String(input.value));
+    } else {
+      next.delete("failedLine");
+    }
+    return next;
+  }
+
+  next.delete("failureResourceType");
+  next.delete("failureAction");
+  next.delete("failedLine");
+  return next;
+}
+
 export function findMatchingJobIdForImportTask(
   task: ImportTask | null,
   jobs: BackgroundJob[],

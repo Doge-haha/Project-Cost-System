@@ -33,6 +33,7 @@ import {
   buildSuggestedErrorReportFileName,
   type ErrorReportFormat,
   type ErrorReportScope,
+  buildNextJobStatusSearchParams,
   parseFailedLine,
   parseOptionalFilterValue,
   parseStatusFilter,
@@ -472,46 +473,42 @@ export function ProjectJobStatusPage() {
   ]);
 
   function setFailureReasonFilter(reasonCode: string | null) {
-    const next = new URLSearchParams(searchParams);
-    if (reasonCode) {
-      next.set("failureReason", reasonCode);
-    } else {
-      next.delete("failureReason");
-    }
-    next.delete("failureResourceType");
-    next.delete("failureAction");
-    next.delete("failedLine");
-    setSearchParams(next);
+    setSearchParams(
+      buildNextJobStatusSearchParams({
+        currentSearch: searchParams,
+        action: "setFailureReason",
+        value: reasonCode,
+      }),
+    );
   }
 
   function setFailureResourceTypeFilter(resourceType: string | null) {
-    const next = new URLSearchParams(searchParams);
-    if (resourceType) {
-      next.set("failureResourceType", resourceType);
-    } else {
-      next.delete("failureResourceType");
-    }
-    next.delete("failedLine");
-    setSearchParams(next);
+    setSearchParams(
+      buildNextJobStatusSearchParams({
+        currentSearch: searchParams,
+        action: "setFailureResourceType",
+        value: resourceType,
+      }),
+    );
   }
 
   function setFailureActionFilter(action: string | null) {
-    const next = new URLSearchParams(searchParams);
-    if (action) {
-      next.set("failureAction", action);
-    } else {
-      next.delete("failureAction");
-    }
-    next.delete("failedLine");
-    setSearchParams(next);
+    setSearchParams(
+      buildNextJobStatusSearchParams({
+        currentSearch: searchParams,
+        action: "setFailureAction",
+        value: action,
+      }),
+    );
   }
 
   function clearFailureSubfilters() {
-    const next = new URLSearchParams(searchParams);
-    next.delete("failureResourceType");
-    next.delete("failureAction");
-    next.delete("failedLine");
-    setSearchParams(next);
+    setSearchParams(
+      buildNextJobStatusSearchParams({
+        currentSearch: searchParams,
+        action: "clearFailureSubfilters",
+      }),
+    );
   }
 
   function buildCurrentViewUrl() {
@@ -538,13 +535,13 @@ export function ProjectJobStatusPage() {
   }
 
   function setFailedItemFocus(lineNo: number | null) {
-    const next = new URLSearchParams(searchParams);
-    if (lineNo) {
-      next.set("failedLine", String(lineNo));
-    } else {
-      next.delete("failedLine");
-    }
-    setSearchParams(next);
+    setSearchParams(
+      buildNextJobStatusSearchParams({
+        currentSearch: searchParams,
+        action: "setFailedLine",
+        value: lineNo,
+      }),
+    );
   }
 
   async function loadJobs(options?: {

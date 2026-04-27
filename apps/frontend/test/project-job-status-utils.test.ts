@@ -6,6 +6,7 @@ import {
   buildCsvLine,
   buildErrorReportActionKey,
   buildFailureSubsetDownload,
+  buildNextJobStatusSearchParams,
   buildSuggestedErrorReportFileName,
   findMatchingImportTaskIdForJob,
   findMatchingJobIdForImportTask,
@@ -51,6 +52,31 @@ describe("project-job-status-utils", () => {
     expect(parseFailedLine("0")).toBeNull();
     expect(parseOptionalFilterValue("bill_item")).toBe("bill_item");
     expect(parseOptionalFilterValue("")).toBeNull();
+  });
+
+  test("updates job status search params for failure filters", () => {
+    expect(
+      buildNextJobStatusSearchParams({
+        currentSearch: "status=failed&failureResourceType=bill_item&failureAction=create&failedLine=4",
+        action: "setFailureReason",
+        value: "missing_field",
+      }).toString(),
+    ).toBe("status=failed&failureReason=missing_field");
+
+    expect(
+      buildNextJobStatusSearchParams({
+        currentSearch: "status=failed&failureReason=missing_field&failedLine=4",
+        action: "setFailureResourceType",
+        value: "bill_item",
+      }).toString(),
+    ).toBe("status=failed&failureReason=missing_field&failureResourceType=bill_item");
+
+    expect(
+      buildNextJobStatusSearchParams({
+        currentSearch: "status=failed&failureReason=missing_field&failureResourceType=bill_item&failureAction=create&failedLine=4",
+        action: "clearFailureSubfilters",
+      }).toString(),
+    ).toBe("status=failed&failureReason=missing_field");
   });
 
   test("builds job status view urls and suggested report filenames", () => {

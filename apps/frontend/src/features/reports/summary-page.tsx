@@ -85,6 +85,7 @@ export function SummaryPage() {
     null,
   );
   const [aiVarianceWarnings, setAiVarianceWarnings] = useState<AiRecommendation[]>([]);
+  const [canExportReports, setCanExportReports] = useState(false);
   const [exportTask, setExportTask] = useState<ReportExportTask | null>(null);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -117,6 +118,7 @@ export function SummaryPage() {
         summaryResponse,
         detailsResponse,
         versionsResponse,
+        workspaceResponse,
         aiVarianceWarningsResponse,
       ] =
         await Promise.all([
@@ -124,6 +126,7 @@ export function SummaryPage() {
           apiClient.getSummary(projectId, billVersionId, taxMode),
           apiClient.getSummaryDetails(projectId, billVersionId, taxMode),
           apiClient.listBillVersions(projectId),
+          apiClient.getProjectWorkspace(projectId),
           apiClient.listAiRecommendations(projectId, {
             recommendationType: "variance_warning",
             status: "generated",
@@ -134,6 +137,9 @@ export function SummaryPage() {
       setSummary(summaryResponse);
       setDetails(detailsResponse.items);
       setVersions(versionsResponse.items);
+      setCanExportReports(
+        Boolean(workspaceResponse.currentUser.permissionSummary.canExportReports),
+      );
       setAiVarianceWarnings(
         billVersionId
           ? aiVarianceWarningsResponse.items.filter(
@@ -501,6 +507,7 @@ export function SummaryPage() {
         </section>
       ) : null}
 
+      {canExportReports ? (
       <section className={exportTask ? "panel panel-focus" : "panel"}>
         <div className="page-header">
           <div>
@@ -578,6 +585,7 @@ export function SummaryPage() {
         ) : null}
         {exportMessage ? <p className="page-description">{exportMessage}</p> : null}
       </section>
+      ) : null}
 
       <section className="summary-grid">
         <article className="stat-card">

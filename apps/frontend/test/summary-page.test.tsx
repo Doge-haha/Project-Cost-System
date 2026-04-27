@@ -40,6 +40,57 @@ function createEmptyAiRecommendationResponse() {
   });
 }
 
+function createWorkspaceResponse(options?: {
+  canExportReports?: boolean;
+  versions?: Array<{
+    id: string;
+    versionName: string;
+    stageCode: string;
+    disciplineCode: string;
+    status: string;
+  }>;
+}) {
+  return createJsonResponse({
+    project: {
+      id: "project-001",
+      code: "XM-001",
+      name: "新点造价项目",
+      status: "active",
+    },
+    currentStage: null,
+    availableStages: [],
+    disciplines: [],
+    billVersions:
+      options?.versions ?? [
+        {
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          status: "editable",
+        },
+      ],
+    todoSummary: { totalCount: 0, pendingReviewCount: 0, pendingProcessDocumentCount: 0, draftProcessDocumentCount: 0, items: [] },
+    riskSummary: { totalCount: 0, rejectedReviewCount: 0, rejectedProcessDocumentCount: 0, failedJobCount: 0, items: [] },
+    importStatus: { mode: "background_job", totalCount: 0, queuedCount: 0, processingCount: 0, completedCount: 0, failedCount: 0, latestTask: null, note: "" },
+    currentUser: {
+      userId: "engineer-001",
+      displayName: "Cost Engineer",
+      memberId: "member-001",
+      permissionSummary: {
+        roleCode: "cost_engineer",
+        roleLabel: "造价工程师",
+        canManageProject: false,
+        canEditProject: true,
+        canExportReports: options?.canExportReports ?? true,
+        scopeSummary: ["项目全部范围"],
+        visibleStageCodes: ["estimate"],
+        visibleDisciplineCodes: ["building"],
+      },
+    },
+  });
+}
+
 describe("SummaryPage", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
@@ -64,6 +115,10 @@ describe("SummaryPage", () => {
           name: "新点造价项目",
           status: "active",
         });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse();
       }
 
       if (url.pathname === "/v1/reports/summary") {
@@ -132,6 +187,10 @@ describe("SummaryPage", () => {
           name: "新点造价项目",
           status: "active",
         });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse();
       }
 
       if (url.pathname === "/v1/reports/summary") {
@@ -219,6 +278,10 @@ describe("SummaryPage", () => {
           name: "新点造价项目",
           status: "active",
         });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse();
       }
 
       if (url.pathname === "/v1/reports/summary") {
@@ -335,6 +398,10 @@ describe("SummaryPage", () => {
           name: "新点造价项目",
           status: "active",
         });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse();
       }
 
       if (url.pathname === "/v1/reports/summary") {
@@ -459,6 +526,10 @@ describe("SummaryPage", () => {
         });
       }
 
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse();
+      }
+
       if (url.pathname === "/v1/reports/summary") {
         return createJsonResponse({
           totalSystemAmount: 1000,
@@ -578,5 +649,72 @@ describe("SummaryPage", () => {
     });
     expect(createObjectUrl).toHaveBeenCalled();
     expect(revokeObjectUrl).toHaveBeenCalledWith("blob:report-export");
+  });
+
+  test("hides report export controls when workspace permission denies export", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createWorkspaceResponse({ canExportReports: false });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        return createJsonResponse({
+          totalSystemAmount: 1000,
+          totalFinalAmount: 1200,
+          varianceAmount: 200,
+          itemCount: 2,
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary/details") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/summary?billVersionId=version-001"]}>
+        <Routes>
+          <Route path="/projects/:projectId/summary" element={<SummaryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "汇总页" })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole("heading", { name: "报表导出" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导出汇总" })).not.toBeInTheDocument();
   });
 });

@@ -144,6 +144,38 @@ export function buildRecentJobStatusProcessingLinkInput(input: {
   };
 }
 
+export function buildJobStatusRecentLinkCopyState(input: {
+  target: "filterLink" | "processingLink";
+  projectId: string;
+  search: string | URLSearchParams;
+  label: string;
+  collaborationUnitLabel: string;
+  batchEntries: RecentProcessingBatchEntry[];
+  selectedFailedItem?: {
+    lineNo: number | null;
+    reasonLabel: string;
+  } | null;
+  selectedFailureReasonTag: { code: string; label: string } | null;
+}) {
+  const recentLinkInput = buildRecentJobStatusProcessingLinkInput({
+    projectId: input.projectId,
+    search: input.search,
+    label: input.label,
+    collaborationUnitLabel: input.collaborationUnitLabel,
+    batchEntries: input.batchEntries,
+    selectedFailedItem: input.selectedFailedItem,
+  });
+
+  return {
+    recentLinkInput,
+    copyState: buildJobStatusCopySuccessState({
+      target: input.target,
+      copiedLinkPath: recentLinkInput.path,
+      selectedFailureReasonTag: input.selectedFailureReasonTag,
+    }),
+  };
+}
+
 export function buildJobStatusClipboardUrl(input: {
   currentHref: string;
   search: string | URLSearchParams;

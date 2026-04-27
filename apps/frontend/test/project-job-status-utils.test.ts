@@ -16,6 +16,7 @@ import {
   buildJobStatusCopyFailureState,
   buildJobStatusDownloadSuccessState,
   buildJobStatusCopySuccessState,
+  buildJobStatusRecentLinkCopyState,
   buildJobStatusSkippedDownloadState,
   buildJobStatusUploadCallout,
   buildNextJobStatusSearchParams,
@@ -173,6 +174,41 @@ describe("project-job-status-utils", () => {
     });
     expect(buildJobStatusCopyFailureState("upstreamSummary")).toEqual({
       error: "处理摘要复制失败，请稍后重试。",
+    });
+  });
+
+  test("builds recent link copy state with recent processing input", () => {
+    const result = buildJobStatusRecentLinkCopyState({
+      target: "processingLink",
+      projectId: "project-001",
+      search: "status=failed&failureReason=missing_field",
+      label: "任务状态处理入口",
+      collaborationUnitLabel: "缺少必填字段",
+      batchEntries: [{ id: "failed-line-4", label: "第 4 条", path: "/jobs" }],
+      selectedFailedItem: {
+        lineNo: 4,
+        reasonLabel: "缺少必填字段",
+      },
+      selectedFailureReasonTag: { code: "missing_field", label: "缺少必填字段" },
+    });
+
+    expect(result.recentLinkInput).toEqual({
+      projectId: "project-001",
+      path: "/projects/project-001/jobs?status=failed&failureReason=missing_field",
+      label: "任务状态处理入口",
+      collaborationUnitLabel: "缺少必填字段",
+      sourceLabel: "任务状态页",
+      batchEntries: [{ id: "failed-line-4", label: "第 4 条", path: "/jobs" }],
+      highlightedBatchEntryId: "failed-line-4",
+      highlightedBatchEntryLabel: "第 4 条 · 缺少必填字段",
+      highlightedBatchEntryPath:
+        "/projects/project-001/jobs?status=failed&failureReason=missing_field&failedLine=4",
+    });
+    expect(result.copyState).toEqual({
+      copyMessage: "已复制当前处理链接，可直接发给协作同事。",
+      copiedLinkPath: "/projects/project-001/jobs?status=failed&failureReason=missing_field",
+      copyMessageReason: { code: "missing_field", label: "缺少必填字段" },
+      error: null,
     });
   });
 

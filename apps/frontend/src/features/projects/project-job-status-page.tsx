@@ -39,6 +39,7 @@ import {
   buildJobStatusErrorReportDownloadPlan,
   buildJobStatusFailureReasonTag,
   buildJobStatusPath,
+  buildJobStatusRecentLinkCopyState,
   buildJobStatusRetryPayload,
   buildSuggestedErrorReportFileName,
   buildJobStatusSkippedDownloadState,
@@ -47,7 +48,6 @@ import {
   type ErrorReportFormat,
   type ErrorReportScope,
   buildNextJobStatusSearchParams,
-  buildRecentJobStatusProcessingLinkInput,
   buildJobStatusReturnParams,
   buildUploadReturnToFailureContext,
   parseFailedLine,
@@ -716,17 +716,14 @@ export function ProjectJobStatusPage() {
           search: searchParams,
         }),
       );
-      const recentLinkInput = buildRecentJobStatusProcessingLinkInput({
+      const { copyState, recentLinkInput } = buildJobStatusRecentLinkCopyState({
+        target: "filterLink",
         projectId: projectId ?? "",
         search: searchParams,
         label: "任务状态筛选视角",
         collaborationUnitLabel: currentFailureSubsetLabel,
         batchEntries: currentFailureSubsetBatchEntries,
         selectedFailedItem,
-      });
-      const copyState = buildJobStatusCopySuccessState({
-        target: "filterLink",
-        copiedLinkPath: recentLinkInput.path,
         selectedFailureReasonTag,
       });
       setCopyMessage(copyState.copyMessage);
@@ -746,20 +743,17 @@ export function ProjectJobStatusPage() {
     }
 
     try {
-      const recentLinkInput = buildRecentJobStatusProcessingLinkInput({
+      const { copyState, recentLinkInput } = buildJobStatusRecentLinkCopyState({
+        target: "processingLink",
         projectId: projectId ?? "",
         search: searchParams,
         label: "任务状态处理入口",
         collaborationUnitLabel: currentFailureSubsetLabel,
         batchEntries: currentFailureSubsetBatchEntries,
         selectedFailedItem,
-      });
-      await window.navigator.clipboard.writeText(buildCurrentViewUrl());
-      const copyState = buildJobStatusCopySuccessState({
-        target: "processingLink",
-        copiedLinkPath: recentLinkInput.path,
         selectedFailureReasonTag,
       });
+      await window.navigator.clipboard.writeText(buildCurrentViewUrl());
       setCopyMessage(copyState.copyMessage);
       setCopiedLinkPath(copyState.copiedLinkPath);
       setCopyMessageReason(copyState.copyMessageReason);

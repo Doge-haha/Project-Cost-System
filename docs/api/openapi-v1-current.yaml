@@ -13,6 +13,7 @@ externalDocs:
   description: 当前已实现 V1 API 路由清单
   url: ./implemented-v1-routes.md
 tags:
+  - name: AI Recommendations
   - name: AI Runtime
   - name: Audit Logs
   - name: Auth
@@ -127,6 +128,303 @@ paths:
       responses:
         '200':
           description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/bill-recommendations:
+    post:
+      operationId: postAiBillRecommendations
+      summary: POST /v1/ai/bill-recommendations
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/quota-recommendations:
+    post:
+      operationId: postAiQuotaRecommendations
+      summary: POST /v1/ai/quota-recommendations
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/recommendations/{recommendationId}/accept:
+    post:
+      operationId: postAiRecommendationsByRecommendationIdAccept
+      summary: POST /v1/ai/recommendations/:recommendationId/accept
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: recommendationId
+        in: path
+        description: recommendationId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/recommendations/{recommendationId}/expire:
+    post:
+      operationId: postAiRecommendationsByRecommendationIdExpire
+      summary: POST /v1/ai/recommendations/:recommendationId/expire
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: recommendationId
+        in: path
+        description: recommendationId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/recommendations/{recommendationId}/ignore:
+    post:
+      operationId: postAiRecommendationsByRecommendationIdIgnore
+      summary: POST /v1/ai/recommendations/:recommendationId/ignore
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: recommendationId
+        in: path
+        description: recommendationId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/variance-warnings:
+    post:
+      operationId: postAiVarianceWarnings
+      summary: POST /v1/ai/variance-warnings
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Created
           content:
             application/json:
               schema:
@@ -339,7 +637,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
       - name: createdFrom
         in: query
         description: Created time lower bound, ISO 8601.
@@ -1039,6 +1337,345 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/ai/bill-recommendations:
+    get:
+      operationId: getProjectsByProjectIdAiBillRecommendations
+      summary: GET /v1/projects/:projectId/ai/bill-recommendations
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        description: resourceType query parameter.
+        required: false
+        schema:
+          type: string
+      - name: resourceId
+        in: query
+        description: resourceId query parameter.
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+      - name: stageCode
+        in: query
+        description: Project stage code.
+        required: false
+        schema:
+          type: string
+      - name: disciplineCode
+        in: query
+        description: Project discipline code.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Maximum number of records to return.
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/ai/quota-recommendations:
+    get:
+      operationId: getProjectsByProjectIdAiQuotaRecommendations
+      summary: GET /v1/projects/:projectId/ai/quota-recommendations
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        description: resourceType query parameter.
+        required: false
+        schema:
+          type: string
+      - name: resourceId
+        in: query
+        description: resourceId query parameter.
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+      - name: stageCode
+        in: query
+        description: Project stage code.
+        required: false
+        schema:
+          type: string
+      - name: disciplineCode
+        in: query
+        description: Project discipline code.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Maximum number of records to return.
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/ai/recommendations:
+    get:
+      operationId: getProjectsByProjectIdAiRecommendations
+      summary: GET /v1/projects/:projectId/ai/recommendations
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: recommendationType
+        in: query
+        description: AI recommendation type.
+        required: false
+        schema:
+          type: string
+          enum: [bill_recommendation, quota_recommendation, variance_warning]
+      - name: resourceType
+        in: query
+        description: resourceType query parameter.
+        required: false
+        schema:
+          type: string
+      - name: resourceId
+        in: query
+        description: resourceId query parameter.
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+      - name: stageCode
+        in: query
+        description: Project stage code.
+        required: false
+        schema:
+          type: string
+      - name: disciplineCode
+        in: query
+        description: Project discipline code.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Maximum number of records to return.
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/ai/variance-warnings:
+    get:
+      operationId: getProjectsByProjectIdAiVarianceWarnings
+      summary: GET /v1/projects/:projectId/ai/variance-warnings
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: resourceType
+        in: query
+        description: resourceType query parameter.
+        required: false
+        schema:
+          type: string
+      - name: resourceId
+        in: query
+        description: resourceId query parameter.
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+      - name: stageCode
+        in: query
+        description: Project stage code.
+        required: false
+        schema:
+          type: string
+      - name: disciplineCode
+        in: query
+        description: Project discipline code.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Maximum number of records to return.
+        required: false
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
         '401':
           description: Unauthorized
           content:
@@ -2463,6 +3100,112 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/default-fee-template:
+    put:
+      operationId: putProjectsByProjectIdDefaultFeeTemplate
+      summary: PUT /v1/projects/:projectId/default-fee-template
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/default-price-version:
+    put:
+      operationId: putProjectsByProjectIdDefaultPriceVersion
+      summary: PUT /v1/projects/:projectId/default-price-version
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/projects/{projectId}/default-pricing-config:
     put:
       operationId: putProjectsByProjectIdDefaultPricingConfig
@@ -3142,7 +3885,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
       responses:
         '200':
           description: Success
@@ -3213,7 +3956,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
       requestBody:
         required: true
         content:
@@ -3417,6 +4160,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/quota-lines:
+    get:
+      operationId: getProjectsByProjectIdQuotaLines
+      summary: GET /v1/projects/:projectId/quota-lines
+      tags:
+        - Quota Lines
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/projects/{projectId}/quota-lines/{quotaLineId}:
     put:
       operationId: putProjectsByProjectIdQuotaLinesByQuotaLineId
@@ -3499,6 +4288,204 @@ paths:
       responses:
         '204':
           description: No Content
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/quota-lines/batch-create:
+    post:
+      operationId: postProjectsByProjectIdQuotaLinesBatchCreate
+      summary: POST /v1/projects/:projectId/quota-lines/batch-create
+      tags:
+        - Quota Lines
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/quota-lines/candidates:
+    get:
+      operationId: getProjectsByProjectIdQuotaLinesCandidates
+      summary: GET /v1/projects/:projectId/quota-lines/candidates
+      tags:
+        - Quota Lines
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/quota-lines/source-chain:
+    get:
+      operationId: getProjectsByProjectIdQuotaLinesSourceChain
+      summary: GET /v1/projects/:projectId/quota-lines/source-chain
+      tags:
+        - Quota Lines
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/quota-lines/validate:
+    post:
+      operationId: postProjectsByProjectIdQuotaLinesValidate
+      summary: POST /v1/projects/:projectId/quota-lines/validate
+      tags:
+        - Quota Lines
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
         '401':
           description: Unauthorized
           content:
@@ -3615,7 +4602,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
       responses:
         '200':
           description: Success

@@ -2,13 +2,29 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { apiClient, ApiError } from "../../lib/api";
-import type { BillItem, BillVersion, ProjectListItem } from "../../lib/types";
+import type {
+  BillItem,
+  BillVersion,
+  FeeTemplate,
+  PriceVersion,
+  ProjectListItem,
+  ProjectQuotaLine,
+  QuotaSourceCandidate,
+  QuotaLineValidationResult,
+} from "../../lib/types";
 import { EmptyState } from "../shared/empty-state";
 import { ErrorState } from "../shared/error-state";
 import { LoadingState } from "../shared/loading-state";
 import { BillVersionSelector } from "../shared/bill-version-selector";
 import { AppBreadcrumbs, buildProjectVersionBreadcrumbs } from "../shared/breadcrumbs";
 import { BillItemsTable, countLeafBillItems } from "./bill-items-table";
+
+function flattenBillItems(items: BillItem[]): BillItem[] {
+  return items.flatMap((item) => [
+    item,
+    ...flattenBillItems(item.children ?? []),
+  ]);
+}
 
 export function BillItemsPage() {
   const params = useParams();
@@ -18,6 +34,19 @@ export function BillItemsPage() {
   const [project, setProject] = useState<ProjectListItem | null>(null);
   const [items, setItems] = useState<BillItem[]>([]);
   const [versions, setVersions] = useState<BillVersion[]>([]);
+  const [quotaLines, setQuotaLines] = useState<ProjectQuotaLine[]>([]);
+  const [quotaCandidates, setQuotaCandidates] = useState<QuotaSourceCandidate[]>([]);
+  const [priceVersions, setPriceVersions] = useState<PriceVersion[]>([]);
+  const [feeTemplates, setFeeTemplates] = useState<FeeTemplate[]>([]);
+  const [selectedPriceVersionId, setSelectedPriceVersionId] = useState("");
+  const [selectedFeeTemplateId, setSelectedFeeTemplateId] = useState("");
+  const [selectedBillItemId, setSelectedBillItemId] = useState("");
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<string[]>([]);
+  const [quotaActionMessage, setQuotaActionMessage] = useState<string | null>(null);
+  const [quotaValidation, setQuotaValidation] = useState<QuotaLineValidationResult | null>(null);
+  const [pricingActionMessage, setPricingActionMessage] = useState<string | null>(null);
+  const [manualUnitPrice, setManualUnitPrice] = useState("");
+  const [manualPricingReason, setManualPricingReason] = useState("市场询价调整");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,14 +61,53 @@ export function BillItemsPage() {
     setError(null);
 
     try {
-      const [projectResponse, itemsResponse, versionsResponse] = await Promise.all([
+      const [
+        projectResponse,
+        itemsResponse,
+        versionsResponse,
+        quotaLinesResponse,
+      ] = await Promise.all([
         apiClient.getProject(projectId),
         apiClient.listBillItems(projectId, versionId),
         apiClient.listBillVersions(projectId),
+        apiClient.listProjectQuotaLines(projectId),
       ]);
+      const selected = versionsResponse.items.find((version) => version.id === versionId);
+      const [candidatesResponse, priceVersionsResponse, feeTemplatesResponse] =
+        await Promise.all([
+          apiClient.listQuotaSourceCandidates(projectId, {
+            disciplineCode: selected?.disciplineCode,
+          }),
+          apiClient.listPriceVersions({
+            disciplineCode: selected?.disciplineCode,
+            status: "active",
+          }),
+          apiClient.listFeeTemplates({
+            stageCode: selected?.stageCode,
+            status: "active",
+          }),
+        ]);
+      const flatItems = flattenBillItems(itemsResponse.items);
       setProject(projectResponse);
       setItems(itemsResponse.items);
       setVersions(versionsResponse.items);
+      setQuotaLines(quotaLinesResponse.items);
+      setQuotaCandidates(candidatesResponse.items);
+      setPriceVersions(priceVersionsResponse.items);
+      setFeeTemplates(feeTemplatesResponse.items);
+      setSelectedPriceVersionId(
+        projectResponse.defaultPriceVersionId ??
+          priceVersionsResponse.items[0]?.id ??
+          "",
+      );
+      setSelectedFeeTemplateId(
+        projectResponse.defaultFeeTemplateId ?? feeTemplatesResponse.items[0]?.id ?? "",
+      );
+      setSelectedBillItemId((current) => current || flatItems[0]?.id || "");
+      setSelectedCandidateIds([]);
+      setQuotaActionMessage(null);
+      setQuotaValidation(null);
+      setPricingActionMessage(null);
     } catch (fetchError) {
       setError(
         fetchError instanceof ApiError
@@ -54,6 +122,210 @@ export function BillItemsPage() {
   useEffect(() => {
     void loadBillItems();
   }, [projectId, versionId]);
+
+  async function handleBatchAddQuotaLines() {
+    if (!projectId || !versionId || !selectedBillItemId) {
+      return;
+    }
+
+    const selectedCandidates = quotaCandidates.filter((candidate) =>
+      selectedCandidateIds.includes(candidate.sourceQuotaId),
+    );
+    if (selectedCandidates.length === 0) {
+      setQuotaActionMessage("请选择要添加的定额。");
+      return;
+    }
+
+    setQuotaActionMessage("正在添加定额...");
+    try {
+      await apiClient.batchCreateQuotaLines({
+        projectId,
+        items: selectedCandidates.map((candidate) => ({
+          billVersionId: versionId,
+          billItemId: selectedBillItemId,
+          sourceStandardSetCode: candidate.sourceStandardSetCode,
+          sourceQuotaId: candidate.sourceQuotaId,
+          sourceSequence: candidate.sourceSequence,
+          chapterCode: candidate.chapterCode,
+          quotaCode: candidate.quotaCode,
+          quotaName: candidate.quotaName,
+          unit: candidate.unit,
+          quantity: 1,
+          laborFee: candidate.laborFee,
+          materialFee: candidate.materialFee,
+          machineFee: candidate.machineFee,
+          contentFactor: 1,
+          sourceMode: candidate.sourceMode,
+        })),
+      });
+      const refreshed = await apiClient.listProjectQuotaLines(projectId);
+      setQuotaLines(refreshed.items);
+      setSelectedCandidateIds([]);
+      setQuotaValidation(null);
+      setQuotaActionMessage(`已添加 ${selectedCandidates.length} 条定额。`);
+    } catch (mutationError) {
+      setQuotaActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "定额添加失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function handleValidateQuotaLines() {
+    if (!projectId) {
+      return;
+    }
+
+    setQuotaActionMessage("正在校验定额...");
+    try {
+      const result = await apiClient.validateProjectQuotaLines(projectId);
+      setQuotaValidation(result);
+      setQuotaActionMessage(
+        result.passed ? "定额校验通过。" : `定额校验发现 ${result.issueCount} 个问题。`,
+      );
+    } catch (mutationError) {
+      setQuotaActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "定额校验失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function handleSavePricingDefaults() {
+    if (!projectId) {
+      return;
+    }
+
+    setPricingActionMessage("正在保存计价配置...");
+    try {
+      const [priceProject, feeProject] = await Promise.all([
+        apiClient.updateProjectDefaultPriceVersion(
+          projectId,
+          selectedPriceVersionId || null,
+        ),
+        apiClient.updateProjectDefaultFeeTemplate(projectId, selectedFeeTemplateId || null),
+      ]);
+      setProject({
+        ...feeProject,
+        defaultPriceVersionId: priceProject.defaultPriceVersionId,
+      });
+      setPricingActionMessage("计价配置已保存。");
+    } catch (mutationError) {
+      setPricingActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "计价配置保存失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function handleRecalculateVersion() {
+    if (!projectId || !versionId) {
+      return;
+    }
+
+    setPricingActionMessage("正在重算当前版本...");
+    try {
+      const result = await apiClient.recalculateBillVersion({
+        projectId,
+        billVersionId: versionId,
+        priceVersionId: selectedPriceVersionId || undefined,
+        feeTemplateId: selectedFeeTemplateId || undefined,
+      });
+      await loadBillItems();
+      setPricingActionMessage(
+        `重算完成：已更新 ${result.recalculatedCount} 条清单项，跳过 ${result.skippedItems.length} 条。`,
+      );
+    } catch (mutationError) {
+      setPricingActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "当前版本重算失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function handleRecalculateProject() {
+    if (!projectId || !selectedVersion) {
+      return;
+    }
+
+    setPricingActionMessage("正在创建项目重算任务...");
+    try {
+      const job = await apiClient.recalculateProject({
+        projectId,
+        stageCode: selectedVersion.stageCode,
+        disciplineCode: selectedVersion.disciplineCode,
+        priceVersionId: selectedPriceVersionId || undefined,
+        feeTemplateId: selectedFeeTemplateId || undefined,
+      });
+      setPricingActionMessage(`项目重算任务已创建：${job.id}（${job.status}）。`);
+    } catch (mutationError) {
+      setPricingActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "项目重算任务创建失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function handleCalculateSelectedItem() {
+    if (!projectId || !selectedBillItemId) {
+      return;
+    }
+
+    setPricingActionMessage("正在计价当前清单项...");
+    try {
+      await apiClient.calculateBillItem({
+        billItemId: selectedBillItemId,
+        priceVersionId: selectedPriceVersionId || undefined,
+        feeTemplateId: selectedFeeTemplateId || undefined,
+      });
+      await loadBillItems();
+      setPricingActionMessage("当前清单项计价完成。");
+    } catch (mutationError) {
+      setPricingActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "当前清单项计价失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function handleManualPricing() {
+    if (!projectId || !versionId || !selectedBillItemId) {
+      return;
+    }
+
+    const normalizedUnitPrice = manualUnitPrice.trim();
+    const parsedUnitPrice =
+      normalizedUnitPrice === "" ? null : Number(normalizedUnitPrice);
+    if (parsedUnitPrice !== null && !Number.isFinite(parsedUnitPrice)) {
+      setPricingActionMessage("人工单价必须是数字。");
+      return;
+    }
+
+    setPricingActionMessage("正在保存人工调价...");
+    try {
+      await apiClient.updateBillItemManualPricing({
+        projectId,
+        billVersionId: versionId,
+        itemId: selectedBillItemId,
+        manualUnitPrice: parsedUnitPrice,
+        reason: manualPricingReason,
+      });
+      await loadBillItems();
+      setPricingActionMessage("人工调价已保存。");
+    } catch (mutationError) {
+      setPricingActionMessage(
+        mutationError instanceof ApiError
+          ? mutationError.message
+          : "人工调价保存失败，请稍后重试。",
+      );
+    }
+  }
 
   if (loading) {
     return <LoadingState title="正在加载清单页" />;
@@ -72,6 +344,12 @@ export function BillItemsPage() {
 
   const selectedVersion =
     versions.find((version) => version.id === versionId) ?? null;
+  const flatItems = flattenBillItems(items);
+  const selectedBillItem = flatItems.find((item) => item.id === selectedBillItemId) ?? null;
+  const visibleQuotaLines = quotaLines.filter((quotaLine) => quotaLine.billVersionId === versionId);
+  const selectedItemQuotaLines = selectedBillItem
+    ? visibleQuotaLines.filter((quotaLine) => quotaLine.billItemId === selectedBillItem.id)
+    : [];
   const breadcrumbs =
     projectId && selectedVersion
       ? buildProjectVersionBreadcrumbs({
@@ -120,6 +398,10 @@ export function BillItemsPage() {
           <p className="stat-label">当前版本</p>
           <p className="stat-value">{selectedVersion?.versionName ?? versionId ?? "-"}</p>
         </article>
+        <article className="stat-card">
+          <p className="stat-label">定额明细</p>
+          <p className="stat-value">{visibleQuotaLines.length}</p>
+        </article>
       </section>
 
       {versions.length > 0 ? (
@@ -149,6 +431,164 @@ export function BillItemsPage() {
         </section>
       ) : null}
 
+      <section className="panel">
+        <div className="page-header">
+          <div>
+            <h3>计价配置</h3>
+            <p className="page-description">
+              绑定当前项目默认价目版本与取费模板，并对当前清单版本重算。
+            </p>
+          </div>
+          <div className="button-row">
+            <button
+              className="primary-button secondary"
+              onClick={() => {
+                void handleSavePricingDefaults();
+              }}
+              type="button"
+            >
+              保存配置
+            </button>
+            <button
+              className="primary-button"
+              disabled={!selectedPriceVersionId || !selectedFeeTemplateId}
+              onClick={() => {
+                void handleCalculateSelectedItem();
+              }}
+              type="button"
+            >
+              单项计价
+            </button>
+            <button
+              className="primary-button"
+              disabled={!selectedPriceVersionId || !selectedFeeTemplateId}
+              onClick={() => {
+                void handleRecalculateVersion();
+              }}
+              type="button"
+            >
+              重算当前版本
+            </button>
+            <button
+              className="primary-button"
+              disabled={!selectedPriceVersionId || !selectedFeeTemplateId}
+              onClick={() => {
+                void handleRecalculateProject();
+              }}
+              type="button"
+            >
+              创建项目重算
+            </button>
+          </div>
+        </div>
+
+        <div className="form-grid">
+          <label className="form-field">
+            默认价目版本
+            <select
+              value={selectedPriceVersionId}
+              onChange={(event) => {
+                setSelectedPriceVersionId(event.target.value);
+                setPricingActionMessage(null);
+              }}
+            >
+              <option value="">未绑定</option>
+              {priceVersions.map((priceVersion) => (
+                <option key={priceVersion.id} value={priceVersion.id}>
+                  {priceVersion.versionName}（{priceVersion.regionCode} /{" "}
+                  {priceVersion.disciplineCode}）
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            默认取费模板
+            <select
+              value={selectedFeeTemplateId}
+              onChange={(event) => {
+                setSelectedFeeTemplateId(event.target.value);
+                setPricingActionMessage(null);
+              }}
+            >
+              <option value="">未绑定</option>
+              {feeTemplates.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.templateName}（{template.stageScope.join(" / ")}）
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {selectedBillItem ? (
+          <div className="form-grid">
+            <label className="form-field">
+              当前清单项
+              <select
+                value={selectedBillItemId}
+                onChange={(event) => {
+                  const nextItem = flatItems.find((item) => item.id === event.target.value);
+                  setSelectedBillItemId(event.target.value);
+                  setManualUnitPrice(
+                    nextItem?.manualUnitPrice === undefined ||
+                      nextItem.manualUnitPrice === null
+                      ? ""
+                      : String(nextItem.manualUnitPrice),
+                  );
+                  setPricingActionMessage(null);
+                }}
+              >
+                {flatItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.code} {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="form-field">
+              人工综合单价
+              <input
+                min="0"
+                step="0.01"
+                type="number"
+                value={manualUnitPrice}
+                onChange={(event) => {
+                  setManualUnitPrice(event.target.value);
+                  setPricingActionMessage(null);
+                }}
+              />
+            </label>
+            <label className="form-field">
+              调价原因
+              <input
+                value={manualPricingReason}
+                onChange={(event) => {
+                  setManualPricingReason(event.target.value);
+                  setPricingActionMessage(null);
+                }}
+              />
+            </label>
+            <div className="form-field button-field">
+              <span>人工调价</span>
+              <button
+                className="primary-button secondary"
+                disabled={!manualPricingReason.trim()}
+                onClick={() => {
+                  void handleManualPricing();
+                }}
+                type="button"
+              >
+                保存人工价
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {pricingActionMessage ? (
+          <p className="page-description">{pricingActionMessage}</p>
+        ) : null}
+      </section>
+
       {items.length === 0 ? (
         <EmptyState
           title="当前版本还没有清单项"
@@ -160,6 +600,178 @@ export function BillItemsPage() {
           <BillItemsTable items={items} />
         </section>
       )}
+
+      {items.length > 0 ? (
+        <section className="panel">
+          <div className="page-header">
+            <div>
+              <h3>定额选择器</h3>
+              <p className="page-description">
+                按当前版本专业默认定额集展示候选定额，可批量添加到选中清单项。
+              </p>
+            </div>
+            <button
+              className="primary-button"
+              disabled={!selectedBillItemId || selectedCandidateIds.length === 0}
+              onClick={() => {
+                void handleBatchAddQuotaLines();
+              }}
+              type="button"
+            >
+              批量添加
+            </button>
+            <button
+              className="primary-button secondary"
+              onClick={() => {
+                void handleValidateQuotaLines();
+              }}
+              type="button"
+            >
+              校验定额
+            </button>
+          </div>
+
+          <label className="form-field">
+            目标清单项
+            <select
+              value={selectedBillItemId}
+              onChange={(event) => {
+                setSelectedBillItemId(event.target.value);
+                setQuotaActionMessage(null);
+              }}
+            >
+              {flatItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.code} {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>选择</th>
+                  <th>定额编号</th>
+                  <th>名称</th>
+                  <th>章节</th>
+                  <th>单位</th>
+                  <th>来源方式</th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotaCandidates.map((candidate) => (
+                  <tr key={candidate.sourceQuotaId}>
+                    <td>
+                      <input
+                        aria-label={`选择 ${candidate.quotaCode}`}
+                        checked={selectedCandidateIds.includes(candidate.sourceQuotaId)}
+                        onChange={(event) => {
+                          setSelectedCandidateIds((current) =>
+                            event.target.checked
+                              ? [...current, candidate.sourceQuotaId]
+                              : current.filter((id) => id !== candidate.sourceQuotaId),
+                          );
+                          setQuotaActionMessage(null);
+                        }}
+                        type="checkbox"
+                      />
+                    </td>
+                    <td>{candidate.quotaCode}</td>
+                    <td>{candidate.quotaName}</td>
+                    <td>{candidate.chapterCode}</td>
+                    <td>{candidate.unit}</td>
+                    <td>{candidate.sourceMode}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {quotaCandidates.length === 0 ? (
+            <EmptyState
+              title="暂无候选定额"
+              body="当前项目专业默认定额集还没有可套用的候选定额。"
+            />
+          ) : null}
+          {quotaActionMessage ? (
+            <p className="page-description">{quotaActionMessage}</p>
+          ) : null}
+          {quotaValidation && quotaValidation.issues.length > 0 ? (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>问题</th>
+                    <th>清单项</th>
+                    <th>定额</th>
+                    <th>单位</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotaValidation.issues.map((issue) => (
+                    <tr key={`${issue.code}-${issue.billItemId}-${issue.quotaLineId ?? "item"}`}>
+                      <td>{issue.code}</td>
+                      <td>
+                        {issue.billItemCode} {issue.billItemName}
+                      </td>
+                      <td>{issue.quotaCode ?? "-"}</td>
+                      <td>
+                        {issue.billItemUnit && issue.quotaUnit
+                          ? `${issue.billItemUnit} / ${issue.quotaUnit}`
+                          : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {selectedBillItem ? (
+        <section className="panel">
+          <h3>已套定额：{selectedBillItem.name}</h3>
+          {selectedItemQuotaLines.length === 0 ? (
+            <EmptyState title="当前清单项还没有定额" body="可从上方候选定额中选择并批量添加。" />
+          ) : (
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>定额编号</th>
+                    <th>名称</th>
+                    <th>单位</th>
+                    <th>数量</th>
+                    <th>人工费</th>
+                    <th>材料费</th>
+                    <th>机械费</th>
+                    <th>含量系数</th>
+                    <th>来源方式</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedItemQuotaLines.map((quotaLine) => (
+                    <tr key={quotaLine.id}>
+                      <td>{quotaLine.quotaCode}</td>
+                      <td>{quotaLine.quotaName}</td>
+                      <td>{quotaLine.unit}</td>
+                      <td>{quotaLine.quantity}</td>
+                      <td>{quotaLine.laborFee ?? "-"}</td>
+                      <td>{quotaLine.materialFee ?? "-"}</td>
+                      <td>{quotaLine.machineFee ?? "-"}</td>
+                      <td>{quotaLine.contentFactor}</td>
+                      <td>{quotaLine.sourceMode}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

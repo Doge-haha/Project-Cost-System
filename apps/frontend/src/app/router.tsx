@@ -2,8 +2,11 @@ import { createBrowserRouter, Navigate, type RouteObject } from "react-router-do
 
 import { AppLayout } from "./layout";
 import { BillItemsPage } from "../features/bills/bill-items-page";
+import { ProjectAuditLogsPage } from "../features/projects/project-audit-logs-page";
+import { ProjectAiRecommendationsPage } from "../features/projects/project-ai-recommendations-page";
 import { ProjectDetailPage } from "../features/projects/project-detail-page";
 import { ProjectJobStatusPage } from "../features/projects/project-job-status-page";
+import { ProjectKnowledgePage } from "../features/projects/project-knowledge-page";
 import { ProjectProcessDocumentsPage } from "../features/projects/project-process-documents-page";
 import { ProjectWorkspaceInboxPage } from "../features/projects/project-workspace-inbox-page";
 import { ProjectReviewsPage } from "../features/projects/project-reviews-page";
@@ -42,6 +45,18 @@ export const appRoutes: RouteObject[] = [
       {
         path: "projects/:projectId/jobs",
         element: <ProjectJobStatusPage />,
+      },
+      {
+        path: "projects/:projectId/audit-logs",
+        element: <ProjectAuditLogsPage />,
+      },
+      {
+        path: "projects/:projectId/knowledge",
+        element: <ProjectKnowledgePage />,
+      },
+      {
+        path: "projects/:projectId/ai-recommendations",
+        element: <ProjectAiRecommendationsPage />,
       },
       {
         path: "projects/:projectId/bill-versions/:versionId/items",

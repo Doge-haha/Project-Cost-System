@@ -6,7 +6,7 @@
 - `apps/ai-runtime`：Python AI Runtime / Knowledge / Memory 子系统
 - `apps/worker`：TypeScript 异步任务进程
 - `apps/mcp-gateway`：TypeScript 面向 AI Agent 的 MCP 能力入口
-- `apps/frontend`：前端应用
+- `apps/frontend`：React + Vite 前端工作台
 - `legacy/backend-java`：冻结归档的 Java 规则验证原型
 - `docs`：设计、架构、实施、排期和导入文档
 - `deploy`：部署相关脚本与配置
@@ -35,8 +35,8 @@
 - `apps/api` 是当前主业务后端主线，接口和测试最完整
 - `apps/worker` 已具备轮询执行后台任务和调用 `apps/ai-runtime` CLI 的能力
 - `apps/mcp-gateway` 承担面向 AI Agent 的 resource/tool/context 聚合
-- `apps/frontend` 目前还是占位目录，尚未正式启动
-- 当前仓库仍处于“后端骨架重建中”，本地开发建议优先走 `database mode`
+- `apps/frontend` 已具备项目列表、项目详情、清单、汇总、审核、过程单据、任务状态和工作台待办页面
+- 当前仓库已完成 Sprint 1 底座、API 契约生成、MCP Gateway 主能力联调和后台 worker 基础闭环，本地开发建议优先走 `database mode`
 
 ## 本地环境
 

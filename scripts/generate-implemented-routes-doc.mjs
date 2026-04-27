@@ -19,6 +19,7 @@ const SECTION_RULES = [
   ["Reports", (route) => route.path.startsWith("/v1/reports")],
   ["Audit Logs", (route) => route.path.includes("/audit-logs")],
   ["Background Jobs", (route) => route.path.startsWith("/v1/jobs") || route.path.endsWith("/recalculate")],
+  ["AI Recommendations", (route) => route.path.includes("/ai/recommendations") || route.path.includes("/ai/bill-recommendations") || route.path.includes("/ai/quota-recommendations") || route.path.includes("/ai/variance-warnings")],
   ["AI Runtime / Knowledge", (route) => matchesAny(route.path, ["/v1/ai-runtime", "/ai-runtime/", "/knowledge-", "/memory-"])],
   ["Import Tasks", (route) => route.path.includes("/import-tasks")],
 ];

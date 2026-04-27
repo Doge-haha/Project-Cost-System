@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -12,6 +12,15 @@ function createJsonResponse(body: unknown) {
       "content-type": "application/json",
     },
   });
+}
+
+function createDeferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
 }
 
 function LocationProbe() {
@@ -2654,7 +2663,7 @@ describe("ProjectJobStatusPage", () => {
   });
 
   test("keeps valid failure subset params while import task data is still loading", async () => {
-    let resolveImportTasks = () => {};
+    const importTasksDeferred = createDeferred();
 
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -2713,9 +2722,7 @@ describe("ProjectJobStatusPage", () => {
       }
 
       if (url.pathname === "/v1/projects/project-001/import-tasks") {
-        await new Promise<void>((resolve) => {
-          resolveImportTasks = resolve;
-        });
+        await importTasksDeferred.promise;
 
         return createJsonResponse({
           items: [
@@ -2848,7 +2855,7 @@ describe("ProjectJobStatusPage", () => {
       "?status=failed&failureReason=missing_field&failureResourceType=bill_item&failureAction=create",
     );
 
-    resolveImportTasks();
+    importTasksDeferred.resolve();
 
     await waitFor(() => {
       expect(
@@ -3031,7 +3038,7 @@ describe("ProjectJobStatusPage", () => {
   });
 
   test("keeps full-batch export available while filtered export is downloading", async () => {
-    let resolveDownload: () => void = () => {};
+    const downloadDeferred = createDeferred();
 
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -3188,9 +3195,7 @@ describe("ProjectJobStatusPage", () => {
         url.pathname ===
         "/v1/projects/project-001/import-tasks/import-task-001/error-report"
       ) {
-        await new Promise<void>((resolve) => {
-          resolveDownload = resolve;
-        });
+        await downloadDeferred.promise;
         return new Response(JSON.stringify({ taskId: "import-task-001", failedItems: [] }), {
           status: 200,
           headers: {
@@ -3230,7 +3235,7 @@ describe("ProjectJobStatusPage", () => {
       screen.getAllByRole("button", { name: "导出整批（CSV）" }).at(-1),
     ).not.toBeDisabled();
 
-    resolveDownload();
+    downloadDeferred.resolve();
 
     await waitFor(() => {
       expect(screen.getByText("已导出当前筛选（字段值非法，JSON）。")).toBeInTheDocument();
@@ -4501,19 +4506,16 @@ describe("ProjectJobStatusPage", () => {
       expect(screen.getAllByRole("heading", { name: "任务状态页" }).at(-1)).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByRole("button", { name: "复制当前筛选链接" })[0]!);
-    await waitFor(() => {
-      expect(screen.getByText("已复制当前筛选链接，可直接发给协作同事。")).toBeInTheDocument();
-    });
+    vi.useFakeTimers();
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 2600);
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "复制当前筛选链接" })[0]!);
     });
+    expect(screen.getByText("已复制当前筛选链接，可直接发给协作同事。")).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(
-        screen.queryByText("已复制当前筛选链接，可直接发给协作同事。"),
-      ).not.toBeInTheDocument();
+    act(() => {
+      vi.advanceTimersByTime(2600);
     });
+    expect(screen.queryByText("已复制当前筛选链接，可直接发给协作同事。")).not.toBeInTheDocument();
   });
 });

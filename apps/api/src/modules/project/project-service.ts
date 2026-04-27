@@ -451,10 +451,21 @@ export class ProjectService {
       defaultFeeTemplateId: input.defaultFeeTemplateId,
     });
 
-    const updated = await this.projectRepository.updateDefaults(input.projectId, {
-      defaultPriceVersionId: input.defaultPriceVersionId,
-      defaultFeeTemplateId: input.defaultFeeTemplateId,
-    });
+    const updatePayload: {
+      defaultPriceVersionId?: string | null;
+      defaultFeeTemplateId?: string | null;
+    } = {};
+    if ("defaultPriceVersionId" in input) {
+      updatePayload.defaultPriceVersionId = input.defaultPriceVersionId ?? null;
+    }
+    if ("defaultFeeTemplateId" in input) {
+      updatePayload.defaultFeeTemplateId = input.defaultFeeTemplateId ?? null;
+    }
+
+    const updated = await this.projectRepository.updateDefaults(
+      input.projectId,
+      updatePayload,
+    );
 
     await this.auditLogService.writeAuditLog({
       projectId: input.projectId,

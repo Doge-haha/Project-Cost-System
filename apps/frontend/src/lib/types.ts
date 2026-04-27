@@ -224,6 +224,91 @@ export type AuditLogListResponse = {
   items: AuditLogRecord[];
 };
 
+export type KnowledgeEntry = {
+  id: string;
+  projectId: string;
+  stageCode?: string | null;
+  sourceJobId?: string | null;
+  sourceType: string;
+  sourceAction: string;
+  title: string;
+  summary: string;
+  tags: string[];
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type KnowledgeEntryListResponse = {
+  items: KnowledgeEntry[];
+  summary: {
+    totalCount: number;
+    sourceTypeCounts: Record<string, number>;
+    sourceActionCounts: Record<string, number>;
+    stageCounts: Record<string, number>;
+  };
+};
+
+export type MemoryEntry = {
+  id: string;
+  projectId: string;
+  stageCode?: string | null;
+  sourceJobId?: string | null;
+  memoryKey: string;
+  subjectType: string;
+  subjectId: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type MemoryEntryListResponse = {
+  items: MemoryEntry[];
+  summary: {
+    totalCount: number;
+    subjectTypeCounts: Record<string, number>;
+    stageCounts: Record<string, number>;
+  };
+};
+
+export type AiRecommendationStatus =
+  | "generated"
+  | "accepted"
+  | "ignored"
+  | "expired";
+
+export type AiRecommendationType =
+  | "bill_recommendation"
+  | "quota_recommendation"
+  | "variance_warning";
+
+export type AiRecommendation = {
+  id: string;
+  projectId: string;
+  stageCode?: string | null;
+  disciplineCode?: string | null;
+  resourceType: string;
+  resourceId: string;
+  recommendationType: AiRecommendationType;
+  inputPayload: Record<string, unknown>;
+  outputPayload: Record<string, unknown>;
+  status: AiRecommendationStatus;
+  createdBy: string;
+  handledBy?: string | null;
+  handledAt?: string | null;
+  statusReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AiRecommendationListResponse = {
+  items: AiRecommendation[];
+  summary: {
+    totalCount: number;
+    statusCounts: Record<AiRecommendationStatus, number>;
+    typeCounts: Record<AiRecommendationType, number>;
+  };
+};
+
 export type BillItem = {
   id: string;
   parentId?: string | null;
@@ -234,15 +319,98 @@ export type BillItem = {
   unit: string;
   sortNo?: number;
   compositeUnitPrice?: number | string | null;
+  systemUnitPrice?: number | string | null;
+  manualUnitPrice?: number | string | null;
+  finalUnitPrice?: number | string | null;
   finalAmount?: number | string | null;
   systemAmount?: number | string | null;
   children?: BillItem[];
+};
+
+export type ProjectQuotaLine = {
+  id: string;
+  billItemId: string;
+  billVersionId: string;
+  stageCode: string;
+  disciplineCode: string;
+  billItemCode: string;
+  billItemName: string;
+  sourceStandardSetCode: string;
+  sourceQuotaId: string;
+  sourceSequence?: number | null;
+  chapterCode: string;
+  quotaCode: string;
+  quotaName: string;
+  unit: string;
+  quantity: number;
+  laborFee?: number | null;
+  materialFee?: number | null;
+  machineFee?: number | null;
+  contentFactor: number;
+  sourceMode: "manual" | "ai" | "history_reference";
+};
+
+export type QuotaSourceCandidate = {
+  sourceStandardSetCode: string;
+  sourceQuotaId: string;
+  sourceSequence?: number | null;
+  chapterCode: string;
+  quotaCode: string;
+  quotaName: string;
+  unit: string;
+  laborFee?: number | null;
+  materialFee?: number | null;
+  machineFee?: number | null;
+  sourceMode: "manual" | "ai" | "history_reference";
+};
+
+export type QuotaLineValidationIssue = {
+  code: "MISSING_QUOTA_LINES" | "UNIT_MISMATCH";
+  severity: "warning";
+  message: string;
+  billVersionId: string;
+  billItemId: string;
+  billItemCode: string;
+  billItemName: string;
+  quotaLineId?: string;
+  quotaCode?: string;
+  billItemUnit?: string;
+  quotaUnit?: string;
+};
+
+export type QuotaLineValidationResult = {
+  passed: boolean;
+  issueCount: number;
+  issues: QuotaLineValidationIssue[];
+};
+
+export type PriceVersion = {
+  id: string;
+  versionCode: string;
+  versionName: string;
+  regionCode: string;
+  disciplineCode: string;
+  status: "active" | "inactive";
+};
+
+export type FeeTemplate = {
+  id: string;
+  templateName: string;
+  projectType?: string | null;
+  regionCode?: string | null;
+  stageScope: string[];
+  taxMode: string;
+  allocationMode: string;
+  status: "draft" | "active" | "inactive";
 };
 
 export type SummaryResponse = {
   totalSystemAmount?: number | string | null;
   totalFinalAmount?: number | string | null;
   varianceAmount?: number | string | null;
+  varianceRate?: number | string | null;
+  taxMode?: "tax_included" | "tax_excluded";
+  totalTaxAmount?: number | string | null;
   itemCount?: number;
   billVersionCount?: number;
 };
@@ -256,6 +424,7 @@ export type SummaryDetailItem = {
   varianceAmount?: number | string | null;
   varianceRate?: number | string | null;
   varianceShare?: number | string | null;
+  taxAmount?: number | string | null;
 };
 
 export type VersionCompareItem = {

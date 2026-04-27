@@ -509,6 +509,93 @@ export const memoryEntries = pgTable(
   }),
 );
 
+export const skillDefinitions = pgTable(
+  "skill_definition",
+  {
+    id: text("id").primaryKey(),
+    skillCode: text("skill_code").notNull(),
+    skillName: text("skill_name").notNull(),
+    description: text("description").notNull(),
+    status: text("status").notNull(),
+    runtimeConfig: jsonb("runtime_config").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    skillDefinitionCodeIndex: index("skill_definition_code_idx").on(
+      table.skillCode,
+    ),
+    skillDefinitionStatusIndex: index("skill_definition_status_idx").on(
+      table.status,
+    ),
+  }),
+);
+
+export const knowledgeRelations = pgTable(
+  "knowledge_relation",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    fromType: text("from_type").notNull(),
+    fromId: text("from_id").notNull(),
+    toType: text("to_type").notNull(),
+    toId: text("to_id").notNull(),
+    relationType: text("relation_type").notNull(),
+    metadata: jsonb("metadata").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    knowledgeRelationProjectIndex: index("knowledge_relation_project_idx").on(
+      table.projectId,
+    ),
+    knowledgeRelationFromIndex: index("knowledge_relation_from_idx").on(
+      table.fromType,
+      table.fromId,
+    ),
+    knowledgeRelationToIndex: index("knowledge_relation_to_idx").on(
+      table.toType,
+      table.toId,
+    ),
+  }),
+);
+
+export const aiRecommendations = pgTable(
+  "ai_recommendation",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    stageCode: text("stage_code"),
+    disciplineCode: text("discipline_code"),
+    resourceType: text("resource_type").notNull(),
+    resourceId: text("resource_id").notNull(),
+    recommendationType: text("recommendation_type").notNull(),
+    inputPayload: jsonb("input_payload").notNull(),
+    outputPayload: jsonb("output_payload").notNull(),
+    status: text("status").notNull(),
+    createdBy: text("created_by").notNull(),
+    handledBy: text("handled_by"),
+    handledAt: timestamp("handled_at", { withTimezone: true }),
+    statusReason: text("status_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    aiRecommendationProjectResourceIndex: index(
+      "ai_recommendation_project_resource_idx",
+    ).on(table.projectId, table.resourceType, table.resourceId),
+    aiRecommendationStatusCreatedIndex: index(
+      "ai_recommendation_status_created_idx",
+    ).on(table.status, table.createdAt),
+    aiRecommendationTypeCreatedIndex: index(
+      "ai_recommendation_type_created_idx",
+    ).on(table.recommendationType, table.createdAt),
+  }),
+);
+
 export const auditLogs = pgTable(
   "audit_log",
   {
@@ -559,5 +646,8 @@ export const schema = {
   reportExportTasks,
   knowledgeEntries,
   memoryEntries,
+  skillDefinitions,
+  knowledgeRelations,
+  aiRecommendations,
   auditLogs,
 };

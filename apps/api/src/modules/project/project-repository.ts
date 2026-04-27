@@ -68,10 +68,12 @@ export class InMemoryProjectRepository implements ProjectRepository {
       throw new Error("Project not found");
     }
 
-    target.defaultPriceVersionId =
-      input.defaultPriceVersionId ?? target.defaultPriceVersionId ?? null;
-    target.defaultFeeTemplateId =
-      input.defaultFeeTemplateId ?? target.defaultFeeTemplateId ?? null;
+    if ("defaultPriceVersionId" in input) {
+      target.defaultPriceVersionId = input.defaultPriceVersionId ?? null;
+    }
+    if ("defaultFeeTemplateId" in input) {
+      target.defaultFeeTemplateId = input.defaultFeeTemplateId ?? null;
+    }
 
     return target;
   }

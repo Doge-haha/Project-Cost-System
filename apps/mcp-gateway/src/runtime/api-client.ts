@@ -61,6 +61,14 @@ export type KnowledgeEntriesQuery = {
   limit?: number;
 };
 
+export type KnowledgeSearchQuery = {
+  projectId: string;
+  q: string;
+  sourceType?: string;
+  stageCode?: string;
+  limit?: number;
+};
+
 export type ExtractKnowledgeInput = {
   projectId: string;
   source: string;
@@ -270,6 +278,47 @@ export class GatewayApiClient {
           "UPSTREAM_REQUEST_FAILED",
         (payload as { error?: { message?: string } }).error?.message ??
           "Failed to load knowledge entries",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async searchKnowledgeEntries(
+    query: KnowledgeSearchQuery,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/projects/${query.projectId}/knowledge-search?${this.buildQuery({
+        q: query.q,
+        sourceType: query.sourceType,
+        stageCode: query.stageCode,
+        limit: query.limit?.toString(),
+      }).toString()}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+        },
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to search knowledge entries",
       );
     }
 

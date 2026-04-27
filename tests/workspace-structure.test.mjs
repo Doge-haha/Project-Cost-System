@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const rootDir = process.cwd();
+const frontendTestDir = path.join(rootDir, "apps/frontend/test");
 
 const requiredPaths = [
   "package.json",
@@ -17,6 +18,18 @@ const requiredPaths = [
   "apps/ai-runtime/app/main.py",
   "legacy/backend-java/build.gradle.kts",
 ];
+
+function collectFiles(directory, predicate) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      return collectFiles(fullPath, predicate);
+    }
+
+    return predicate(fullPath) ? [fullPath] : [];
+  });
+}
 
 test("repository exposes the new AI-first workspace skeleton", () => {
   for (const relativePath of requiredPaths) {
@@ -60,4 +73,28 @@ test("MCP Gateway docs list every exposed capability", async () => {
     assert.match(readme, new RegExp(`- \`${capability.name}\``));
     assert.match(designDoc, new RegExp(`- \`${capability.name}\``));
   }
+});
+
+test("frontend tests avoid real timer waits", () => {
+  const frontendTestFiles = collectFiles(frontendTestDir, (filePath) =>
+    /\.(ts|tsx)$/.test(filePath),
+  );
+  const violations = [];
+
+  for (const filePath of frontendTestFiles) {
+    const content = fs.readFileSync(filePath, "utf8");
+    const relativePath = path.relative(rootDir, filePath);
+
+    if (/setTimeout\s*\(/.test(content)) {
+      violations.push(`${relativePath}: uses setTimeout; prefer fake timers`);
+    }
+
+    const newPromiseCount = [...content.matchAll(/new Promise/g)].length;
+    const createDeferredCount = [...content.matchAll(/function createDeferred/g)].length;
+    if (newPromiseCount > createDeferredCount) {
+      violations.push(`${relativePath}: inline Promise wait should use createDeferred helper`);
+    }
+  }
+
+  assert.deepEqual(violations, []);
 });

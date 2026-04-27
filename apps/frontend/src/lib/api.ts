@@ -1,17 +1,29 @@
 import { getRuntimeConfig } from "./config";
 import type {
   AuditLogListResponse,
+  AiRecommendation,
+  AiRecommendationListResponse,
+  AiRecommendationStatus,
+  AiRecommendationType,
+  BackgroundJob,
   BackgroundJobListResponse,
   BillItem,
   BillVersion,
   CreateReportExportResponse,
+  FeeTemplate,
   ImportTaskListResponse,
+  KnowledgeEntryListResponse,
+  MemoryEntryListResponse,
   ProcessDocumentListResponse,
+  PriceVersion,
   ProjectDiscipline,
   ProjectListItem,
   ProjectMember,
+  ProjectQuotaLine,
   ProjectStage,
   ProjectWorkspace,
+  QuotaSourceCandidate,
+  QuotaLineValidationResult,
   ReportExportTask,
   ReviewSubmissionListResponse,
   SummaryDetailItem,
@@ -289,17 +301,133 @@ export const apiClient = {
     query?: {
       limit?: number;
       resourceType?: string;
+      resourceId?: string;
+      resourceIdPrefix?: string;
       action?: string;
+      operatorId?: string;
+      createdFrom?: string;
+      createdTo?: string;
     },
   ) {
     return request<AuditLogListResponse>(`/v1/projects/${projectId}/audit-logs`, {
       limit: query?.limit,
       resourceType: query?.resourceType,
+      resourceId: query?.resourceId,
+      resourceIdPrefix: query?.resourceIdPrefix,
       action: query?.action,
+      operatorId: query?.operatorId,
+      createdFrom: query?.createdFrom,
+      createdTo: query?.createdTo,
     });
   },
   getBackgroundJob(jobId: string) {
     return request(`/v1/jobs/${jobId}`);
+  },
+  listKnowledgeEntries(
+    projectId: string,
+    query?: {
+      sourceJobId?: string;
+      sourceType?: string;
+      sourceAction?: string;
+      stageCode?: string;
+      limit?: number;
+    },
+  ) {
+    return request<KnowledgeEntryListResponse>(
+      `/v1/projects/${projectId}/knowledge-entries`,
+      {
+        sourceJobId: query?.sourceJobId,
+        sourceType: query?.sourceType,
+        sourceAction: query?.sourceAction,
+        stageCode: query?.stageCode,
+        limit: query?.limit,
+      },
+    );
+  },
+  searchKnowledgeEntries(
+    projectId: string,
+    query: {
+      q: string;
+      sourceType?: string;
+      stageCode?: string;
+      limit?: number;
+    },
+  ) {
+    return request<KnowledgeEntryListResponse>(
+      `/v1/projects/${projectId}/knowledge-search`,
+      {
+        q: query.q,
+        sourceType: query.sourceType,
+        stageCode: query.stageCode,
+        limit: query.limit,
+      },
+    );
+  },
+  listMemoryEntries(
+    projectId: string,
+    query?: {
+      sourceJobId?: string;
+      subjectType?: string;
+      subjectId?: string;
+      stageCode?: string;
+      limit?: number;
+    },
+  ) {
+    return request<MemoryEntryListResponse>(
+      `/v1/projects/${projectId}/memory-entries`,
+      {
+        sourceJobId: query?.sourceJobId,
+        subjectType: query?.subjectType,
+        subjectId: query?.subjectId,
+        stageCode: query?.stageCode,
+        limit: query?.limit,
+      },
+    );
+  },
+  listAiRecommendations(
+    projectId: string,
+    query?: {
+      recommendationType?: AiRecommendationType;
+      resourceType?: string;
+      resourceId?: string;
+      status?: AiRecommendationStatus;
+      stageCode?: string;
+      disciplineCode?: string;
+      limit?: number;
+    },
+  ) {
+    return request<AiRecommendationListResponse>(
+      `/v1/projects/${projectId}/ai/recommendations`,
+      {
+        recommendationType: query?.recommendationType,
+        resourceType: query?.resourceType,
+        resourceId: query?.resourceId,
+        status: query?.status,
+        stageCode: query?.stageCode,
+        disciplineCode: query?.disciplineCode,
+        limit: query?.limit,
+      },
+    );
+  },
+  acceptAiRecommendation(recommendationId: string, reason?: string) {
+    return request<AiRecommendation>(
+      `/v1/ai/recommendations/${recommendationId}/accept`,
+      undefined,
+      {
+        method: "POST",
+        body: reason ? { reason } : {},
+      },
+    );
+  },
+  ignoreAiRecommendation(recommendationId: string, reason?: string) {
+    return request<AiRecommendation>(
+      `/v1/ai/recommendations/${recommendationId}/ignore`,
+      undefined,
+      {
+        method: "POST",
+        body: reason ? { reason } : {},
+      },
+    );
   },
   listProjectBackgroundJobs(
     projectId: string,
@@ -375,16 +503,215 @@ export const apiClient = {
       `/v1/projects/${projectId}/bill-versions/${billVersionId}/items`,
     );
   },
-  getSummary(projectId: string, billVersionId?: string) {
+  listProjectQuotaLines(projectId: string) {
+    return request<{ items: ProjectQuotaLine[] }>(
+      `/v1/projects/${projectId}/quota-lines`,
+    );
+  },
+  listQuotaSourceCandidates(
+    projectId: string,
+    query?: {
+      standardSetCode?: string;
+      disciplineCode?: string;
+      keyword?: string;
+      chapterCode?: string;
+    },
+  ) {
+    return request<{ items: QuotaSourceCandidate[] }>(
+      `/v1/projects/${projectId}/quota-lines/candidates`,
+      {
+        standardSetCode: query?.standardSetCode,
+        disciplineCode: query?.disciplineCode,
+        keyword: query?.keyword,
+        chapterCode: query?.chapterCode,
+      },
+    );
+  },
+  batchCreateQuotaLines(input: {
+    projectId: string;
+    items: Array<{
+      billVersionId: string;
+      billItemId: string;
+      sourceStandardSetCode: string;
+      sourceQuotaId: string;
+      sourceSequence?: number | null;
+      chapterCode: string;
+      quotaCode: string;
+      quotaName: string;
+      unit: string;
+      quantity: number;
+      laborFee?: number | null;
+      materialFee?: number | null;
+      machineFee?: number | null;
+      contentFactor?: number;
+      sourceMode: "manual" | "ai" | "history_reference";
+    }>;
+  }) {
+    return request<{ items: ProjectQuotaLine[] }>(
+      `/v1/projects/${input.projectId}/quota-lines/batch-create`,
+      undefined,
+      {
+        method: "POST",
+        body: {
+          items: input.items,
+        },
+      },
+    );
+  },
+  validateProjectQuotaLines(projectId: string) {
+    return request<QuotaLineValidationResult>(
+      `/v1/projects/${projectId}/quota-lines/validate`,
+      undefined,
+      {
+        method: "POST",
+        body: {},
+      },
+    );
+  },
+  listPriceVersions(query?: {
+    regionCode?: string;
+    disciplineCode?: string;
+    status?: PriceVersion["status"];
+  }) {
+    return request<{ items: PriceVersion[] }>("/v1/price-versions", {
+      regionCode: query?.regionCode,
+      disciplineCode: query?.disciplineCode,
+      status: query?.status,
+    });
+  },
+  listFeeTemplates(query?: {
+    regionCode?: string;
+    projectType?: string;
+    stageCode?: string;
+    status?: FeeTemplate["status"];
+  }) {
+    return request<{ items: FeeTemplate[] }>("/v1/fee-templates", {
+      regionCode: query?.regionCode,
+      projectType: query?.projectType,
+      stageCode: query?.stageCode,
+      status: query?.status,
+    });
+  },
+  updateProjectDefaultPriceVersion(projectId: string, defaultPriceVersionId: string | null) {
+    return request<ProjectListItem>(
+      `/v1/projects/${projectId}/default-price-version`,
+      undefined,
+      {
+        method: "PUT",
+        body: { defaultPriceVersionId },
+      },
+    );
+  },
+  updateProjectDefaultFeeTemplate(projectId: string, defaultFeeTemplateId: string | null) {
+    return request<ProjectListItem>(
+      `/v1/projects/${projectId}/default-fee-template`,
+      undefined,
+      {
+        method: "PUT",
+        body: { defaultFeeTemplateId },
+      },
+    );
+  },
+  recalculateBillVersion(input: {
+    projectId: string;
+    billVersionId: string;
+    priceVersionId?: string;
+    feeTemplateId?: string;
+  }) {
+    return request<{
+      recalculatedCount: number;
+      skippedItems: Array<{
+        billItemId: string;
+        reason: string;
+      }>;
+    }>(
+      `/v1/projects/${input.projectId}/bill-versions/${input.billVersionId}/recalculate`,
+      undefined,
+      {
+        method: "POST",
+        body: {
+          priceVersionId: input.priceVersionId,
+          feeTemplateId: input.feeTemplateId,
+        },
+      },
+    );
+  },
+  recalculateProject(input: {
+    projectId: string;
+    stageCode?: string;
+    disciplineCode?: string;
+    priceVersionId?: string;
+    feeTemplateId?: string;
+  }) {
+    return request<BackgroundJob>(`/v1/projects/${input.projectId}/recalculate`, undefined, {
+      method: "POST",
+      body: {
+        stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
+        priceVersionId: input.priceVersionId,
+        feeTemplateId: input.feeTemplateId,
+      },
+    });
+  },
+  calculateBillItem(input: {
+    billItemId: string;
+    priceVersionId?: string;
+    feeTemplateId?: string;
+  }) {
+    return request<{
+      billItemId: string;
+      systemUnitPrice: number;
+      finalUnitPrice: number;
+      systemAmount: number;
+      finalAmount: number;
+    }>("/v1/engine/calculate", undefined, {
+      method: "POST",
+      body: {
+        billItemId: input.billItemId,
+        priceVersionId: input.priceVersionId,
+        feeTemplateId: input.feeTemplateId,
+      },
+    });
+  },
+  updateBillItemManualPricing(input: {
+    projectId: string;
+    billVersionId: string;
+    itemId: string;
+    manualUnitPrice: number | null;
+    reason: string;
+  }) {
+    return request<BillItem>(
+      `/v1/projects/${input.projectId}/bill-versions/${input.billVersionId}/items/${input.itemId}/manual-pricing`,
+      undefined,
+      {
+        method: "PUT",
+        body: {
+          manualUnitPrice: input.manualUnitPrice,
+          reason: input.reason,
+        },
+      },
+    );
+  },
+  getSummary(
+    projectId: string,
+    billVersionId?: string,
+    taxMode?: "tax_included" | "tax_excluded",
+  ) {
     return request<SummaryResponse>("/v1/reports/summary", {
       projectId,
       billVersionId,
+      taxMode,
     });
   },
-  getSummaryDetails(projectId: string, billVersionId?: string) {
+  getSummaryDetails(
+    projectId: string,
+    billVersionId?: string,
+    taxMode?: "tax_included" | "tax_excluded",
+  ) {
     return request<{ items: SummaryDetailItem[] }>("/v1/reports/summary/details", {
       projectId,
       billVersionId,
+      taxMode,
       limit: 10,
     });
   },

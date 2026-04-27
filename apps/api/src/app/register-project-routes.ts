@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 
 import type { TransactionRunner } from "../shared/tx/transaction.js";
 import type { AiRuntimePreviewService } from "../modules/ai/ai-runtime-preview-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import type { AuditLogService } from "../modules/audit/audit-log-service.js";
 import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import type { ImportTaskService } from "../modules/import/import-task-service.js";
@@ -9,6 +10,7 @@ import type { KnowledgeService } from "../modules/knowledge/knowledge-service.js
 import type { ProcessDocumentService } from "../modules/process/process-document-service.js";
 import type { ProjectService } from "../modules/project/project-service.js";
 import { registerImportRoutes } from "./register-import-routes.js";
+import { registerAiRecommendationRoutes } from "./register-ai-recommendation-routes.js";
 import { registerKnowledgeRoutes } from "./register-knowledge-routes.js";
 import { registerProcessDocumentRoutes } from "./register-process-document-routes.js";
 import { registerProjectCoreRoutes } from "./register-project-core-routes.js";
@@ -18,6 +20,7 @@ export function registerProjectRoutes(
   input: {
     transactionRunner: TransactionRunner;
     aiRuntimePreviewService: AiRuntimePreviewService;
+    aiRecommendationService: AiRecommendationService;
     backgroundJobService: BackgroundJobService;
     projectService: ProjectService;
     auditLogService: AuditLogService;
@@ -32,6 +35,11 @@ export function registerProjectRoutes(
     backgroundJobService: input.backgroundJobService,
     auditLogService: input.auditLogService,
     importTaskService: input.importTaskService,
+  });
+
+  registerAiRecommendationRoutes(app, {
+    transactionRunner: input.transactionRunner,
+    aiRecommendationService: input.aiRecommendationService,
   });
 
   registerProjectCoreRoutes(app, {

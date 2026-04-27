@@ -80,6 +80,26 @@ export class BillVersionService {
     return this.billVersionRepository.listByContext(input);
   }
 
+  async listAuthorizedProjectVersions(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<BillVersionRecord[]> {
+    await this.assertProjectExists(input.projectId);
+    const [versions, authorizationService] = await Promise.all([
+      this.billVersionRepository.listByProjectId(input.projectId),
+      this.createAuthorizationService(input.projectId),
+    ]);
+
+    return versions.filter((version) =>
+      authorizationService.canViewContext({
+        projectId: input.projectId,
+        stageCode: version.stageCode,
+        disciplineCode: version.disciplineCode,
+        userId: input.userId,
+      }),
+    );
+  }
+
   async createBillVersion(input: {
     projectId: string;
     stageCode: string;

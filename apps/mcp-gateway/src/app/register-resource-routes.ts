@@ -6,14 +6,17 @@ import { buildImportFailureContextResource } from "./import-failure-context.js";
 import { resourceEnvelope } from "./responders.js";
 import {
   importFailureContextQuerySchema,
+  billVersionContextQuerySchema,
   jobStatusQuerySchema,
   jobsSummaryQuerySchema,
   knowledgeExtractionHistoryQuerySchema,
+  knowledgeSearchQuerySchema,
   processDocumentSummaryQuerySchema,
   projectContextQuerySchema,
   projectSummaryQuerySchema,
   reportExportStatusQuerySchema,
   reviewSummaryQuerySchema,
+  stageContextQuerySchema,
   summaryDetailsQuerySchema,
 } from "./schemas.js";
 
@@ -143,6 +146,123 @@ export function registerResourceRoutes(
             ? latestKnowledgeEntries.items
             : [],
       },
+    });
+  });
+
+  app.get("/v1/resources/stage-context", async (request) => {
+    const query = stageContextQuerySchema.parse(request.query);
+    const [projectSummary, latestKnowledgeEntries] = await Promise.all([
+      apiClient.fetchProjectSummary(
+        {
+          projectId: query.projectId,
+          stageCode: query.stageCode,
+          disciplineCode: query.disciplineCode,
+        },
+        request.bearerToken!,
+      ),
+      apiClient.fetchKnowledgeEntries(
+        {
+          projectId: query.projectId,
+          stageCode: query.stageCode,
+          limit: query.knowledgeLimit ?? 5,
+        },
+        request.bearerToken!,
+      ),
+    ]);
+
+    return resourceEnvelope({
+      resourceType: "stage_context",
+      scope: {
+        projectId: query.projectId,
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode ?? null,
+      },
+      data: {
+        projectSummary,
+        latestKnowledgeSummary:
+          typeof latestKnowledgeEntries.summary === "object" &&
+          latestKnowledgeEntries.summary !== null
+            ? latestKnowledgeEntries.summary
+            : null,
+        latestKnowledgeEntries:
+          Array.isArray(latestKnowledgeEntries.items)
+            ? latestKnowledgeEntries.items
+            : [],
+      },
+    });
+  });
+
+  app.get("/v1/resources/bill-version-context", async (request) => {
+    const query = billVersionContextQuerySchema.parse(request.query);
+    const [projectSummary, summaryDetails, latestKnowledgeEntries] =
+      await Promise.all([
+        apiClient.fetchProjectSummary(query, request.bearerToken!),
+        apiClient.fetchSummaryDetails(
+          {
+            projectId: query.projectId,
+            billVersionId: query.billVersionId,
+            stageCode: query.stageCode,
+            disciplineCode: query.disciplineCode,
+            limit: query.detailsLimit ?? 10,
+          },
+          request.bearerToken!,
+        ),
+        apiClient.fetchKnowledgeEntries(
+          {
+            projectId: query.projectId,
+            stageCode: query.stageCode,
+            limit: query.knowledgeLimit ?? 5,
+          },
+          request.bearerToken!,
+        ),
+      ]);
+
+    return resourceEnvelope({
+      resourceType: "bill_version_context",
+      scope: {
+        projectId: query.projectId,
+        billVersionId: query.billVersionId,
+        stageCode: query.stageCode ?? null,
+        disciplineCode: query.disciplineCode ?? null,
+      },
+      data: {
+        projectSummary,
+        summaryDetails,
+        latestKnowledgeSummary:
+          typeof latestKnowledgeEntries.summary === "object" &&
+          latestKnowledgeEntries.summary !== null
+            ? latestKnowledgeEntries.summary
+            : null,
+        latestKnowledgeEntries:
+          Array.isArray(latestKnowledgeEntries.items)
+            ? latestKnowledgeEntries.items
+            : [],
+      },
+    });
+  });
+
+  app.get("/v1/resources/knowledge-search", async (request) => {
+    const query = knowledgeSearchQuerySchema.parse(request.query);
+    const data = await apiClient.searchKnowledgeEntries(
+      {
+        projectId: query.projectId,
+        q: query.q,
+        sourceType: query.sourceType,
+        stageCode: query.stageCode,
+        limit: query.limit,
+      },
+      request.bearerToken!,
+    );
+
+    return resourceEnvelope({
+      resourceType: "knowledge_search",
+      scope: {
+        projectId: query.projectId,
+        q: query.q,
+        sourceType: query.sourceType ?? null,
+        stageCode: query.stageCode ?? null,
+      },
+      data,
     });
   });
 

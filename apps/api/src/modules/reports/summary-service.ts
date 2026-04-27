@@ -2,6 +2,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 import {
   absoluteDecimal,
   divideDecimal,
+  multiplyDecimal,
   roundDecimal,
   subtractDecimal,
   sumDecimal,
@@ -13,6 +14,10 @@ import type { ProjectDisciplineRepository } from "../project/project-discipline-
 import type { ProjectMemberRepository } from "../project/project-member-repository.js";
 import type { ProjectRepository } from "../project/project-repository.js";
 import type { ProjectStageRepository } from "../project/project-stage-repository.js";
+import type { FeeRuleRepository } from "../fee/fee-rule-repository.js";
+import type { FeeTemplateRepository } from "../fee/fee-template-repository.js";
+
+type SummaryTaxMode = "tax_included" | "tax_excluded";
 
 export type SummaryResult = {
   projectId: string;
@@ -26,6 +31,8 @@ export type SummaryResult = {
   totalFinalAmount: number;
   varianceAmount: number;
   varianceRate: number;
+  taxMode?: SummaryTaxMode;
+  totalTaxAmount?: number;
 };
 
 export type SummaryDetailItem = {
@@ -42,6 +49,7 @@ export type SummaryDetailItem = {
   varianceAmount: number;
   varianceRate: number;
   varianceShare: number;
+  taxAmount?: number;
 };
 
 export type SummaryDetailResult = {
@@ -50,6 +58,7 @@ export type SummaryDetailResult = {
   stageCode: string | null;
   disciplineCode: string | null;
   unitCode: string | null;
+  taxMode?: SummaryTaxMode;
   totalCount: number;
   items: SummaryDetailItem[];
 };
@@ -83,6 +92,8 @@ type Dependencies = {
   projectMemberRepository: ProjectMemberRepository;
   billVersionRepository: BillVersionRepository;
   billItemRepository: BillItemRepository;
+  feeTemplateRepository: FeeTemplateRepository;
+  feeRuleRepository: FeeRuleRepository;
 };
 
 export class SummaryService {
@@ -94,6 +105,7 @@ export class SummaryService {
     stageCode?: string;
     disciplineCode?: string;
     unitCode?: string;
+    taxMode?: SummaryTaxMode;
     userId: string;
   }): Promise<SummaryResult> {
     const billVersions = await this.getAuthorizedBillVersions(input);
@@ -101,19 +113,40 @@ export class SummaryService {
       await this.listBillItemsForVersions(billVersions),
       input.unitCode,
     );
+    const taxRatesByBillVersionId =
+      input.taxMode === "tax_excluded"
+        ? await this.resolveTaxRatesByBillVersion(billVersions, input.projectId)
+        : new Map<string, number>();
 
     const totalSystemAmount = sumDecimal(
       allItems.map((item) => item.systemAmount ?? 0),
       2,
     );
     const totalFinalAmount = sumDecimal(
-      allItems.map((item) => item.finalAmount ?? 0),
+      allItems.map((item) =>
+        this.applyTaxModeToFinalAmount({
+          systemAmount: item.systemAmount ?? 0,
+          finalAmount: item.finalAmount ?? 0,
+          taxRate: taxRatesByBillVersionId.get(item.billVersionId) ?? 0,
+          taxMode: input.taxMode,
+        }),
+      ),
+      2,
+    );
+    const totalTaxAmount = sumDecimal(
+      allItems.map((item) =>
+        multiplyDecimal(
+          item.systemAmount ?? 0,
+          taxRatesByBillVersionId.get(item.billVersionId) ?? 0,
+          2,
+        ),
+      ),
       2,
     );
     const varianceAmount = subtractDecimal(totalFinalAmount, totalSystemAmount, 2);
     const varianceRate = divideDecimal(varianceAmount, totalSystemAmount, 6);
 
-    return {
+    const result: SummaryResult = {
       projectId: input.projectId,
       billVersionId: input.billVersionId ?? null,
       stageCode: input.stageCode ?? null,
@@ -126,6 +159,11 @@ export class SummaryService {
       varianceAmount,
       varianceRate,
     };
+    if (input.taxMode) {
+      result.taxMode = input.taxMode;
+      result.totalTaxAmount = totalTaxAmount;
+    }
+    return result;
   }
 
   async getSummaryDetails(input: {
@@ -134,6 +172,7 @@ export class SummaryService {
     stageCode?: string;
     disciplineCode?: string;
     unitCode?: string;
+    taxMode?: SummaryTaxMode;
     limit?: number;
     userId: string;
   }): Promise<SummaryDetailResult> {
@@ -142,10 +181,23 @@ export class SummaryService {
       await this.listBillItemsForVersions(billVersions),
       input.unitCode,
     );
+    const taxRatesByBillVersionId =
+      input.taxMode === "tax_excluded"
+        ? await this.resolveTaxRatesByBillVersion(billVersions, input.projectId)
+        : new Map<string, number>();
     const totalVariance = sumDecimal(
       allItems.map((item) =>
         absoluteDecimal(
-          subtractDecimal(item.finalAmount ?? 0, item.systemAmount ?? 0, 2),
+          subtractDecimal(
+            this.applyTaxModeToFinalAmount({
+              systemAmount: item.systemAmount ?? 0,
+              finalAmount: item.finalAmount ?? 0,
+              taxRate: taxRatesByBillVersionId.get(item.billVersionId) ?? 0,
+              taxMode: input.taxMode,
+            }),
+            item.systemAmount ?? 0,
+            2,
+          ),
           2,
         ),
       ),
@@ -160,7 +212,14 @@ export class SummaryService {
           );
           return this.filterItemsByUnitCode(items, input.unitCode).map((item) => {
             const systemAmount = roundDecimal(item.systemAmount ?? 0, 2);
-            const finalAmount = roundDecimal(item.finalAmount ?? 0, 2);
+            const taxRate = taxRatesByBillVersionId.get(item.billVersionId) ?? 0;
+            const taxAmount = multiplyDecimal(systemAmount, taxRate, 2);
+            const finalAmount = this.applyTaxModeToFinalAmount({
+              systemAmount,
+              finalAmount: item.finalAmount ?? 0,
+              taxRate,
+              taxMode: input.taxMode,
+            });
             const varianceAmount = subtractDecimal(finalAmount, systemAmount, 2);
             const varianceRate = divideDecimal(varianceAmount, systemAmount, 6);
             const varianceShare = divideDecimal(
@@ -183,6 +242,7 @@ export class SummaryService {
               varianceAmount,
               varianceRate,
               varianceShare,
+              ...(input.taxMode ? { taxAmount } : {}),
             };
           });
         }),
@@ -197,6 +257,7 @@ export class SummaryService {
       stageCode: input.stageCode ?? null,
       disciplineCode: input.disciplineCode ?? null,
       unitCode: input.unitCode ?? null,
+      ...(input.taxMode ? { taxMode: input.taxMode } : {}),
       totalCount: details.length,
       items: details.slice(0, input.limit ?? 20),
     };
@@ -326,6 +387,59 @@ export class SummaryService {
       }
       return true;
     });
+  }
+
+  private async resolveTaxRatesByBillVersion(
+    billVersions: Array<{ id: string; stageCode: string; disciplineCode: string }>,
+    projectId: string,
+  ) {
+    const project = await this.dependencies.projectRepository.findById(projectId);
+    const feeTemplateId = project?.defaultFeeTemplateId ?? null;
+    if (!feeTemplateId) {
+      return new Map<string, number>();
+    }
+
+    const feeTemplate = await this.dependencies.feeTemplateRepository.findById(
+      feeTemplateId,
+    );
+    if (!feeTemplate || feeTemplate.status !== "active") {
+      return new Map<string, number>();
+    }
+
+    const feeRules = await this.dependencies.feeRuleRepository.listByFeeTemplateId(
+      feeTemplate.id,
+    );
+    const taxRules = feeRules.filter((rule) => rule.feeType === "tax");
+    const taxRatesByBillVersionId = new Map<string, number>();
+    for (const billVersion of billVersions) {
+      if (!feeTemplate.stageScope.includes(billVersion.stageCode)) {
+        taxRatesByBillVersionId.set(billVersion.id, 0);
+        continue;
+      }
+      const matchedRule =
+        taxRules.find((rule) => rule.disciplineCode === billVersion.disciplineCode) ??
+        taxRules.find((rule) => rule.disciplineCode === null);
+      taxRatesByBillVersionId.set(billVersion.id, matchedRule?.feeRate ?? 0);
+    }
+
+    return taxRatesByBillVersionId;
+  }
+
+  private applyTaxModeToFinalAmount(input: {
+    systemAmount: number;
+    finalAmount: number;
+    taxRate: number;
+    taxMode?: SummaryTaxMode;
+  }) {
+    const finalAmount = roundDecimal(input.finalAmount, 2);
+    if (input.taxMode !== "tax_excluded") {
+      return finalAmount;
+    }
+    return subtractDecimal(
+      finalAmount,
+      multiplyDecimal(input.systemAmount, input.taxRate, 2),
+      2,
+    );
   }
 
   private async getAuthorizedBillVersion(input: {

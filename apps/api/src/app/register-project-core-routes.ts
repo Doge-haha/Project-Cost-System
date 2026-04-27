@@ -13,6 +13,14 @@ const updateProjectPricingDefaultsSchema = z.object({
   defaultFeeTemplateId: z.string().min(1).nullable().optional(),
 });
 
+const updateProjectDefaultPriceVersionSchema = z.object({
+  defaultPriceVersionId: z.string().min(1).nullable(),
+});
+
+const updateProjectDefaultFeeTemplateSchema = z.object({
+  defaultFeeTemplateId: z.string().min(1).nullable(),
+});
+
 const projectStageSetupSchema = z.object({
   stageCode: z.string().min(1),
   stageName: z.string().min(1),
@@ -238,6 +246,34 @@ export function registerProjectCoreRoutes(
         userId: request.currentUser!.id,
         roleCodes: request.currentUser!.roleCodes,
         defaultPriceVersionId: payload.defaultPriceVersionId,
+        defaultFeeTemplateId: payload.defaultFeeTemplateId,
+      }),
+    );
+  });
+
+  app.put("/v1/projects/:projectId/default-price-version", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const payload = updateProjectDefaultPriceVersionSchema.parse(request.body);
+
+    return transactionRunner.runInTransaction(async () =>
+      projectService.updateProjectPricingDefaults({
+        projectId,
+        userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
+        defaultPriceVersionId: payload.defaultPriceVersionId,
+      }),
+    );
+  });
+
+  app.put("/v1/projects/:projectId/default-fee-template", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const payload = updateProjectDefaultFeeTemplateSchema.parse(request.body);
+
+    return transactionRunner.runInTransaction(async () =>
+      projectService.updateProjectPricingDefaults({
+        projectId,
+        userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
         defaultFeeTemplateId: payload.defaultFeeTemplateId,
       }),
     );

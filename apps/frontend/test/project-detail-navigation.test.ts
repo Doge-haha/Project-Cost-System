@@ -36,7 +36,10 @@ describe("project detail navigation helpers", () => {
         billVersionId: "version-002",
       }),
     ).toEqual({
+      auditLogsPath: "/projects/project-001/audit-logs",
+      aiRecommendationsPath: "/projects/project-001/ai-recommendations",
       billItemsPath: "/projects/project-001/bill-versions/version-002/items",
+      knowledgePath: "/projects/project-001/knowledge",
       summaryPath: "/projects/project-001/summary?billVersionId=version-002",
     });
   });

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams, useParams } from "react-router-dom"
 
 import { apiClient, ApiError } from "../../lib/api";
 import type {
+  AiRecommendation,
   BillVersion,
   ProjectListItem,
   ReportExportTask,
@@ -57,12 +58,21 @@ function formatReportType(reportType: ReportExportTask["reportType"]) {
   return reportType === "variance" ? "偏差明细" : "汇总";
 }
 
+function formatPayloadText(value: unknown) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 export function SummaryPage() {
   const params = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectId = params.projectId;
   const billVersionId = searchParams.get("billVersionId") ?? undefined;
+  const taxModeParam = searchParams.get("taxMode");
+  const taxMode =
+    taxModeParam === "tax_included" || taxModeParam === "tax_excluded"
+      ? taxModeParam
+      : undefined;
   const compareBaseBillVersionId =
     searchParams.get("compareBaseBillVersionId") ?? undefined;
   const compareTargetBillVersionId =
@@ -74,6 +84,7 @@ export function SummaryPage() {
   const [versionCompare, setVersionCompare] = useState<VersionCompareResponse | null>(
     null,
   );
+  const [aiVarianceWarnings, setAiVarianceWarnings] = useState<AiRecommendation[]>([]);
   const [exportTask, setExportTask] = useState<ReportExportTask | null>(null);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
@@ -101,17 +112,35 @@ export function SummaryPage() {
     setError(null);
 
     try {
-      const [projectResponse, summaryResponse, detailsResponse, versionsResponse] =
+      const [
+        projectResponse,
+        summaryResponse,
+        detailsResponse,
+        versionsResponse,
+        aiVarianceWarningsResponse,
+      ] =
         await Promise.all([
           apiClient.getProject(projectId),
-          apiClient.getSummary(projectId, billVersionId),
-          apiClient.getSummaryDetails(projectId, billVersionId),
+          apiClient.getSummary(projectId, billVersionId, taxMode),
+          apiClient.getSummaryDetails(projectId, billVersionId, taxMode),
           apiClient.listBillVersions(projectId),
+          apiClient.listAiRecommendations(projectId, {
+            recommendationType: "variance_warning",
+            status: "generated",
+            limit: 5,
+          }),
         ]);
       setProject(projectResponse);
       setSummary(summaryResponse);
       setDetails(detailsResponse.items);
       setVersions(versionsResponse.items);
+      setAiVarianceWarnings(
+        billVersionId
+          ? aiVarianceWarningsResponse.items.filter(
+              (item) => item.outputPayload.billVersionId === billVersionId,
+            )
+          : aiVarianceWarningsResponse.items,
+      );
 
       if (
         compareBaseBillVersionId &&
@@ -141,7 +170,13 @@ export function SummaryPage() {
 
   useEffect(() => {
     void loadSummary();
-  }, [projectId, billVersionId, compareBaseBillVersionId, compareTargetBillVersionId]);
+  }, [
+    projectId,
+    billVersionId,
+    taxMode,
+    compareBaseBillVersionId,
+    compareTargetBillVersionId,
+  ]);
 
   async function createExportTask(reportType: ReportExportTask["reportType"]) {
     if (!projectId) {
@@ -304,10 +339,15 @@ export function SummaryPage() {
                     if (!projectId) {
                       return;
                     }
+                    const nextSearchParams = new URLSearchParams();
+                    nextSearchParams.set("billVersionId", nextVersionId);
+                    if (taxMode) {
+                      nextSearchParams.set("taxMode", taxMode);
+                    }
                     window.history.replaceState(
                       null,
                       "",
-                      `/projects/${projectId}/summary?billVersionId=${nextVersionId}`,
+                      `/projects/${projectId}/summary?${nextSearchParams.toString()}`,
                     );
                     window.dispatchEvent(new PopStateEvent("popstate"));
                   }}
@@ -315,6 +355,27 @@ export function SummaryPage() {
                   versions={versions}
                 />
               ) : null}
+              <label className="connection-label">
+                计税口径
+                <select
+                  aria-label="计税口径"
+                  className="version-select"
+                  onChange={(event) => {
+                    if (!projectId) {
+                      return;
+                    }
+                    const nextSearchParams = new URLSearchParams(searchParams);
+                    nextSearchParams.set("taxMode", event.target.value);
+                    void navigate(
+                      `/projects/${projectId}/summary?${nextSearchParams.toString()}`,
+                    );
+                  }}
+                  value={taxMode ?? "tax_included"}
+                >
+                  <option value="tax_included">含税口径</option>
+                  <option value="tax_excluded">不含税口径</option>
+                </select>
+              </label>
               {versionContext ? (
                 <Link className="app-nav-link active" to={versionContext.billItemsPath}>
                   返回当前版本清单页
@@ -539,11 +600,61 @@ export function SummaryPage() {
             {formatMoney(summary.varianceAmount)}
           </p>
         </article>
+        {summary.taxMode ? (
+          <article className="stat-card">
+            <p className="stat-label">
+              {summary.taxMode === "tax_excluded" ? "已剔除税金" : "税金"}
+            </p>
+            <p className="stat-value">{formatMoney(summary.totalTaxAmount)}</p>
+          </article>
+        ) : null}
         <article className="stat-card">
           <p className="stat-label">清单条目数</p>
           <p className="stat-value">{summary.itemCount ?? "-"}</p>
         </article>
       </section>
+
+      {aiVarianceWarnings.length > 0 ? (
+        <section className="panel panel-focus">
+          <div className="page-header">
+            <div>
+              <h3>AI 偏差预警</h3>
+              <p className="page-description">
+                当前还有 {aiVarianceWarnings.length} 条待处理预警，来自 AI 推荐结果缓存。
+              </p>
+            </div>
+            {projectId ? (
+              <Link
+                className="app-nav-link active"
+                to={`/projects/${projectId}/ai-recommendations?recommendationType=variance_warning&status=generated`}
+              >
+                查看全部预警
+              </Link>
+            ) : null}
+          </div>
+          <div className="highlight-grid">
+            {aiVarianceWarnings.map((warning) => (
+              <article className="highlight-card negative" key={warning.id}>
+                <p className="stat-label">
+                  {formatPayloadText(warning.outputPayload.itemCode) || warning.resourceId}
+                </p>
+                <h4 className="highlight-title">
+                  {formatPayloadText(warning.outputPayload.itemName) || "偏差预警"}
+                </h4>
+                <p className="highlight-variance">
+                  {formatMoney(
+                    warning.outputPayload.varianceAmount as number | string | null,
+                  )}
+                </p>
+                <p className="page-description">
+                  {formatPayloadText(warning.outputPayload.warning) ||
+                    "最终金额与系统金额偏差超过阈值。"}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {highlightCards.length > 0 ? (
         <section className="panel">
@@ -583,6 +694,9 @@ export function SummaryPage() {
                   <span>系统值 {formatMoney(detail.systemAmount)}</span>
                   <span>最终值 {formatMoney(detail.finalAmount)}</span>
                   <span>偏差 {formatMoney(detail.varianceAmount)}</span>
+                  {detail.taxAmount !== undefined ? (
+                    <span>税金 {formatMoney(detail.taxAmount)}</span>
+                  ) : null}
                 </div>
               </article>
             ))}

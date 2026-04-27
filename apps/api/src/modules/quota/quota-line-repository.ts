@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { quotaLines } from "../../infrastructure/database/schema.js";
 
+export type QuotaLineSourceMode = "manual" | "ai" | "history_reference";
+
 export type QuotaLineRecord = {
   id: string;
   billItemId: string;
@@ -20,11 +22,20 @@ export type QuotaLineRecord = {
   materialFee?: number | null;
   machineFee?: number | null;
   contentFactor: number;
-  sourceMode: string;
+  sourceMode: QuotaLineSourceMode;
+};
+
+export type QuotaSourceCandidateFilter = {
+  sourceStandardSetCode?: string;
+  chapterCode?: string;
+  keyword?: string;
 };
 
 export interface QuotaLineRepository {
   listByBillItemId(billItemId: string): Promise<QuotaLineRecord[]>;
+  listSourceCandidates(
+    input: QuotaSourceCandidateFilter,
+  ): Promise<QuotaLineRecord[]>;
   findById(quotaLineId: string): Promise<QuotaLineRecord | null>;
   create(input: Omit<QuotaLineRecord, "id">): Promise<QuotaLineRecord>;
   update(
@@ -44,6 +55,12 @@ export class InMemoryQuotaLineRepository implements QuotaLineRepository {
 
   async listByBillItemId(billItemId: string): Promise<QuotaLineRecord[]> {
     return this.quotaLines.filter((quotaLine) => quotaLine.billItemId === billItemId);
+  }
+
+  async listSourceCandidates(
+    input: QuotaSourceCandidateFilter,
+  ): Promise<QuotaLineRecord[]> {
+    return filterSourceCandidates(this.quotaLines, input);
   }
 
   async findById(quotaLineId: string): Promise<QuotaLineRecord | null> {
@@ -114,6 +131,21 @@ export class DbQuotaLineRepository implements QuotaLineRepository {
     });
 
     return records.map(mapQuotaLineRecord);
+  }
+
+  async listSourceCandidates(
+    input: QuotaSourceCandidateFilter,
+  ): Promise<QuotaLineRecord[]> {
+    const records = await this.db.query.quotaLines.findMany({
+      orderBy: (table, { asc }) => [
+        asc(table.sourceStandardSetCode),
+        asc(table.chapterCode),
+        asc(table.quotaCode),
+        asc(table.id),
+      ],
+    });
+
+    return filterSourceCandidates(records.map(mapQuotaLineRecord), input);
   }
 
   async findById(quotaLineId: string): Promise<QuotaLineRecord | null> {
@@ -197,6 +229,47 @@ export class DbQuotaLineRepository implements QuotaLineRepository {
   }
 }
 
+function filterSourceCandidates(
+  records: QuotaLineRecord[],
+  input: QuotaSourceCandidateFilter,
+): QuotaLineRecord[] {
+  const keyword = input.keyword?.trim().toLowerCase();
+  const seen = new Set<string>();
+  const candidates: QuotaLineRecord[] = [];
+
+  for (const record of records) {
+    if (
+      input.sourceStandardSetCode &&
+      record.sourceStandardSetCode !== input.sourceStandardSetCode
+    ) {
+      continue;
+    }
+    if (input.chapterCode && record.chapterCode !== input.chapterCode) {
+      continue;
+    }
+    if (
+      keyword &&
+      !record.quotaCode.toLowerCase().includes(keyword) &&
+      !record.quotaName.toLowerCase().includes(keyword)
+    ) {
+      continue;
+    }
+
+    const key = [
+      record.sourceStandardSetCode,
+      record.sourceQuotaId,
+      record.quotaCode,
+    ].join(":");
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    candidates.push(record);
+  }
+
+  return candidates;
+}
+
 function mapQuotaLineRecord(
   record: typeof quotaLines.$inferSelect,
 ): QuotaLineRecord {
@@ -215,6 +288,6 @@ function mapQuotaLineRecord(
     materialFee: record.materialFee ?? null,
     machineFee: record.machineFee ?? null,
     contentFactor: record.contentFactor,
-    sourceMode: record.sourceMode,
+    sourceMode: record.sourceMode as QuotaLineSourceMode,
   };
 }

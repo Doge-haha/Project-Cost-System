@@ -143,6 +143,16 @@ const billItems: BillItemRecord[] = [
     unit: "项",
     sortNo: 1,
   },
+  {
+    id: "bill-item-003",
+    billVersionId: "bill-version-001",
+    parentId: null,
+    itemCode: "A.2",
+    itemName: "混凝土工程",
+    quantity: 20,
+    unit: "m3",
+    sortNo: 2,
+  },
 ];
 
 const quotaLines: QuotaLineRecord[] = [
@@ -160,6 +170,23 @@ const quotaLines: QuotaLineRecord[] = [
     laborFee: 120,
     materialFee: 50,
     machineFee: 30,
+    contentFactor: 1,
+    sourceMode: "manual",
+  },
+  {
+    id: "quota-line-002",
+    billItemId: "bill-item-002",
+    sourceStandardSetCode: "js-2013-installation",
+    sourceQuotaId: "quota-source-101",
+    sourceSequence: 1,
+    chapterCode: "03",
+    quotaCode: "030101001",
+    quotaName: "安装定额",
+    unit: "项",
+    quantity: 10,
+    laborFee: 30,
+    materialFee: 40,
+    machineFee: 50,
     contentFactor: 1,
     sourceMode: "manual",
   },
@@ -220,7 +247,43 @@ test("GET /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines re
   });
 
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json(), { items: quotaLines });
+  assert.deepEqual(response.json(), { items: [quotaLines[0]] });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/quota-lines returns quota lines within member scope", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/quota-lines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        ...quotaLines[0],
+        billVersionId: "bill-version-001",
+        stageCode: "estimate",
+        disciplineCode: "building",
+        billItemCode: "A.1",
+        billItemName: "土石方工程",
+      },
+    ],
+  });
 
   await app.close();
 });
@@ -261,7 +324,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines c
 
   assert.equal(response.statusCode, 201);
   assert.deepEqual(response.json(), {
-    id: "quota-line-002",
+    id: "quota-line-003",
     billItemId: "bill-item-001",
     sourceStandardSetCode: "js-2013-building",
     sourceQuotaId: "quota-source-002",
@@ -276,6 +339,307 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines c
     machineFee: 60,
     contentFactor: 1.2,
     sourceMode: "manual",
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/quota-lines/batch-create creates multiple quota lines", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/quota-lines/batch-create",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      items: [
+        {
+          billVersionId: "bill-version-001",
+          billItemId: "bill-item-001",
+          sourceStandardSetCode: "js-2013-building",
+          sourceQuotaId: "quota-source-002",
+          sourceSequence: 2,
+          chapterCode: "02",
+          quotaCode: "010101002",
+          quotaName: "机械挖土方",
+          unit: "m3",
+          quantity: 80,
+          laborFee: 90,
+          materialFee: 20,
+          machineFee: 60,
+          contentFactor: 1.2,
+          sourceMode: "manual",
+        },
+        {
+          billVersionId: "bill-version-002",
+          billItemId: "bill-item-002",
+          sourceStandardSetCode: "js-2013-installation",
+          sourceQuotaId: "quota-source-102",
+          sourceSequence: 2,
+          chapterCode: "03",
+          quotaCode: "030101002",
+          quotaName: "安装新增定额",
+          unit: "项",
+          quantity: 5,
+          laborFee: 10,
+          materialFee: 20,
+          machineFee: 30,
+          contentFactor: 1,
+          sourceMode: "manual",
+        },
+      ],
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        id: "quota-line-003",
+        billItemId: "bill-item-001",
+        sourceStandardSetCode: "js-2013-building",
+        sourceQuotaId: "quota-source-002",
+        sourceSequence: 2,
+        chapterCode: "02",
+        quotaCode: "010101002",
+        quotaName: "机械挖土方",
+        unit: "m3",
+        quantity: 80,
+        laborFee: 90,
+        materialFee: 20,
+        machineFee: 60,
+        contentFactor: 1.2,
+        sourceMode: "manual",
+      },
+      {
+        id: "quota-line-004",
+        billItemId: "bill-item-002",
+        sourceStandardSetCode: "js-2013-installation",
+        sourceQuotaId: "quota-source-102",
+        sourceSequence: 2,
+        chapterCode: "03",
+        quotaCode: "030101002",
+        quotaName: "安装新增定额",
+        unit: "项",
+        quantity: 5,
+        laborFee: 10,
+        materialFee: 20,
+        machineFee: 30,
+        contentFactor: 1,
+        sourceMode: "manual",
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/quota-lines/validate reports visible bill items without quota lines", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/quota-lines/validate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    passed: false,
+    issueCount: 1,
+    issues: [
+      {
+        code: "MISSING_QUOTA_LINES",
+        severity: "warning",
+        message: "Bill item has no quota lines",
+        billVersionId: "bill-version-001",
+        billItemId: "bill-item-003",
+        billItemCode: "A.2",
+        billItemName: "混凝土工程",
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/quota-lines/validate reports quota unit mismatch", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/quota-lines/quota-line-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      sourceStandardSetCode: "js-2013-building",
+      sourceQuotaId: "quota-source-001",
+      sourceSequence: 1,
+      chapterCode: "01",
+      quotaCode: "010101001",
+      quotaName: "人工挖土方",
+      unit: "m2",
+      quantity: 100,
+      laborFee: 120,
+      materialFee: 50,
+      machineFee: 30,
+      contentFactor: 1,
+      sourceMode: "manual",
+    },
+  });
+
+  assert.equal(updateResponse.statusCode, 200);
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/quota-lines/validate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    passed: false,
+    issueCount: 2,
+    issues: [
+      {
+        code: "UNIT_MISMATCH",
+        severity: "warning",
+        message: "Quota line unit does not match bill item unit",
+        billVersionId: "bill-version-001",
+        billItemId: "bill-item-001",
+        billItemCode: "A.1",
+        billItemName: "土石方工程",
+        quotaLineId: "quota-line-001",
+        quotaCode: "010101001",
+        billItemUnit: "m3",
+        quotaUnit: "m2",
+      },
+      {
+        code: "MISSING_QUOTA_LINES",
+        severity: "warning",
+        message: "Bill item has no quota lines",
+        billVersionId: "bill-version-001",
+        billItemId: "bill-item-003",
+        billItemCode: "A.2",
+        billItemName: "混凝土工程",
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/quota-lines/source-chain returns visible quota source context", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/quota-lines/source-chain",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        quotaLineId: "quota-line-001",
+        billVersionId: "bill-version-001",
+        billVersionName: "估算版 V1",
+        stageCode: "estimate",
+        disciplineCode: "building",
+        billItemId: "bill-item-001",
+        billItemCode: "A.1",
+        billItemName: "土石方工程",
+        sourceMode: "manual",
+        sourceStandardSetCode: "js-2013-building",
+        sourceQuotaId: "quota-source-001",
+        sourceSequence: 1,
+        quotaCode: "010101001",
+        quotaName: "人工挖土方",
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/quota-lines/candidates uses discipline default standard set and filters candidates", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/quota-lines/candidates?disciplineCode=building&keyword=挖土&chapterCode=01",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        sourceStandardSetCode: "js-2013-building",
+        sourceQuotaId: "quota-source-001",
+        sourceSequence: 1,
+        chapterCode: "01",
+        quotaCode: "010101001",
+        quotaName: "人工挖土方",
+        unit: "m3",
+        laborFee: 120,
+        materialFee: 50,
+        machineFee: 30,
+        sourceMode: "manual",
+      },
+    ],
   });
 
   await app.close();
@@ -367,6 +731,50 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines r
       message: "Duplicate quota source is not allowed for the same bill item",
     },
   });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines rejects unsupported source mode", async () => {
+  const app = createQuotaApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/quota-lines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      sourceStandardSetCode: "js-2013-building",
+      sourceQuotaId: "quota-source-002",
+      sourceSequence: 2,
+      chapterCode: "02",
+      quotaCode: "010101002",
+      quotaName: "机械挖土方",
+      unit: "m3",
+      quantity: 80,
+      laborFee: 90,
+      materialFee: 20,
+      machineFee: 60,
+      contentFactor: 1.2,
+      sourceMode: "spreadsheet",
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.equal(response.json().error.code, "VALIDATION_ERROR");
+  assert.deepEqual(
+    response.json().error.details.map((detail: { field: string }) => detail.field),
+    ["sourceMode"],
+  );
 
   await app.close();
 });

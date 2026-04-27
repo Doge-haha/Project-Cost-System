@@ -6,10 +6,18 @@ import type { AuditLogService } from "../audit/audit-log-service.js";
 import type { BillItemRepository } from "../bill/bill-item-repository.js";
 import { BillItemService } from "../bill/bill-item-service.js";
 import { BillVersionService } from "../bill/bill-version-service.js";
+import type { ProjectDisciplineRepository } from "../project/project-discipline-repository.js";
 import type {
   QuotaLineRecord,
   QuotaLineRepository,
+  QuotaLineSourceMode,
 } from "./quota-line-repository.js";
+
+export const quotaLineSourceModeSchema = z.enum([
+  "manual",
+  "ai",
+  "history_reference",
+]);
 
 export const createQuotaLineSchema = z.object({
   sourceStandardSetCode: z.string().min(1),
@@ -24,15 +32,92 @@ export const createQuotaLineSchema = z.object({
   materialFee: z.number().nonnegative().nullable().optional(),
   machineFee: z.number().nonnegative().nullable().optional(),
   contentFactor: z.number().positive().optional(),
-  sourceMode: z.string().min(1),
+  sourceMode: quotaLineSourceModeSchema,
 });
 
 export const updateQuotaLineSchema = createQuotaLineSchema;
+export const batchCreateQuotaLinesSchema = z.object({
+  items: z
+    .array(
+      createQuotaLineSchema.extend({
+        billVersionId: z.string().min(1),
+        billItemId: z.string().min(1),
+      }),
+    )
+    .min(1),
+});
+
+export const listQuotaSourceCandidatesSchema = z.object({
+  standardSetCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+  keyword: z.string().min(1).optional(),
+  chapterCode: z.string().min(1).optional(),
+});
+
+export type ProjectQuotaLineRecord = QuotaLineRecord & {
+  billVersionId: string;
+  stageCode: string;
+  disciplineCode: string;
+  billItemCode: string;
+  billItemName: string;
+};
+
+export type QuotaLineSourceChainRecord = {
+  quotaLineId: string;
+  billVersionId: string;
+  billVersionName: string;
+  stageCode: string;
+  disciplineCode: string;
+  billItemId: string;
+  billItemCode: string;
+  billItemName: string;
+  sourceMode: QuotaLineSourceMode;
+  sourceStandardSetCode: string;
+  sourceQuotaId: string;
+  sourceSequence?: number | null;
+  quotaCode: string;
+  quotaName: string;
+};
+
+export type QuotaSourceCandidateRecord = {
+  sourceStandardSetCode: string;
+  sourceQuotaId: string;
+  sourceSequence?: number | null;
+  chapterCode: string;
+  quotaCode: string;
+  quotaName: string;
+  unit: string;
+  laborFee?: number | null;
+  materialFee?: number | null;
+  machineFee?: number | null;
+  sourceMode: QuotaLineSourceMode;
+};
+
+export type QuotaLineValidationIssue = {
+  code: "MISSING_QUOTA_LINES" | "UNIT_MISMATCH";
+  severity: "warning";
+  message: string;
+  billVersionId: string;
+  billItemId: string;
+  billItemCode: string;
+  billItemName: string;
+  quotaLineId?: string;
+  quotaCode?: string;
+  billItemUnit?: string;
+  quotaUnit?: string;
+};
+
+export type QuotaLineValidationResult = {
+  passed: boolean;
+  issueCount: number;
+  issues: QuotaLineValidationIssue[];
+};
 
 type Dependencies = {
   billItemService: BillItemService;
   billItemRepository: BillItemRepository;
   billVersionService: BillVersionService;
+  projectDisciplineRepository: ProjectDisciplineRepository;
 };
 
 export class QuotaLineService {
@@ -59,6 +144,189 @@ export class QuotaLineService {
     return this.quotaLineRepository.listByBillItemId(input.billItemId);
   }
 
+  async listProjectQuotaLines(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<ProjectQuotaLineRecord[]> {
+    const versions = await this.dependencies.billVersionService.listAuthorizedProjectVersions({
+      projectId: input.projectId,
+      userId: input.userId,
+    });
+    const projectQuotaLines: ProjectQuotaLineRecord[] = [];
+
+    for (const version of versions) {
+      const billItems = await this.dependencies.billItemRepository.listByBillVersionId(
+        version.id,
+      );
+
+      for (const billItem of billItems) {
+        const quotaLines = await this.quotaLineRepository.listByBillItemId(billItem.id);
+        projectQuotaLines.push(
+          ...quotaLines.map((quotaLine) => ({
+            ...quotaLine,
+            billVersionId: version.id,
+            stageCode: version.stageCode,
+            disciplineCode: version.disciplineCode,
+            billItemCode: billItem.itemCode,
+            billItemName: billItem.itemName,
+          })),
+        );
+      }
+    }
+
+    return projectQuotaLines;
+  }
+
+  async listQuotaSourceCandidates(input: {
+    projectId: string;
+    userId: string;
+    standardSetCode?: string;
+    disciplineCode?: string;
+    keyword?: string;
+    chapterCode?: string;
+  }): Promise<QuotaSourceCandidateRecord[]> {
+    const versions = await this.dependencies.billVersionService.listAuthorizedProjectVersions({
+      projectId: input.projectId,
+      userId: input.userId,
+    });
+    const allowedDisciplineCodes = new Set(
+      versions.map((version) => version.disciplineCode),
+    );
+    if (input.disciplineCode && !allowedDisciplineCodes.has(input.disciplineCode)) {
+      throw new AppError(
+        403,
+        "FORBIDDEN",
+        "User cannot view quota candidates for this discipline",
+      );
+    }
+
+    const sourceStandardSetCode =
+      input.standardSetCode ??
+      (await this.resolveDefaultStandardSetCode({
+        projectId: input.projectId,
+        disciplineCode: input.disciplineCode,
+        allowedDisciplineCodes,
+      }));
+    const candidates = await this.quotaLineRepository.listSourceCandidates({
+      sourceStandardSetCode: sourceStandardSetCode ?? undefined,
+      chapterCode: input.chapterCode,
+      keyword: input.keyword,
+    });
+
+    return candidates.map((candidate) => ({
+      sourceStandardSetCode: candidate.sourceStandardSetCode,
+      sourceQuotaId: candidate.sourceQuotaId,
+      sourceSequence: candidate.sourceSequence ?? null,
+      chapterCode: candidate.chapterCode,
+      quotaCode: candidate.quotaCode,
+      quotaName: candidate.quotaName,
+      unit: candidate.unit,
+      laborFee: candidate.laborFee ?? null,
+      materialFee: candidate.materialFee ?? null,
+      machineFee: candidate.machineFee ?? null,
+      sourceMode: candidate.sourceMode,
+    }));
+  }
+
+  async listProjectQuotaLineSourceChains(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<QuotaLineSourceChainRecord[]> {
+    const versions = await this.dependencies.billVersionService.listAuthorizedProjectVersions({
+      projectId: input.projectId,
+      userId: input.userId,
+    });
+    const sourceChains: QuotaLineSourceChainRecord[] = [];
+
+    for (const version of versions) {
+      const billItems = await this.dependencies.billItemRepository.listByBillVersionId(
+        version.id,
+      );
+
+      for (const billItem of billItems) {
+        const quotaLines = await this.quotaLineRepository.listByBillItemId(billItem.id);
+        sourceChains.push(
+          ...quotaLines.map((quotaLine) => ({
+            quotaLineId: quotaLine.id,
+            billVersionId: version.id,
+            billVersionName: version.versionName,
+            stageCode: version.stageCode,
+            disciplineCode: version.disciplineCode,
+            billItemId: billItem.id,
+            billItemCode: billItem.itemCode,
+            billItemName: billItem.itemName,
+            sourceMode: quotaLine.sourceMode,
+            sourceStandardSetCode: quotaLine.sourceStandardSetCode,
+            sourceQuotaId: quotaLine.sourceQuotaId,
+            sourceSequence: quotaLine.sourceSequence ?? null,
+            quotaCode: quotaLine.quotaCode,
+            quotaName: quotaLine.quotaName,
+          })),
+        );
+      }
+    }
+
+    return sourceChains;
+  }
+
+  async validateProjectQuotaLines(input: {
+    projectId: string;
+    userId: string;
+  }): Promise<QuotaLineValidationResult> {
+    const versions = await this.dependencies.billVersionService.listAuthorizedProjectVersions({
+      projectId: input.projectId,
+      userId: input.userId,
+    });
+    const issues: QuotaLineValidationIssue[] = [];
+
+    for (const version of versions) {
+      const billItems = await this.dependencies.billItemRepository.listByBillVersionId(
+        version.id,
+      );
+
+      for (const billItem of billItems) {
+        const quotaLines = await this.quotaLineRepository.listByBillItemId(billItem.id);
+
+        if (quotaLines.length === 0) {
+          issues.push({
+            code: "MISSING_QUOTA_LINES",
+            severity: "warning",
+            message: "Bill item has no quota lines",
+            billVersionId: version.id,
+            billItemId: billItem.id,
+            billItemCode: billItem.itemCode,
+            billItemName: billItem.itemName,
+          });
+          continue;
+        }
+
+        for (const quotaLine of quotaLines) {
+          if (quotaLine.unit !== billItem.unit) {
+            issues.push({
+              code: "UNIT_MISMATCH",
+              severity: "warning",
+              message: "Quota line unit does not match bill item unit",
+              billVersionId: version.id,
+              billItemId: billItem.id,
+              billItemCode: billItem.itemCode,
+              billItemName: billItem.itemName,
+              quotaLineId: quotaLine.id,
+              quotaCode: quotaLine.quotaCode,
+              billItemUnit: billItem.unit,
+              quotaUnit: quotaLine.unit,
+            });
+          }
+        }
+      }
+    }
+
+    return {
+      passed: issues.length === 0,
+      issueCount: issues.length,
+      issues,
+    };
+  }
+
   async createQuotaLine(input: {
     projectId: string;
     billVersionId: string;
@@ -75,7 +343,7 @@ export class QuotaLineService {
     materialFee?: number | null;
     machineFee?: number | null;
     contentFactor?: number;
-    sourceMode: string;
+    sourceMode: QuotaLineSourceMode;
     userId: string;
   }): Promise<QuotaLineRecord> {
     const version = await this.assertBillItemInEditableContext(input, "edit");
@@ -130,7 +398,7 @@ export class QuotaLineService {
     materialFee?: number | null;
     machineFee?: number | null;
     contentFactor?: number;
-    sourceMode: string;
+    sourceMode: QuotaLineSourceMode;
     userId: string;
   }): Promise<QuotaLineRecord> {
     const existingQuotaLine = await this.quotaLineRepository.findById(input.quotaLineId);
@@ -304,5 +572,30 @@ export class QuotaLineService {
         "Duplicate quota source is not allowed for the same bill item",
       );
     }
+  }
+
+  private async resolveDefaultStandardSetCode(input: {
+    projectId: string;
+    disciplineCode?: string;
+    allowedDisciplineCodes: Set<string>;
+  }): Promise<string | null> {
+    const disciplines = await this.dependencies.projectDisciplineRepository.listByProjectId(
+      input.projectId,
+    );
+    const enabledDisciplines = disciplines.filter(
+      (discipline) =>
+        discipline.status === "enabled" &&
+        input.allowedDisciplineCodes.has(discipline.disciplineCode),
+    );
+
+    if (input.disciplineCode) {
+      return (
+        enabledDisciplines.find(
+          (discipline) => discipline.disciplineCode === input.disciplineCode,
+        )?.defaultStandardSetCode ?? null
+      );
+    }
+
+    return enabledDisciplines[0]?.defaultStandardSetCode ?? null;
   }
 }

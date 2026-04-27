@@ -555,6 +555,86 @@ select {
   padding: 0 14px;
 }
 
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.form-field select,
+.form-field input {
+  min-height: 42px;
+  border-radius: 8px;
+  border: 1px solid rgba(28, 36, 32, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0 12px;
+  color: #1c2420;
+}
+
+.button-field {
+  justify-content: flex-end;
+}
+
+.primary-button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.primary-button.secondary {
+  background: #1c2420;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+
+.data-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(28, 36, 32, 0.08);
+  text-align: left;
+}
+
+.data-table th {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .highlight-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -610,6 +690,7 @@ select {
   .stat-grid,
   .summary-grid,
   .detail-grid,
+  .form-grid,
   .highlight-grid {
     grid-template-columns: 1fr;
   }

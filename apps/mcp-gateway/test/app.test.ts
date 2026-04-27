@@ -115,6 +115,41 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         ],
       },
       {
+        name: "stage-context",
+        uri: "/v1/resources/stage-context",
+        mode: "read",
+        description: "Stage-scoped project summary and latest knowledge context",
+        parameters: [
+          "projectId",
+          "stageCode",
+          "disciplineCode?",
+          "knowledgeLimit?",
+        ],
+      },
+      {
+        name: "bill-version-context",
+        uri: "/v1/resources/bill-version-context",
+        mode: "read",
+        description:
+          "Bill-version-scoped summary, variance details, and latest knowledge context",
+        parameters: [
+          "projectId",
+          "billVersionId",
+          "stageCode?",
+          "disciplineCode?",
+          "detailsLimit?",
+          "knowledgeLimit?",
+        ],
+      },
+      {
+        name: "knowledge-search",
+        uri: "/v1/resources/knowledge-search",
+        mode: "read",
+        description:
+          "Search project knowledge entries through the API knowledge-search endpoint",
+        parameters: ["projectId", "q", "sourceType?", "stageCode?", "limit?"],
+      },
+      {
         name: "job-status",
         uri: "/v1/resources/job-status",
         mode: "read",
@@ -658,6 +693,206 @@ test("GET /v1/resources/project-context includes optional job status snapshot", 
         stageCounts: {},
       },
       latestKnowledgeEntries: [],
+    },
+  });
+
+  await app.close();
+});
+
+test("GET /v1/resources/stage-context aggregates stage summary and knowledge", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchProjectSummary: async (query) => {
+        requests.push({ resource: "summary", ...query });
+        return {
+          projectId: query.projectId,
+          stageCode: query.stageCode,
+          totalFinalAmount: 4560,
+        };
+      },
+      fetchKnowledgeEntries: async (query) => {
+        requests.push({ resource: "knowledge", ...query });
+        return {
+          items: [{ id: "knowledge-entry-001", title: "stage-risk" }],
+          summary: { totalCount: 1 },
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/stage-context?projectId=project-001&stageCode=estimate&disciplineCode=building&knowledgeLimit=2",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "stage_context",
+    scope: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+    data: {
+      projectSummary: {
+        projectId: "project-001",
+        stageCode: "estimate",
+        totalFinalAmount: 4560,
+      },
+      latestKnowledgeSummary: {
+        totalCount: 1,
+      },
+      latestKnowledgeEntries: [{ id: "knowledge-entry-001", title: "stage-risk" }],
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      resource: "summary",
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+    {
+      resource: "knowledge",
+      projectId: "project-001",
+      stageCode: "estimate",
+      limit: 2,
+    },
+  ]);
+
+  await app.close();
+});
+
+test("GET /v1/resources/bill-version-context aggregates version summary details and knowledge", async () => {
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchProjectSummary: async (query) => ({
+        projectId: query.projectId,
+        billVersionId: query.billVersionId,
+        totalFinalAmount: 7890,
+      }),
+      fetchSummaryDetails: async (query) => ({
+        items: [{ itemId: "bill-item-001", varianceAmount: 120 }],
+        query,
+      }),
+      fetchKnowledgeEntries: async () => ({
+        items: [{ id: "knowledge-entry-001", title: "version-review" }],
+        summary: { totalCount: 1 },
+      }),
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/bill-version-context?projectId=project-001&billVersionId=bill-version-001&stageCode=estimate&disciplineCode=building&detailsLimit=3&knowledgeLimit=2",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "bill_version_context",
+    scope: {
+      projectId: "project-001",
+      billVersionId: "bill-version-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+    data: {
+      projectSummary: {
+        projectId: "project-001",
+        billVersionId: "bill-version-001",
+        totalFinalAmount: 7890,
+      },
+      summaryDetails: {
+        items: [{ itemId: "bill-item-001", varianceAmount: 120 }],
+        query: {
+          projectId: "project-001",
+          billVersionId: "bill-version-001",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          limit: 3,
+        },
+      },
+      latestKnowledgeSummary: {
+        totalCount: 1,
+      },
+      latestKnowledgeEntries: [
+        { id: "knowledge-entry-001", title: "version-review" },
+      ],
+    },
+  });
+
+  await app.close();
+});
+
+test("GET /v1/resources/knowledge-search proxies knowledge search with scope", async () => {
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      searchKnowledgeEntries: async (query) => ({
+        items: [{ id: "knowledge-entry-001", title: "review threshold" }],
+        summary: { totalCount: 1 },
+        query,
+      }),
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/knowledge-search?projectId=project-001&q=review&sourceType=review_submission&stageCode=estimate&limit=5",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "knowledge_search",
+    scope: {
+      projectId: "project-001",
+      q: "review",
+      sourceType: "review_submission",
+      stageCode: "estimate",
+    },
+    data: {
+      items: [{ id: "knowledge-entry-001", title: "review threshold" }],
+      summary: { totalCount: 1 },
+      query: {
+        projectId: "project-001",
+        q: "review",
+        sourceType: "review_submission",
+        stageCode: "estimate",
+        limit: 5,
+      },
     },
   });
 

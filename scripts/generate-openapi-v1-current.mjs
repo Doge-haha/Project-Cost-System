@@ -21,6 +21,10 @@ const queryParameterMap = new Map([
   ["/v1/price-versions/:priceVersionId/items", ["quotaCode"]],
   ["/v1/projects", ["page", "pageSize"]],
   ["/v1/projects/:projectId/audit-logs", ["resourceType", "resourceId", "resourceIdPrefix", "action", "operatorId", "createdFrom", "createdTo", "limit"]],
+  ["/v1/projects/:projectId/ai/recommendations", ["recommendationType", "resourceType", "resourceId", "status", "stageCode", "disciplineCode", "limit"]],
+  ["/v1/projects/:projectId/ai/bill-recommendations", ["resourceType", "resourceId", "status", "stageCode", "disciplineCode", "limit"]],
+  ["/v1/projects/:projectId/ai/quota-recommendations", ["resourceType", "resourceId", "status", "stageCode", "disciplineCode", "limit"]],
+  ["/v1/projects/:projectId/ai/variance-warnings", ["resourceType", "resourceId", "status", "stageCode", "disciplineCode", "limit"]],
   ["/v1/projects/:projectId/bill-versions", ["stageCode", "disciplineCode"]],
   ["/v1/projects/:projectId/import-tasks/:taskId/error-report", ["failureReason", "format"]],
   ["/v1/projects/:projectId/knowledge-entries", ["sourceJobId", "sourceType", "sourceAction", "stageCode", "limit"]],
@@ -40,7 +44,8 @@ const enumQueryParameters = new Map([
   ["documentType", ["change_order", "site_visa", "progress_payment"]],
   ["format", ["json", "csv"]],
   ["jobType", ["report_export", "project_recalculate", "knowledge_extraction"]],
-  ["status", ["queued", "processing", "completed", "failed", "pending", "approved", "rejected", "cancelled", "draft", "submitted"]],
+  ["recommendationType", ["bill_recommendation", "quota_recommendation", "variance_warning"]],
+  ["status", ["queued", "processing", "completed", "failed", "pending", "approved", "rejected", "cancelled", "draft", "submitted", "generated", "accepted", "ignored", "expired"]],
 ]);
 
 const parameterDescriptions = new Map([
@@ -61,6 +66,7 @@ const parameterDescriptions = new Map([
   ["pageSize", "Page size."],
   ["projectId", "Project id."],
   ["q", "Search query."],
+  ["recommendationType", "AI recommendation type."],
   ["regionCode", "Region code."],
   ["resourceIdPrefix", "Resource id prefix filter."],
   ["stageCode", "Project stage code."],
@@ -73,6 +79,7 @@ const tagRules = [
   ["Reports", (route) => route.path.startsWith("/v1/reports")],
   ["Background Jobs", (route) => route.path.startsWith("/v1/jobs") || route.path.endsWith("/recalculate")],
   ["AI Runtime", (route) => route.path.includes("/ai-runtime")],
+  ["AI Recommendations", (route) => route.path.includes("/ai/recommendations") || route.path.includes("/ai/bill-recommendations") || route.path.includes("/ai/quota-recommendations") || route.path.includes("/ai/variance-warnings")],
   ["Import Tasks", (route) => route.path.includes("/import-tasks")],
   ["Knowledge", (route) => route.path.includes("/knowledge") || route.path.includes("/memory")],
   ["Reviews", (route) => route.path.includes("/reviews")],
@@ -279,7 +286,10 @@ function successStatusFor(route) {
       route.path.endsWith("/quota-lines") ||
       route.path.endsWith("/projects") ||
       route.path.endsWith("/process-documents") ||
-      route.path.endsWith("/reviews"))
+      route.path.endsWith("/reviews") ||
+      route.path.endsWith("/ai/bill-recommendations") ||
+      route.path.endsWith("/ai/quota-recommendations") ||
+      route.path.endsWith("/ai/variance-warnings"))
   ) {
     return "201";
   }

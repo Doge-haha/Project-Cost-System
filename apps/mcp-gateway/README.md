@@ -38,6 +38,9 @@ npm --workspace @saas-pricing/mcp-gateway run typecheck
 - `summary-details`
 - `jobs-summary`
 - `project-context`
+- `stage-context`
+- `bill-version-context`
+- `knowledge-search`
 - `job-status`
 - `knowledge-extraction-history`
 - `knowledge-extraction-result`

@@ -106,6 +106,15 @@ test("database migrations create pricing, fee, and audit tables", async () => {
     await runtime.pool.query(
       "insert into memory_entry (id, project_id, stage_code, source_job_id, memory_key, subject_type, subject_id, content, metadata, created_at) values ('memory-entry-001', 'project-001', 'estimate', 'background-job-001', 'project-001:user-001:review_submission:reject', 'user', 'user-001', 'review_submission:reject', '{\"resourceType\":\"review_submission\"}', '2026-04-19T10:00:00.000Z')",
     );
+    await runtime.pool.query(
+      "insert into skill_definition (id, skill_code, skill_name, description, status, runtime_config, created_at, updated_at) values ('skill-definition-001', 'quota-recommendation', '定额推荐', 'AI 定额推荐技能预留', 'active', '{\"entry\":\"quota\"}', '2026-04-19T10:00:00.000Z', '2026-04-19T10:00:00.000Z')",
+    );
+    await runtime.pool.query(
+      "insert into knowledge_relation (id, project_id, from_type, from_id, to_type, to_id, relation_type, metadata, created_at) values ('knowledge-relation-001', 'project-001', 'knowledge_entry', 'knowledge-entry-001', 'memory_entry', 'memory-entry-001', 'derived_memory', '{\"confidence\":0.9}', '2026-04-19T10:00:00.000Z')",
+    );
+    await runtime.pool.query(
+      "insert into ai_recommendation (id, project_id, stage_code, discipline_code, resource_type, resource_id, recommendation_type, input_payload, output_payload, status, created_by, handled_by, handled_at, status_reason, created_at, updated_at) values ('ai-recommendation-001', 'project-001', 'estimate', 'building', 'bill_item', 'bill-item-001', 'quota_recommendation', '{\"itemName\":\"土方工程\"}', '{\"quotaCode\":\"010101\"}', 'generated', 'user-001', null, null, null, '2026-04-19T10:00:00.000Z', '2026-04-19T10:00:00.000Z')",
+    );
 
     const priceItems = await runtime.pool.query(
       "select id, price_version_id, total_unit_price from price_item",
@@ -130,6 +139,15 @@ test("database migrations create pricing, fee, and audit tables", async () => {
     );
     const memoryEntries = await runtime.pool.query(
       "select id, subject_type, subject_id from memory_entry",
+    );
+    const skillDefinitions = await runtime.pool.query(
+      "select id, skill_code, status from skill_definition",
+    );
+    const knowledgeRelations = await runtime.pool.query(
+      "select id, from_type, to_type, relation_type from knowledge_relation",
+    );
+    const aiRecommendations = await runtime.pool.query(
+      "select id, recommendation_type, status from ai_recommendation",
     );
 
     assert.deepEqual(priceItems.rows, [
@@ -187,6 +205,28 @@ test("database migrations create pricing, fee, and audit tables", async () => {
         id: "memory-entry-001",
         subjectType: "user",
         subjectId: "user-001",
+      },
+    ]);
+    assert.deepEqual(skillDefinitions.rows, [
+      {
+        id: "skill-definition-001",
+        skillCode: "quota-recommendation",
+        status: "active",
+      },
+    ]);
+    assert.deepEqual(knowledgeRelations.rows, [
+      {
+        id: "knowledge-relation-001",
+        fromType: "knowledge_entry",
+        toType: "memory_entry",
+        relationType: "derived_memory",
+      },
+    ]);
+    assert.deepEqual(aiRecommendations.rows, [
+      {
+        id: "ai-recommendation-001",
+        recommendationType: "quota_recommendation",
+        status: "generated",
       },
     ]);
   } finally {

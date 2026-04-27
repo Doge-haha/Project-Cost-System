@@ -1397,6 +1397,68 @@ test("GET /v1/reports/summary aggregates project totals using system and final a
   await app.close();
 });
 
+test("GET /v1/reports/summary and /details support tax excluded mode", async () => {
+  const app = createPricingApp({
+    projectDefaults: {
+      defaultPriceVersionId: "price-version-001",
+      defaultFeeTemplateId: "fee-template-001",
+    },
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  await app.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+    },
+  });
+
+  const summaryResponse = await app.inject({
+    method: "GET",
+    url: "/v1/reports/summary?projectId=project-001&billVersionId=bill-version-001&taxMode=tax_excluded",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(summaryResponse.statusCode, 200);
+  assert.equal(summaryResponse.json().taxMode, "tax_excluded");
+  assert.equal(summaryResponse.json().totalSystemAmount, 1080);
+  assert.equal(summaryResponse.json().totalFinalAmount, 1166.4);
+  assert.equal(summaryResponse.json().totalTaxAmount, 32.4);
+  assert.equal(summaryResponse.json().varianceAmount, 86.4);
+  assert.equal(summaryResponse.json().varianceRate, 0.08);
+
+  const detailsResponse = await app.inject({
+    method: "GET",
+    url: "/v1/reports/summary/details?projectId=project-001&billVersionId=bill-version-001&taxMode=tax_excluded&limit=1",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(detailsResponse.statusCode, 200);
+  assert.equal(detailsResponse.json().taxMode, "tax_excluded");
+  assert.equal(detailsResponse.json().items[0].systemAmount, 1080);
+  assert.equal(detailsResponse.json().items[0].finalAmount, 1166.4);
+  assert.equal(detailsResponse.json().items[0].taxAmount, 32.4);
+  assert.equal(detailsResponse.json().items[0].varianceAmount, 86.4);
+  assert.equal(detailsResponse.json().items[0].varianceRate, 0.08);
+
+  await app.close();
+});
+
 test("POST /v1/projects/:id/recalculate recalculates all authorized versions in scope", async () => {
   const backgroundJobSink = new RecordingBackgroundJobSink();
   const app = createPricingApp({

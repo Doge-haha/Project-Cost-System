@@ -28,6 +28,25 @@ export const projectContextQuerySchema = projectSummaryQuerySchema.extend({
   jobId: z.string().min(1).optional(),
 });
 
+export const stageContextQuerySchema = projectSummaryQuerySchema.extend({
+  stageCode: z.string().min(1),
+  knowledgeLimit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+export const billVersionContextQuerySchema = projectSummaryQuerySchema.extend({
+  billVersionId: z.string().min(1),
+  detailsLimit: z.coerce.number().int().positive().max(100).optional(),
+  knowledgeLimit: z.coerce.number().int().positive().max(100).optional(),
+});
+
+export const knowledgeSearchQuerySchema = z.object({
+  projectId: z.string().min(1),
+  q: z.string().min(1),
+  sourceType: z.string().min(1).optional(),
+  stageCode: z.string().min(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
 export const recalculateProjectToolSchema = z.object({
   projectId: z.string().min(1),
   stageCode: z.string().min(1).optional(),

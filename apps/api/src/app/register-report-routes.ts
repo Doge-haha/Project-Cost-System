@@ -15,6 +15,7 @@ const summaryQuerySchema = z.object({
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
   unitCode: z.string().min(1).optional(),
+  taxMode: z.enum(["tax_included", "tax_excluded"]).optional(),
 });
 
 const summaryDetailQuerySchema = z.object({
@@ -23,6 +24,7 @@ const summaryDetailQuerySchema = z.object({
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
   unitCode: z.string().min(1).optional(),
+  taxMode: z.enum(["tax_included", "tax_excluded"]).optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
@@ -58,6 +60,7 @@ export function registerReportRoutes(
         stageCode: query.stageCode,
         disciplineCode: query.disciplineCode,
         unitCode: query.unitCode,
+        taxMode: query.taxMode,
         userId: request.currentUser!.id,
       }),
     );
@@ -73,6 +76,7 @@ export function registerReportRoutes(
         stageCode: query.stageCode,
         disciplineCode: query.disciplineCode,
         unitCode: query.unitCode,
+        taxMode: query.taxMode,
         limit: query.limit,
         userId: request.currentUser!.id,
       }),

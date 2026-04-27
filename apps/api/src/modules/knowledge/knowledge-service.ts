@@ -40,6 +40,8 @@ type ExtractionBatchResult = {
   };
 };
 
+type RecommendationFeedbackStatus = "accepted" | "ignored" | "expired";
+
 export class KnowledgeService {
   constructor(
     private readonly knowledgeEntryRepository: KnowledgeEntryRepository,
@@ -233,6 +235,90 @@ export class KnowledgeService {
       knowledgeEntries,
       memoryEntries,
     };
+  }
+
+  async persistRecommendationFeedback(input: {
+    projectId: string;
+    stageCode?: string | null;
+    recommendationId: string;
+    recommendationType: string;
+    resourceType: string;
+    resourceId: string;
+    status: RecommendationFeedbackStatus;
+    reason?: string | null;
+    operatorId: string;
+    outputPayload?: Record<string, unknown>;
+  }): Promise<{
+    knowledgeEntry: KnowledgeEntryRecord;
+    memoryEntries: MemoryEntryRecord[];
+  }> {
+    const createdAt = new Date().toISOString();
+    const summary = [
+      `AI recommendation ${input.recommendationType} was ${input.status}.`,
+      `Resource ${input.resourceType}/${input.resourceId}.`,
+      input.reason ? `Reason: ${input.reason}.` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const metadata = {
+      recommendationId: input.recommendationId,
+      recommendationType: input.recommendationType,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+      status: input.status,
+      reason: input.reason ?? null,
+      outputPayload: input.outputPayload ?? {},
+    };
+
+    const knowledgeEntry = await this.knowledgeEntryRepository.create({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: null,
+      sourceType: "ai_recommendation",
+      sourceAction: input.status,
+      title: "AI recommendation feedback",
+      summary,
+      tags: ["ai_recommendation", input.status, input.recommendationType],
+      metadata,
+      createdAt,
+    });
+
+    const userMemoryEntry = await this.memoryEntryRepository.create({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: null,
+      memoryKey: [
+        input.projectId,
+        input.operatorId,
+        "ai_recommendation",
+        input.status,
+      ].join(":"),
+      subjectType: "user",
+      subjectId: input.operatorId,
+      content: summary,
+      metadata,
+      createdAt,
+    });
+
+    const projectMemoryEntry = await this.memoryEntryRepository.create({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: null,
+      memoryKey: [input.projectId, "project", "ai_recommendation", input.status].join(
+        ":",
+      ),
+      subjectType: "project",
+      subjectId: input.projectId,
+      content: summary,
+      metadata: {
+        ...metadata,
+        operatorId: input.operatorId,
+      },
+      createdAt,
+    });
+
+    return { knowledgeEntry, memoryEntries: [userMemoryEntry, projectMemoryEntry] };
   }
 
   private async assertProjectVisible(projectId: string, userId: string): Promise<void> {

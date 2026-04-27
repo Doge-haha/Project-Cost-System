@@ -11,6 +11,9 @@ export type BillTableRow = {
   isLeaf: boolean;
   quantity: number | string;
   unit: string;
+  systemUnitPrice: number | string | null;
+  manualUnitPrice: number | string | null;
+  finalUnitPrice: number | string | null;
   systemAmount: number | string | null;
   finalAmount: number | string | null;
 };
@@ -41,6 +44,9 @@ export function buildBillTableRows(items: BillItem[]): BillTableRow[] {
     isLeaf: !parentIds.has(item.id),
     quantity: item.quantity,
     unit: item.unit,
+    systemUnitPrice: item.systemUnitPrice ?? null,
+    manualUnitPrice: item.manualUnitPrice ?? null,
+    finalUnitPrice: item.finalUnitPrice ?? null,
     systemAmount: item.systemAmount ?? null,
     finalAmount: item.finalAmount ?? null,
   }));
@@ -99,6 +105,9 @@ export function BillItemsTable(props: { items: BillItem[] }) {
             <th>名称</th>
             <th>工程量</th>
             <th>单位</th>
+            <th>系统单价</th>
+            <th>人工单价</th>
+            <th>最终单价</th>
             <th>系统金额</th>
             <th>最终金额</th>
             <th>节点类型</th>
@@ -146,6 +155,9 @@ export function BillItemsTable(props: { items: BillItem[] }) {
               </td>
               <td>{row.quantity}</td>
               <td>{row.unit}</td>
+              <td>{formatMoney(row.systemUnitPrice)}</td>
+              <td>{formatMoney(row.manualUnitPrice)}</td>
+              <td>{formatMoney(row.finalUnitPrice)}</td>
               <td>{formatMoney(row.systemAmount)}</td>
               <td>{formatMoney(row.finalAmount)}</td>
               <td>{row.isLeaf ? "叶子节点" : "父级节点"}</td>

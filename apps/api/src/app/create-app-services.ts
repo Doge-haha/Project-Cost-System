@@ -24,6 +24,7 @@ import { ReviewSubmissionService } from "../modules/review/review-submission-ser
 import { AuditLogService } from "../modules/audit/audit-log-service.js";
 import { ProcessDocumentService } from "../modules/process/process-document-service.js";
 import { AiRuntimePreviewService } from "../modules/ai/ai-runtime-preview-service.js";
+import { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import { KnowledgeService } from "../modules/knowledge/knowledge-service.js";
 import { ImportTaskService } from "../modules/import/import-task-service.js";
 import type { AppRepositories } from "./create-app-repositories.js";
@@ -33,6 +34,7 @@ export type AppServices = {
   auditLogService: AuditLogService;
   backgroundJobService: BackgroundJobService;
   aiRuntimePreviewService: AiRuntimePreviewService;
+  aiRecommendationService: AiRecommendationService;
   projectService: ProjectService;
   billVersionService: BillVersionService;
   billItemService: BillItemService;
@@ -149,6 +151,7 @@ export function createAppServices(
       billItemService,
       billItemRepository: repositories.billItem,
       billVersionService,
+      projectDisciplineRepository: repositories.projectDiscipline,
     },
     auditLogService,
   );
@@ -156,6 +159,42 @@ export function createAppServices(
   const priceItemService = new PriceItemService(repositories.priceItem, {
     priceVersionRepository: repositories.priceVersion,
   });
+  const feeTemplateService = new FeeTemplateService(
+    repositories.feeTemplate,
+    repositories.feeRule,
+  );
+  const summaryService = new SummaryService({
+    projectRepository: repositories.project,
+    projectStageRepository: repositories.projectStage,
+    projectDisciplineRepository: repositories.projectDiscipline,
+    projectMemberRepository: repositories.projectMember,
+    billVersionRepository: repositories.billVersion,
+    billItemRepository: repositories.billItem,
+    feeTemplateRepository: repositories.feeTemplate,
+    feeRuleRepository: repositories.feeRule,
+  });
+  const knowledgeService = new KnowledgeService(
+    repositories.knowledgeEntry,
+    repositories.memoryEntry,
+    repositories.project,
+    repositories.projectStage,
+    repositories.projectDiscipline,
+    repositories.projectMember,
+  );
+  const aiRecommendationService = new AiRecommendationService(
+    repositories.aiRecommendation,
+    {
+      projectRepository: repositories.project,
+      projectStageRepository: repositories.projectStage,
+      projectDisciplineRepository: repositories.projectDiscipline,
+      projectMemberRepository: repositories.projectMember,
+      billItemService,
+      quotaLineService,
+      summaryService,
+      knowledgeService,
+    },
+    auditLogService,
+  );
   const calculateService = new CalculateService(
     {
       projectRepository: repositories.project,
@@ -172,26 +211,6 @@ export function createAppServices(
       billVersionService,
     },
     auditLogService,
-  );
-  const feeTemplateService = new FeeTemplateService(
-    repositories.feeTemplate,
-    repositories.feeRule,
-  );
-  const summaryService = new SummaryService({
-    projectRepository: repositories.project,
-    projectStageRepository: repositories.projectStage,
-    projectDisciplineRepository: repositories.projectDiscipline,
-    projectMemberRepository: repositories.projectMember,
-    billVersionRepository: repositories.billVersion,
-    billItemRepository: repositories.billItem,
-  });
-  const knowledgeService = new KnowledgeService(
-    repositories.knowledgeEntry,
-    repositories.memoryEntry,
-    repositories.project,
-    repositories.projectStage,
-    repositories.projectDiscipline,
-    repositories.projectMember,
   );
   const reportExportTaskService = new ReportExportTaskService(
     repositories.reportExportTask,
@@ -284,6 +303,7 @@ export function createAppServices(
     auditLogService,
     backgroundJobService,
     aiRuntimePreviewService,
+    aiRecommendationService,
     projectService,
     billVersionService,
     billItemService,

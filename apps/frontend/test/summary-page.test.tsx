@@ -20,6 +20,26 @@ function createJsonResponse(body: unknown) {
   });
 }
 
+function createEmptyAiRecommendationResponse() {
+  return createJsonResponse({
+    items: [],
+    summary: {
+      totalCount: 0,
+      statusCounts: {
+        generated: 0,
+        accepted: 0,
+        ignored: 0,
+        expired: 0,
+      },
+      typeCounts: {
+        bill_recommendation: 0,
+        quota_recommendation: 0,
+        variance_warning: 0,
+      },
+    },
+  });
+}
+
 describe("SummaryPage", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
@@ -75,6 +95,10 @@ describe("SummaryPage", () => {
         });
       }
 
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -95,6 +119,93 @@ describe("SummaryPage", () => {
       "/projects/project-001",
     );
     expect(screen.getByText("当前项目：新点造价项目（XM-001）")).toBeInTheDocument();
+  });
+
+  test("renders tax excluded summary mode and tax amount", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        expect(url.searchParams.get("taxMode")).toBe("tax_excluded");
+        return createJsonResponse({
+          totalSystemAmount: 1080,
+          totalFinalAmount: 1166.4,
+          varianceAmount: 86.4,
+          varianceRate: 0.08,
+          totalTaxAmount: 32.4,
+          taxMode: "tax_excluded",
+          itemCount: 1,
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary/details") {
+        expect(url.searchParams.get("taxMode")).toBe("tax_excluded");
+        return createJsonResponse({
+          items: [
+            {
+              itemId: "bill-item-001",
+              itemCode: "A.1",
+              itemName: "土石方工程",
+              systemAmount: 1080,
+              finalAmount: 1166.4,
+              varianceAmount: 86.4,
+              taxAmount: 32.4,
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/projects/project-001/summary?billVersionId=version-001&taxMode=tax_excluded",
+        ]}
+      >
+        <Routes>
+          <Route path="/projects/:projectId/summary" element={<SummaryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("combobox", { name: "计税口径" })).toHaveValue(
+        "tax_excluded",
+      );
+    });
+
+    expect(screen.getByText("已剔除税金")).toBeInTheDocument();
+    expect(screen.getAllByText("32.40").length).toBeGreaterThan(0);
+    expect(screen.getByText("税金 32.40")).toBeInTheDocument();
   });
 
   test("renders full version compare table when compare query is present", async () => {
@@ -144,6 +255,10 @@ describe("SummaryPage", () => {
             },
           ],
         });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
       }
 
       if (url.pathname === "/v1/reports/version-compare") {
@@ -209,6 +324,114 @@ describe("SummaryPage", () => {
     expect(within(compareTable).getByText("121.20")).toBeInTheDocument();
   });
 
+  test("renders generated AI variance warnings on the summary page", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        return createJsonResponse({
+          totalSystemAmount: 1000,
+          totalFinalAmount: 1400,
+          varianceAmount: 400,
+          itemCount: 2,
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary/details") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        expect(url.searchParams.get("recommendationType")).toBe("variance_warning");
+        expect(url.searchParams.get("status")).toBe("generated");
+        return createJsonResponse({
+          items: [
+            {
+              id: "ai-rec-001",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "bill_item",
+              resourceId: "bill-item-001",
+              recommendationType: "variance_warning",
+              inputPayload: {},
+              outputPayload: {
+                billVersionId: "version-001",
+                itemCode: "A-001",
+                itemName: "土方工程",
+                warning: "清单最终金额与系统金额偏差超过阈值",
+                varianceAmount: 400,
+              },
+              status: "generated",
+              createdBy: "engineer-001",
+              createdAt: "2026-04-27T00:00:00.000Z",
+              updatedAt: "2026-04-27T00:00:00.000Z",
+            },
+          ],
+          summary: {
+            totalCount: 1,
+            statusCounts: {
+              generated: 1,
+              accepted: 0,
+              ignored: 0,
+              expired: 0,
+            },
+            typeCounts: {
+              bill_recommendation: 0,
+              quota_recommendation: 0,
+              variance_warning: 1,
+            },
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/summary?billVersionId=version-001"]}>
+        <Routes>
+          <Route path="/projects/:projectId/summary" element={<SummaryPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "AI 偏差预警" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("当前还有 1 条待处理预警，来自 AI 推荐结果缓存。")).toBeInTheDocument();
+    expect(screen.getByText("土方工程")).toBeInTheDocument();
+    expect(screen.getAllByText("400.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("link", { name: "查看全部预警" })).toHaveAttribute(
+      "href",
+      "/projects/project-001/ai-recommendations?recommendationType=variance_warning&status=generated",
+    );
+  });
+
   test("creates report export task, refreshes status, and exposes download", async () => {
     const createObjectUrl = vi.fn(() => "blob:report-export");
     const revokeObjectUrl = vi.fn();
@@ -261,6 +484,10 @@ describe("SummaryPage", () => {
             },
           ],
         });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createEmptyAiRecommendationResponse();
       }
 
       if (url.pathname === "/v1/reports/export" && init?.method === "POST") {

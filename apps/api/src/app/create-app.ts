@@ -17,6 +17,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
   registerProjectRoutes(app, {
     transactionRunner: services.transactionRunner,
     aiRuntimePreviewService: services.aiRuntimePreviewService,
+    aiRecommendationService: services.aiRecommendationService,
     backgroundJobService: services.backgroundJobService,
     projectService: services.projectService,
     auditLogService: services.auditLogService,

@@ -78,6 +78,10 @@ import {
   InMemoryImportTaskRepository,
   type ImportTaskRepository,
 } from "../modules/import/import-task-repository.js";
+import {
+  InMemoryAiRecommendationRepository,
+  type AiRecommendationRepository,
+} from "../modules/ai/ai-recommendation-repository.js";
 
 export type AppRepositories = {
   project: ProjectRepository;
@@ -100,6 +104,7 @@ export type AppRepositories = {
   reportExportTask: ReportExportTaskRepository;
   backgroundJob: BackgroundJobRepository;
   importTask: ImportTaskRepository;
+  aiRecommendation: AiRecommendationRepository;
 };
 
 export type CreateAppRepositoryOptions = {
@@ -123,6 +128,7 @@ export type CreateAppRepositoryOptions = {
   reportExportTaskRepository?: ReportExportTaskRepository;
   backgroundJobRepository?: BackgroundJobRepository;
   importTaskRepository?: ImportTaskRepository;
+  aiRecommendationRepository?: AiRecommendationRepository;
 };
 
 export function createAppRepositories(
@@ -169,5 +175,8 @@ export function createAppRepositories(
       new InMemoryBackgroundJobRepository([]),
     importTask:
       options.importTaskRepository ?? new InMemoryImportTaskRepository([]),
+    aiRecommendation:
+      options.aiRecommendationRepository ??
+      new InMemoryAiRecommendationRepository([]),
   };
 }

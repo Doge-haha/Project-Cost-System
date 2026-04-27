@@ -780,6 +780,11 @@ export function ProjectDetailPage() {
         >
           <h3>最近动态</h3>
           <p className="page-description">最近 8 条项目操作时间线</p>
+          <p className="page-description">
+            <Link className="breadcrumbs-link" to={`/projects/${projectId}/audit-logs`}>
+              查看全部审计日志
+            </Link>
+          </p>
           {activityCopyMessage ? (
             <div className="version-card-actions">
               <p className="page-description">{activityCopyMessage}</p>
@@ -974,6 +979,24 @@ export function ProjectDetailPage() {
                 <h3>查看汇总页</h3>
                 <p className="page-description">
                   当前版本汇总、系统值、最终值与偏差摘要
+                </p>
+              </Link>
+              <Link className="project-link" to={navigation.auditLogsPath}>
+                <h3>查看审计日志</h3>
+                <p className="page-description">
+                  按资源、动作、操作人和时间追溯项目关键变更
+                </p>
+              </Link>
+              <Link className="project-link" to={navigation.knowledgePath}>
+                <h3>查看知识与记忆</h3>
+                <p className="page-description">
+                  查看 AI 抽取的项目经验、风险提示和长期偏好
+                </p>
+              </Link>
+              <Link className="project-link" to={navigation.aiRecommendationsPath}>
+                <h3>查看 AI 推荐</h3>
+                <p className="page-description">
+                  处理清单推荐、定额推荐和偏差预警
                 </p>
               </Link>
             </div>

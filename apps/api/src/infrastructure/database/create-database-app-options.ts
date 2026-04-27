@@ -21,6 +21,7 @@ import { DbReportExportTaskRepository } from "../../modules/reports/report-expor
 import { DbKnowledgeEntryRepository } from "../../modules/knowledge/knowledge-entry-repository.js";
 import { DbMemoryEntryRepository } from "../../modules/knowledge/memory-entry-repository.js";
 import { DbImportTaskRepository } from "../../modules/import/import-task-repository.js";
+import { DbAiRecommendationRepository } from "../../modules/ai/ai-recommendation-repository.js";
 import { createTransactionRunner } from "../../shared/tx/transaction.js";
 import { createDatabaseClient } from "./database-client.js";
 import { parseDatabaseConfig } from "./database-config.js";
@@ -76,6 +77,7 @@ export function createDatabaseAppOptions(
       reportExportTaskRepository: new DbReportExportTaskRepository(client.db),
       knowledgeEntryRepository: new DbKnowledgeEntryRepository(client.db),
       memoryEntryRepository: new DbMemoryEntryRepository(client.db),
+      aiRecommendationRepository: new DbAiRecommendationRepository(client.db),
       auditLogRepository: new DbAuditLogRepository(client.db),
     },
     close: async () => {

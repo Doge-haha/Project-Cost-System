@@ -1143,6 +1143,85 @@ test("PUT /v1/projects/:id/default-pricing-config updates project default price 
   await app.close();
 });
 
+test("PUT /v1/projects/:id/default-price-version and /default-fee-template update defaults independently", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(
+      seededProjects.map((project) => ({
+        ...project,
+        defaultPriceVersionId: null,
+        defaultFeeTemplateId: null,
+      })),
+    ),
+    projectStageRepository: new InMemoryProjectStageRepository(seededStages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      seededDisciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(seededMembers),
+    priceVersionRepository: new InMemoryPriceVersionRepository(
+      seededPriceVersions,
+    ),
+    feeTemplateRepository: new InMemoryFeeTemplateRepository(
+      seededFeeTemplates,
+    ),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const priceResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/default-price-version",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      defaultPriceVersionId: "price-version-001",
+    },
+  });
+
+  assert.equal(priceResponse.statusCode, 200);
+  assert.equal(priceResponse.json().defaultPriceVersionId, "price-version-001");
+  assert.equal(priceResponse.json().defaultFeeTemplateId, null);
+
+  const feeResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/default-fee-template",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      defaultFeeTemplateId: "fee-template-001",
+    },
+  });
+
+  assert.equal(feeResponse.statusCode, 200);
+  assert.equal(feeResponse.json().defaultPriceVersionId, "price-version-001");
+  assert.equal(feeResponse.json().defaultFeeTemplateId, "fee-template-001");
+
+  const clearPriceResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/default-price-version",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      defaultPriceVersionId: null,
+    },
+  });
+
+  assert.equal(clearPriceResponse.statusCode, 200);
+  assert.equal(clearPriceResponse.json().defaultPriceVersionId, null);
+  assert.equal(clearPriceResponse.json().defaultFeeTemplateId, "fee-template-001");
+
+  await app.close();
+});
+
 test("PUT /v1/projects/:id/default-pricing-config rejects non-managers", async () => {
   const app = createApp({
     jwtSecret,

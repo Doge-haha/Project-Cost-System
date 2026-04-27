@@ -218,6 +218,20 @@ describe("project-job-status-utils", () => {
     ).toBe("/projects/project-001/jobs");
   });
 
+  test("builds project job status paths from URLSearchParams", () => {
+    const search = new URLSearchParams("status=failed&failureReason=missing_field");
+    search.set("failedLine", "4");
+
+    expect(
+      buildJobStatusPath({
+        projectId: "project-001",
+        search,
+      }),
+    ).toBe(
+      "/projects/project-001/jobs?status=failed&failureReason=missing_field&failedLine=4",
+    );
+  });
+
   test("builds recent processing link input for copied job status links", () => {
     expect(
       buildRecentJobStatusProcessingLinkInput({

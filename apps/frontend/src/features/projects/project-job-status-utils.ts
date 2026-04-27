@@ -136,7 +136,10 @@ export function buildRecentJobStatusProcessingLinkInput(input: {
       ? `第 ${highlightedLineNo} 条 · ${input.selectedFailedItem?.reasonLabel ?? ""}`
       : null,
     highlightedBatchEntryPath: highlightedLineNo
-      ? `/projects/${input.projectId}/jobs?${highlightedParams.toString()}`
+      ? buildJobStatusPath({
+          projectId: input.projectId,
+          search: highlightedParams,
+        })
       : null,
   };
 }

@@ -459,6 +459,41 @@ select {
   background: rgba(24, 92, 71, 0.06);
 }
 
+.recommendation-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.recommendation-group h3 {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-size: 16px;
+}
+
+.recommendation-card h4 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.recommendation-card.expired {
+  border-color: rgba(161, 63, 55, 0.24);
+  background: rgba(161, 63, 55, 0.06);
+}
+
+.recommendation-expired {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0 0 8px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(161, 63, 55, 0.12);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .summary-actions,
 .compare-actions {
   display: flex;

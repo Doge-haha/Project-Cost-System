@@ -14,7 +14,7 @@
 
 - 这是一份接手开发母计划，不直接替代现有的 [2026-04-16-saas-pricing-v1-implementation.md](/Users/huahaha/Documents/New%20project/docs/superpowers/plans/2026-04-16-saas-pricing-v1-implementation.md:1)。
 - 现有业务拆分文档仍有效，但本计划以“当前真实代码状态”为准，优先解决工程基线、持久化、模块收口问题。
-- 本计划默认不扩大 `legacy/backend-java` 的代码面积，只把它作为规则和数据结构参考。
+- 旧 Java 原型代码已移出仓库；历史规则参考以 `docs/architecture` 中的设计与复盘文档为准。
 - 本计划不把 `apps/frontend` 提前到第一优先级，避免后端口径未稳时产生高返工成本。
 
 ## Current Baseline
@@ -384,4 +384,3 @@ Phase 0
 - [ ] 持久化技术选型已定
 - [ ] Phase 1 的子计划已写完
 - [ ] 本地环境能稳定启动依赖服务
-

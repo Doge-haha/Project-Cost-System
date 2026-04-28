@@ -214,7 +214,7 @@
 
 1. 看 [backend-tech-stack-redecision.md](/Users/huahaha/Documents/New%20project/docs/architecture/backend-tech-stack-redecision.md)
 2. 看 [backend-architecture-redesign.md](/Users/huahaha/Documents/New%20project/docs/architecture/backend-architecture-redesign.md)
-3. 把当前 `apps/backend` 归档为 `legacy/backend-java`
+3. 旧 Java 原型仅保留文档结论，不再作为仓库代码目录维护
 4. 新建：
    - `apps/api`
    - `apps/ai-runtime`

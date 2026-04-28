@@ -266,6 +266,111 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.queryByText("定额推荐 · 已忽略")).not.toBeInTheDocument();
   });
 
+  test("groups recommendations by resource type and highlights expired items", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "ai-recommendation-001",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "bill_item",
+              resourceId: "bill-item-001",
+              recommendationType: "bill_recommendation",
+              inputPayload: {},
+              outputPayload: {
+                itemName: "土方工程",
+                reason: "历史清单匹配",
+              },
+              status: "generated",
+              createdBy: "engineer-001",
+              handledBy: null,
+              handledAt: null,
+              statusReason: null,
+              createdAt: "2026-04-18T11:00:00.000Z",
+              updatedAt: "2026-04-18T11:00:00.000Z",
+            },
+            {
+              id: "ai-recommendation-002",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "bill_item",
+              resourceId: "bill-item-002",
+              recommendationType: "variance_warning",
+              inputPayload: {},
+              outputPayload: {
+                warning: "最终金额偏差超过阈值",
+              },
+              status: "expired",
+              createdBy: "engineer-001",
+              handledBy: "system",
+              handledAt: "2026-04-18T11:30:00.000Z",
+              statusReason: "上游清单版本已变化",
+              createdAt: "2026-04-18T11:10:00.000Z",
+              updatedAt: "2026-04-18T11:30:00.000Z",
+            },
+            {
+              id: "ai-recommendation-003",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "quota_line",
+              resourceId: "quota-line-001",
+              recommendationType: "quota_recommendation",
+              inputPayload: {},
+              outputPayload: {
+                quotaName: "挖土方",
+                reason: "清单名称匹配",
+              },
+              status: "generated",
+              createdBy: "engineer-001",
+              handledBy: null,
+              handledAt: null,
+              statusReason: null,
+              createdAt: "2026-04-18T11:20:00.000Z",
+              updatedAt: "2026-04-18T11:20:00.000Z",
+            },
+          ],
+          summary: {
+            totalCount: 3,
+            statusCounts: {
+              generated: 2,
+              accepted: 0,
+              ignored: 0,
+              expired: 1,
+            },
+            typeCounts: {
+              bill_recommendation: 1,
+              quota_recommendation: 1,
+              variance_warning: 1,
+            },
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("资源 bill_item · 2 条")).toBeInTheDocument();
+    });
+    expect(screen.getByText("资源 quota_line · 1 条")).toBeInTheDocument();
+    expect(screen.getByText("偏差预警 · 已失效")).toBeInTheDocument();
+    expect(screen.getByText("已失效 · 不再建议执行")).toBeInTheDocument();
+    expect(screen.getByText("处理人 system · 原因 上游清单版本已变化")).toBeInTheDocument();
+  });
+
   test("applies recommendation filters", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));

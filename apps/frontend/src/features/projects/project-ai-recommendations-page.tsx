@@ -70,6 +70,10 @@ export function ProjectAiRecommendationsPage() {
   const [acceptTarget, setAcceptTarget] = useState<AiRecommendation | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const activeQuery = useMemo(() => readFilters(searchParams), [searchParams]);
+  const recommendationGroups = useMemo(
+    () => groupRecommendationsByResourceType(state?.recommendations.items ?? []),
+    [state?.recommendations.items],
+  );
 
   async function loadRecommendations() {
     if (!projectId) {
@@ -323,113 +327,130 @@ export function ProjectAiRecommendationsPage() {
         <h2>推荐列表</h2>
         {actionMessage ? <p className="page-description">{actionMessage}</p> : null}
         {state.recommendations.items.length > 0 ? (
-          <div className="project-list">
-            {state.recommendations.items.map((recommendation) => (
-              <article className="project-link" key={recommendation.id}>
-                <h3>
-                  {formatRecommendationType(recommendation.recommendationType)} ·{" "}
-                  {formatRecommendationStatus(recommendation.status)}
-                </h3>
-                <p className="page-description">
-                  {recommendation.resourceType} · {recommendation.resourceId}
-                  {recommendation.stageCode ? ` · ${recommendation.stageCode}` : ""}
-                  {recommendation.disciplineCode
-                    ? ` · ${recommendation.disciplineCode}`
-                    : ""}{" "}
-                  · {formatProjectDateTime(recommendation.createdAt)}
-                </p>
-                <p className="page-description">
-                  {formatRecommendationPayload(recommendation.outputPayload)}
-                </p>
-                {formatRecommendationTrace(recommendation.outputPayload) ? (
-                  <p className="page-description">
-                    {formatRecommendationTrace(recommendation.outputPayload)}
-                  </p>
-                ) : null}
-                {formatRecommendationProvider(recommendation.inputPayload) ? (
-                  <p className="page-description">
-                    {formatRecommendationProvider(recommendation.inputPayload)}
-                  </p>
-                ) : null}
-                <p className="page-description">
-                  生成人 {recommendation.createdBy}
-                </p>
-                {recommendation.status === "generated" ? (
-                  <>
-                    <div className="version-card-actions">
-                      <button
-                        className="connection-button secondary"
-                        disabled={actionTargetId === recommendation.id}
-                        onClick={() => {
-                          void handleRecommendation(recommendation, "ignore");
-                        }}
-                        type="button"
-                      >
-                        忽略
-                      </button>
-                      <button
-                        className="connection-button"
-                        disabled={actionTargetId === recommendation.id}
-                        onClick={() => {
-                          setAcceptTarget(recommendation);
-                          setActionMessage(null);
-                        }}
-                        type="button"
-                      >
-                        接受
-                      </button>
-                    </div>
-                    {acceptTarget?.id === recommendation.id ? (
-                      <div
-                        aria-label="确认接受 AI 推荐"
-                        className="action-confirmation"
-                        role="dialog"
-                      >
+          <div className="recommendation-group-list">
+            {recommendationGroups.map((group) => (
+              <section className="recommendation-group" key={group.resourceType}>
+                <h3>资源 {group.resourceType} · {group.items.length} 条</h3>
+                <div className="project-list">
+                  {group.items.map((recommendation) => (
+                    <article
+                      className={
+                        recommendation.status === "expired"
+                          ? "project-link recommendation-card expired"
+                          : "project-link recommendation-card"
+                      }
+                      key={recommendation.id}
+                    >
+                      <h4>
+                        {formatRecommendationType(recommendation.recommendationType)} ·{" "}
+                        {formatRecommendationStatus(recommendation.status)}
+                      </h4>
+                      {recommendation.status === "expired" ? (
+                        <p className="recommendation-expired">已失效 · 不再建议执行</p>
+                      ) : null}
+                      <p className="page-description">
+                        {recommendation.resourceType} · {recommendation.resourceId}
+                        {recommendation.stageCode ? ` · ${recommendation.stageCode}` : ""}
+                        {recommendation.disciplineCode
+                          ? ` · ${recommendation.disciplineCode}`
+                          : ""}{" "}
+                        · {formatProjectDateTime(recommendation.createdAt)}
+                      </p>
+                      <p className="page-description">
+                        {formatRecommendationPayload(recommendation.outputPayload)}
+                      </p>
+                      {formatRecommendationTrace(recommendation.outputPayload) ? (
                         <p className="page-description">
-                          确认接受后，系统会按该推荐写入正式业务链并保留审计记录。
+                          {formatRecommendationTrace(recommendation.outputPayload)}
                         </p>
+                      ) : null}
+                      {formatRecommendationProvider(recommendation.inputPayload) ? (
                         <p className="page-description">
-                          {formatRecommendationType(recommendation.recommendationType)} ·{" "}
-                          {recommendation.resourceType} · {recommendation.resourceId}
+                          {formatRecommendationProvider(recommendation.inputPayload)}
                         </p>
-                        <div className="version-card-actions">
-                          <button
-                            className="connection-button secondary"
-                            disabled={actionTargetId === recommendation.id}
-                            onClick={() => setAcceptTarget(null)}
-                            type="button"
-                          >
-                            取消
-                          </button>
-                          <button
-                            className="connection-button"
-                            disabled={actionTargetId === recommendation.id}
-                            onClick={() => {
-                              void handleRecommendation(recommendation, "accept");
-                            }}
-                            type="button"
-                          >
-                            确认接受
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <p className="page-description">
-                      处理人 {recommendation.handledBy ?? "-"} · 原因{" "}
-                      {recommendation.statusReason ?? "-"}
-                    </p>
-                    <p className="page-description">
-                      处理时间{" "}
-                      {recommendation.handledAt
-                        ? formatProjectDateTime(recommendation.handledAt)
-                        : "-"}
-                    </p>
-                  </>
-                )}
-              </article>
+                      ) : null}
+                      <p className="page-description">
+                        生成人 {recommendation.createdBy}
+                      </p>
+                      {recommendation.status === "generated" ? (
+                        <>
+                          <div className="version-card-actions">
+                            <button
+                              className="connection-button secondary"
+                              disabled={actionTargetId === recommendation.id}
+                              onClick={() => {
+                                void handleRecommendation(recommendation, "ignore");
+                              }}
+                              type="button"
+                            >
+                              忽略
+                            </button>
+                            <button
+                              className="connection-button"
+                              disabled={actionTargetId === recommendation.id}
+                              onClick={() => {
+                                setAcceptTarget(recommendation);
+                                setActionMessage(null);
+                              }}
+                              type="button"
+                            >
+                              接受
+                            </button>
+                          </div>
+                          {acceptTarget?.id === recommendation.id ? (
+                            <div
+                              aria-label="确认接受 AI 推荐"
+                              className="action-confirmation"
+                              role="dialog"
+                            >
+                              <p className="page-description">
+                                确认接受后，系统会按该推荐写入正式业务链并保留审计记录。
+                              </p>
+                              <p className="page-description">
+                                {formatRecommendationType(recommendation.recommendationType)} ·{" "}
+                                {recommendation.resourceType} · {recommendation.resourceId}
+                              </p>
+                              <div className="version-card-actions">
+                                <button
+                                  className="connection-button secondary"
+                                  disabled={actionTargetId === recommendation.id}
+                                  onClick={() => setAcceptTarget(null)}
+                                  type="button"
+                                >
+                                  取消
+                                </button>
+                                <button
+                                  className="connection-button"
+                                  disabled={actionTargetId === recommendation.id}
+                                  onClick={() => {
+                                    void handleRecommendation(recommendation, "accept");
+                                  }}
+                                  type="button"
+                                >
+                                  确认接受
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          <p className="page-description">
+                            处理人 {recommendation.handledBy ?? "-"} · 原因{" "}
+                            {recommendation.statusReason ?? "-"}
+                          </p>
+                          <p className="page-description">
+                            处理时间{" "}
+                            {recommendation.handledAt
+                              ? formatProjectDateTime(recommendation.handledAt)
+                              : "-"}
+                          </p>
+                        </>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         ) : (
@@ -438,6 +459,21 @@ export function ProjectAiRecommendationsPage() {
       </section>
     </div>
   );
+}
+
+function groupRecommendationsByResourceType(items: AiRecommendation[]) {
+  const grouped = new Map<string, AiRecommendation[]>();
+
+  for (const item of items) {
+    const group = grouped.get(item.resourceType) ?? [];
+    group.push(item);
+    grouped.set(item.resourceType, group);
+  }
+
+  return Array.from(grouped.entries()).map(([resourceType, groupItems]) => ({
+    resourceType,
+    items: groupItems,
+  }));
 }
 
 function readFilters(searchParams: URLSearchParams): RecommendationFilters {

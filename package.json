@@ -16,7 +16,7 @@
     "docs:api": "npm run docs:api-routes && npm run docs:openapi-current",
     "docs:api-routes": "node scripts/generate-implemented-routes-doc.mjs",
     "docs:openapi-current": "node scripts/generate-openapi-v1-current.mjs",
-    "docs:openspec": "npx --yes openspec validate doc-normalize-v1-to-openspec",
+    "docs:openspec": "npx --yes @fission-ai/openspec validate doc-normalize-v1-to-openspec",
     "api:test:live-db": "DATABASE_URL=postgres://postgres:postgres@localhost:5432/saas_pricing npm --workspace @saas-pricing/api run test:live-db",
     "dev:smoke:live-db": "npm run dev:deps:up && npm run api:test:live-db",
     "test": "npm run test:packages && npm run test:workspace && npm run test:ai-runtime",

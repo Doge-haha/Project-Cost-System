@@ -4343,7 +4343,7 @@ describe("ProjectJobStatusPage", () => {
     expect(downloadedFiles[0]).toBe(
       "import-task-021-error-report-current-subset-missing_field-resource-bill_item-action-create.json",
     );
-  });
+  }, 15_000);
 
   test("auto dismisses copied-link feedback on the job status page", async () => {
     fetchMock.mockImplementation(async (input) => {

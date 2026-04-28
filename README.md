@@ -7,7 +7,6 @@
 - `apps/worker`：TypeScript 异步任务进程
 - `apps/mcp-gateway`：TypeScript 面向 AI Agent 的 MCP 能力入口
 - `apps/frontend`：React + Vite 前端工作台
-- `legacy/backend-java`：冻结归档的 Java 规则验证原型
 - `docs`：设计、架构、实施、排期和导入文档
 - `deploy`：部署相关脚本与配置
 
@@ -218,4 +217,4 @@ make api-live-db
 - `apps/frontend` 现在提供了最小 React + Vite 工作台骨架，首版页面覆盖项目列表、项目详情、清单页和汇总页
 - frontend 当前直接请求 `apps/api`，可通过 `VITE_API_BEARER_TOKEN` 或侧边栏开发连接面板提供 Bearer Token
 - `apps/ai-runtime` 当前通过 [apps/ai-runtime/app/cli.py](./apps/ai-runtime/app/cli.py) 提供结构化输入输出能力
-- 根目录 `Makefile` 仍保留旧 `backend-java` 时代目标，当前主线开发不建议依赖它
+- 旧 Java 原型代码已从仓库移除，历史结论保留在架构文档中；当前主线只维护 TypeScript/Python 工作区

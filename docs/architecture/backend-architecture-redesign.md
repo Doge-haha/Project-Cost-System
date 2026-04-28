@@ -38,7 +38,7 @@ New project/
 ├── docs/
 ├── deploy/
 └── legacy/
-    └── backend-java/       # 当前 Java 原型冻结归档
+    └── backend-java/       # 历史 Java 原型归档目录；当前代码目录已移除
 ```
 
 ### 3.1 `apps/api`

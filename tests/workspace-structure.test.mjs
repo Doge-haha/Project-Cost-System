@@ -16,7 +16,6 @@ const requiredPaths = [
   "apps/worker/src/main.ts",
   "apps/ai-runtime/pyproject.toml",
   "apps/ai-runtime/app/main.py",
-  "legacy/backend-java/build.gradle.kts",
 ];
 
 function collectFiles(directory, predicate) {

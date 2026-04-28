@@ -13,12 +13,11 @@
 - `apps/mcp-gateway`：TypeScript 的 MCP 能力入口，负责面向 AI Agent 的资源、工具和上下文聚合。
 - `apps/ai-runtime`：Python AI Runtime，承接知识抽取、CLI 调用和 AI 相关运行时能力。
 - `apps/frontend`：React + TypeScript 前端工作台，已存在基础骨架与测试文件。
-- `legacy/backend-java`：冻结归档的 Java 原型，用于保留早期业务规则验证成果。
 - `docs`：现有业务设计、架构、排期和导入文档集合。
 
 ## 当前架构判断
 
-当前仓库已经不再以 `legacy/backend-java` 作为主线实现，而是以 `apps/api + apps/worker + apps/mcp-gateway + apps/ai-runtime + apps/frontend` 作为现行主目录结构。
+当前仓库已经不再以 Java 原型作为主线实现，也不再保留旧 Java 代码目录，而是以 `apps/api + apps/worker + apps/mcp-gateway + apps/ai-runtime + apps/frontend` 作为现行主目录结构。
 
 同时，文档层存在两类内容并存：
 

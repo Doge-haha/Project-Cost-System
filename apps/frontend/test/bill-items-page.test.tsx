@@ -114,6 +114,12 @@ describe("BillItemsPage", () => {
               materialFee: 50,
               machineFee: 30,
               sourceMode: "manual",
+              sourceDataset: "js-2013-building",
+              sourceRegion: "上海",
+              workContentSummary: "挖土、装土、修边",
+              resourceCompositionSummary: "人工费 120 / 材料费 50 / 机械费 30",
+              matchReason: "关键字命中定额名称",
+              matchScore: 0.9,
             },
           ],
         });
@@ -180,6 +186,9 @@ describe("BillItemsPage", () => {
     expect(screen.getByText("估算取费模板（estimate）")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "定额选择器" })).toBeInTheDocument();
     expect(screen.getByText("人工挖土方")).toBeInTheDocument();
+    expect(screen.getByText("上海 / js-2013-building")).toBeInTheDocument();
+    expect(screen.getByText("关键字命中定额名称")).toBeInTheDocument();
+    expect(screen.getByText("人工费 120 / 材料费 50 / 机械费 30")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "校验定额" }));
 

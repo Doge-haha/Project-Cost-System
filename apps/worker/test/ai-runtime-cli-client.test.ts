@@ -66,3 +66,58 @@ test("AiRuntimeCliClient surfaces stderr as an error", async () => {
     /events must be a list/,
   );
 });
+
+test("AiRuntimeCliClient sends semantic reference quota task", async () => {
+  const calls: Array<{ input: string }> = [];
+  const client = new AiRuntimeCliClient({
+    pythonExecutable: "python3",
+    cliPath: "/tmp/ai-runtime-cli.py",
+    commandRunner: async (_file, _args, input) => {
+      calls.push({ input });
+      return {
+        stdout: JSON.stringify({
+          source: "reference_quota",
+          result: { matchMode: "semantic_text_fallback", items: [] },
+        }),
+        stderr: "",
+      };
+    },
+  });
+
+  const result = await client.processReferenceQuotaSemanticSearch({
+    query: "挖土",
+    records: [],
+    limit: 3,
+  });
+
+  assert.match(calls[0]?.input ?? "", /"task":"reference_quota_semantic_search"/);
+  assert.match(calls[0]?.input ?? "", /"query":"挖土"/);
+  assert.equal(result.source, "reference_quota");
+});
+
+test("AiRuntimeCliClient sends LLM chat task", async () => {
+  const calls: Array<{ input: string }> = [];
+  const client = new AiRuntimeCliClient({
+    pythonExecutable: "python3",
+    cliPath: "/tmp/ai-runtime-cli.py",
+    commandRunner: async (_file, _args, input) => {
+      calls.push({ input });
+      return {
+        stdout: JSON.stringify({
+          source: "llm_provider",
+          result: { content: "ok" },
+        }),
+        stderr: "",
+      };
+    },
+  });
+
+  const result = await client.processLlmChat({
+    model: "cost-model",
+    messages: [{ role: "user", content: "hello" }],
+  });
+
+  assert.match(calls[0]?.input ?? "", /"task":"llm_chat"/);
+  assert.match(calls[0]?.input ?? "", /"model":"cost-model"/);
+  assert.deepEqual(result.result, { content: "ok" });
+});

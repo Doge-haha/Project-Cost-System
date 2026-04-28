@@ -18,11 +18,16 @@ import type {
   QuotaLineRepository,
   QuotaLineSourceMode,
 } from "./quota-line-repository.js";
+import type {
+  ReferenceQuotaRecord,
+  ReferenceQuotaRepository,
+} from "./reference-quota-repository.js";
 
 export const quotaLineSourceModeSchema = z.enum([
   "manual",
   "ai",
   "history_reference",
+  "reference_knowledge",
 ]);
 
 export const createQuotaLineSchema = z.object({
@@ -97,6 +102,12 @@ export type QuotaSourceCandidateRecord = {
   materialFee?: number | null;
   machineFee?: number | null;
   sourceMode: QuotaLineSourceMode;
+  sourceDataset: string;
+  sourceRegion?: string | null;
+  workContentSummary?: string | null;
+  resourceCompositionSummary?: string | null;
+  matchReason?: string | null;
+  matchScore?: number | null;
 };
 
 export type QuotaLineValidationIssue = {
@@ -127,6 +138,7 @@ type Dependencies = {
   billItemRepository: BillItemRepository;
   billVersionService: BillVersionService;
   projectDisciplineRepository: ProjectDisciplineRepository;
+  referenceQuotaRepository?: ReferenceQuotaRepository;
 };
 
 export class QuotaLineService {
@@ -221,20 +233,22 @@ export class QuotaLineService {
       chapterCode: input.chapterCode,
       keyword: input.keyword,
     });
+    const referenceCandidates =
+      await this.dependencies.referenceQuotaRepository?.listCandidates({
+        standardSetCode: sourceStandardSetCode ?? undefined,
+        disciplineCode: input.disciplineCode,
+        chapterCode: input.chapterCode,
+        keyword: input.keyword,
+      }) ?? [];
 
-    return candidates.map((candidate) => ({
-      sourceStandardSetCode: candidate.sourceStandardSetCode,
-      sourceQuotaId: candidate.sourceQuotaId,
-      sourceSequence: candidate.sourceSequence ?? null,
-      chapterCode: candidate.chapterCode,
-      quotaCode: candidate.quotaCode,
-      quotaName: candidate.quotaName,
-      unit: candidate.unit,
-      laborFee: candidate.laborFee ?? null,
-      materialFee: candidate.materialFee ?? null,
-      machineFee: candidate.machineFee ?? null,
-      sourceMode: candidate.sourceMode,
-    }));
+    return sortCandidatesByMatch([
+      ...candidates.map((candidate) =>
+        mapQuotaLineCandidate(candidate, input.keyword),
+      ),
+      ...referenceCandidates.map((candidate) =>
+        mapReferenceQuotaCandidate(candidate, input.keyword),
+      ),
+    ]);
   }
 
   async listProjectQuotaLineSourceChains(input: {
@@ -649,4 +663,173 @@ export class QuotaLineService {
 
     return enabledDisciplines[0]?.defaultStandardSetCode ?? null;
   }
+}
+
+function mapQuotaLineCandidate(
+  candidate: QuotaLineRecord,
+  keyword?: string,
+): QuotaSourceCandidateRecord {
+  return {
+    sourceStandardSetCode: candidate.sourceStandardSetCode,
+    sourceQuotaId: candidate.sourceQuotaId,
+    sourceSequence: candidate.sourceSequence ?? null,
+    chapterCode: candidate.chapterCode,
+    quotaCode: candidate.quotaCode,
+    quotaName: candidate.quotaName,
+    unit: candidate.unit,
+    laborFee: candidate.laborFee ?? null,
+    materialFee: candidate.materialFee ?? null,
+    machineFee: candidate.machineFee ?? null,
+    sourceMode: candidate.sourceMode,
+    sourceDataset: candidate.sourceStandardSetCode,
+    sourceRegion: null,
+    workContentSummary: null,
+    resourceCompositionSummary: buildResourceCompositionSummary(candidate),
+    matchReason: buildCandidateMatchReason(candidate, keyword),
+    matchScore: buildCandidateMatchScore(candidate, keyword),
+  };
+}
+
+function sortCandidatesByMatch(
+  candidates: QuotaSourceCandidateRecord[],
+): QuotaSourceCandidateRecord[] {
+  return [...candidates].sort((left, right) => {
+    const scoreDelta = (right.matchScore ?? 0) - (left.matchScore ?? 0);
+    if (scoreDelta !== 0) {
+      return scoreDelta;
+    }
+    return left.quotaCode.localeCompare(right.quotaCode);
+  });
+}
+
+function mapReferenceQuotaCandidate(
+  candidate: ReferenceQuotaRecord,
+  keyword?: string,
+): QuotaSourceCandidateRecord {
+  return {
+    sourceStandardSetCode: candidate.standardSetCode,
+    sourceQuotaId: candidate.sourceQuotaId,
+    sourceSequence: candidate.sourceSequence ?? null,
+    chapterCode: candidate.chapterCode,
+    quotaCode: candidate.quotaCode,
+    quotaName: candidate.quotaName,
+    unit: candidate.unit,
+    laborFee: candidate.laborFee ?? null,
+    materialFee: candidate.materialFee ?? null,
+    machineFee: candidate.machineFee ?? null,
+    sourceMode: "reference_knowledge",
+    sourceDataset: candidate.sourceDataset,
+    sourceRegion: candidate.sourceRegion ?? null,
+    workContentSummary: candidate.workContentSummary ?? null,
+    resourceCompositionSummary:
+      candidate.resourceCompositionSummary ?? buildResourceCompositionSummary(candidate),
+    matchReason: buildReferenceCandidateMatchReason(candidate, keyword),
+    matchScore: buildReferenceCandidateMatchScore(candidate, keyword),
+  };
+}
+
+function buildResourceCompositionSummary(candidate: {
+  laborFee?: number | null;
+  materialFee?: number | null;
+  machineFee?: number | null;
+}): string | null {
+  const parts = [
+    ["人工费", candidate.laborFee],
+    ["材料费", candidate.materialFee],
+    ["机械费", candidate.machineFee],
+  ]
+    .filter(([, value]) => value !== null && value !== undefined)
+    .map(([label, value]) => `${label} ${value}`);
+
+  return parts.length > 0 ? parts.join(" / ") : null;
+}
+
+function buildReferenceCandidateMatchReason(
+  candidate: ReferenceQuotaRecord,
+  keyword?: string,
+): string | null {
+  const normalizedKeyword = keyword?.trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return "参考定额知识库候选";
+  }
+  if (candidate.quotaCode.toLowerCase().includes(normalizedKeyword)) {
+    return "参考库关键字命中定额编号";
+  }
+  if (candidate.quotaName.toLowerCase().includes(normalizedKeyword)) {
+    return "参考库关键字命中定额名称";
+  }
+  if (candidate.searchText.toLowerCase().includes(normalizedKeyword)) {
+    return "参考库关键字命中工作内容";
+  }
+
+  return null;
+}
+
+function buildReferenceCandidateMatchScore(
+  candidate: ReferenceQuotaRecord,
+  keyword?: string,
+): number | null {
+  const normalizedKeyword = keyword?.trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return 0.65;
+  }
+  if (
+    candidate.quotaCode.toLowerCase() === normalizedKeyword ||
+    candidate.quotaName.toLowerCase() === normalizedKeyword
+  ) {
+    return 1;
+  }
+  if (
+    candidate.quotaCode.toLowerCase().includes(normalizedKeyword) ||
+    candidate.quotaName.toLowerCase().includes(normalizedKeyword)
+  ) {
+    return 0.92;
+  }
+  if (candidate.searchText.toLowerCase().includes(normalizedKeyword)) {
+    return 0.82;
+  }
+
+  return null;
+}
+
+function buildCandidateMatchReason(
+  candidate: QuotaLineRecord,
+  keyword?: string,
+): string | null {
+  const normalizedKeyword = keyword?.trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return "默认定额集候选";
+  }
+  if (candidate.quotaCode.toLowerCase().includes(normalizedKeyword)) {
+    return "关键字命中定额编号";
+  }
+  if (candidate.quotaName.toLowerCase().includes(normalizedKeyword)) {
+    return "关键字命中定额名称";
+  }
+
+  return null;
+}
+
+function buildCandidateMatchScore(
+  candidate: QuotaLineRecord,
+  keyword?: string,
+): number | null {
+  const normalizedKeyword = keyword?.trim().toLowerCase();
+  if (!normalizedKeyword) {
+    return 0.6;
+  }
+  if (
+    candidate.quotaCode.toLowerCase() === normalizedKeyword ||
+    candidate.quotaName.toLowerCase() === normalizedKeyword
+  ) {
+    return 1;
+  }
+  if (
+    candidate.quotaCode.toLowerCase().includes(normalizedKeyword) ||
+    candidate.quotaName.toLowerCase().includes(normalizedKeyword)
+  ) {
+    return 0.9;
+  }
+
+  return null;
 }

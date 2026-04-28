@@ -10,6 +10,7 @@ import { DbBillVersionRepository } from "../../modules/bill/bill-version-reposit
 import { DbBillWorkItemRepository } from "../../modules/bill/bill-work-item-repository.js";
 import { DbAuditLogRepository } from "../../modules/audit/audit-log-repository.js";
 import { DbQuotaLineRepository } from "../../modules/quota/quota-line-repository.js";
+import { DbReferenceQuotaRepository } from "../../modules/quota/reference-quota-repository.js";
 import { DbPriceVersionRepository } from "../../modules/pricing/price-version-repository.js";
 import { DbPriceItemRepository } from "../../modules/pricing/price-item-repository.js";
 import { DbFeeTemplateRepository } from "../../modules/fee/fee-template-repository.js";
@@ -66,6 +67,7 @@ export function createDatabaseAppOptions(
       billItemRepository: new DbBillItemRepository(client.db),
       billWorkItemRepository: new DbBillWorkItemRepository(client.db),
       quotaLineRepository: new DbQuotaLineRepository(client.db),
+      referenceQuotaRepository: new DbReferenceQuotaRepository(client.db),
       priceVersionRepository: new DbPriceVersionRepository(client.db),
       priceItemRepository: new DbPriceItemRepository(client.db),
       feeTemplateRepository: new DbFeeTemplateRepository(client.db),

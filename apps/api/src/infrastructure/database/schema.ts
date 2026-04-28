@@ -223,6 +223,45 @@ export const quotaLines = pgTable(
   }),
 );
 
+export const referenceQuotas = pgTable(
+  "reference_quota",
+  {
+    id: text("id").primaryKey(),
+    sourceDataset: text("source_dataset").notNull(),
+    sourceRegion: text("source_region"),
+    standardSetCode: text("standard_set_code").notNull(),
+    disciplineCode: text("discipline_code"),
+    sourceQuotaId: text("source_quota_id").notNull(),
+    sourceSequence: integer("source_sequence"),
+    chapterCode: text("chapter_code").notNull(),
+    quotaCode: text("quota_code").notNull(),
+    quotaName: text("quota_name").notNull(),
+    unit: text("unit").notNull(),
+    laborFee: doublePrecision("labor_fee"),
+    materialFee: doublePrecision("material_fee"),
+    machineFee: doublePrecision("machine_fee"),
+    workContentSummary: text("work_content_summary"),
+    resourceCompositionSummary: text("resource_composition_summary"),
+    searchText: text("search_text").notNull(),
+    metadata: jsonb("metadata").notNull(),
+    ...auditColumns,
+  },
+  (table) => ({
+    referenceQuotaStandardSetIndex: index("reference_quota_standard_set_idx").on(
+      table.standardSetCode,
+      table.disciplineCode,
+    ),
+    referenceQuotaKeywordIndex: index("reference_quota_keyword_idx").on(
+      table.quotaCode,
+      table.quotaName,
+    ),
+    referenceQuotaDatasetIndex: index("reference_quota_dataset_idx").on(
+      table.sourceDataset,
+      table.sourceRegion,
+    ),
+  }),
+);
+
 export const priceVersions = pgTable(
   "price_version",
   {
@@ -635,6 +674,7 @@ export const schema = {
   billItems,
   billWorkItems,
   quotaLines,
+  referenceQuotas,
   priceVersions,
   priceItems,
   feeTemplates,

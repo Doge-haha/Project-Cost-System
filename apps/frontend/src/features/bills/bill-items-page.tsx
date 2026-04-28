@@ -658,6 +658,9 @@ export function BillItemsPage() {
                   <th>章节</th>
                   <th>单位</th>
                   <th>来源方式</th>
+                  <th>来源库/地区</th>
+                  <th>匹配说明</th>
+                  <th>费用组成</th>
                 </tr>
               </thead>
               <tbody>
@@ -683,6 +686,13 @@ export function BillItemsPage() {
                     <td>{candidate.chapterCode}</td>
                     <td>{candidate.unit}</td>
                     <td>{candidate.sourceMode}</td>
+                    <td>
+                      {[candidate.sourceRegion, candidate.sourceDataset]
+                        .filter(Boolean)
+                        .join(" / ") || "-"}
+                    </td>
+                    <td>{candidate.matchReason ?? candidate.workContentSummary ?? "-"}</td>
+                    <td>{candidate.resourceCompositionSummary ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>

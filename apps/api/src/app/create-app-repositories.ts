@@ -31,6 +31,10 @@ import {
   type QuotaLineRepository,
 } from "../modules/quota/quota-line-repository.js";
 import {
+  InMemoryReferenceQuotaRepository,
+  type ReferenceQuotaRepository,
+} from "../modules/quota/reference-quota-repository.js";
+import {
   InMemoryPriceVersionRepository,
   type PriceVersionRepository,
 } from "../modules/pricing/price-version-repository.js";
@@ -92,6 +96,7 @@ export type AppRepositories = {
   billItem: BillItemRepository;
   billWorkItem: BillWorkItemRepository;
   quotaLine: QuotaLineRepository;
+  referenceQuota: ReferenceQuotaRepository;
   priceVersion: PriceVersionRepository;
   priceItem: PriceItemRepository;
   feeTemplate: FeeTemplateRepository;
@@ -116,6 +121,7 @@ export type CreateAppRepositoryOptions = {
   billItemRepository?: BillItemRepository;
   billWorkItemRepository?: BillWorkItemRepository;
   quotaLineRepository?: QuotaLineRepository;
+  referenceQuotaRepository?: ReferenceQuotaRepository;
   priceVersionRepository?: PriceVersionRepository;
   priceItemRepository?: PriceItemRepository;
   feeTemplateRepository?: FeeTemplateRepository;
@@ -150,6 +156,8 @@ export function createAppRepositories(
       options.billWorkItemRepository ?? new InMemoryBillWorkItemRepository([]),
     quotaLine:
       options.quotaLineRepository ?? new InMemoryQuotaLineRepository([]),
+    referenceQuota:
+      options.referenceQuotaRepository ?? new InMemoryReferenceQuotaRepository([]),
     priceVersion:
       options.priceVersionRepository ?? new InMemoryPriceVersionRepository([]),
     priceItem: options.priceItemRepository ?? new InMemoryPriceItemRepository([]),

@@ -112,6 +112,9 @@ export DATABASE_URL=postgres://postgres:postgres@localhost:5432/saas_pricing
 export JWT_SECRET=1234567890abcdef
 export API_BASE_URL=http://localhost:3000
 export WORKER_TOKEN=dev-worker-token
+export LLM_API_KEY=your-provider-key
+export LLM_MODEL=your-model-name
+export LLM_BASE_URL=https://api.openai.com/v1
 ```
 
 只跑某个 workspace 的测试：

@@ -546,7 +546,7 @@ export const apiClient = {
       materialFee?: number | null;
       machineFee?: number | null;
       contentFactor?: number;
-      sourceMode: "manual" | "ai" | "history_reference";
+      sourceMode: "manual" | "ai" | "history_reference" | "reference_knowledge";
     }>;
   }) {
     return request<{ items: ProjectQuotaLine[] }>(

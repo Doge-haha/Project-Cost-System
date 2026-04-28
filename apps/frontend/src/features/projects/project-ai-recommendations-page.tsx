@@ -74,6 +74,8 @@ export function ProjectAiRecommendationsPage() {
     () => groupRecommendationsByResourceType(state?.recommendations.items ?? []),
     [state?.recommendations.items],
   );
+  const canHandleRecommendations =
+    state?.workspace.currentUser.permissionSummary.canEditProject ?? false;
 
   async function loadRecommendations() {
     if (!projectId) {
@@ -372,7 +374,7 @@ export function ProjectAiRecommendationsPage() {
                       <p className="page-description">
                         生成人 {recommendation.createdBy}
                       </p>
-                      {recommendation.status === "generated" ? (
+                      {recommendation.status === "generated" && canHandleRecommendations ? (
                         <>
                           <div className="version-card-actions">
                             <button
@@ -433,6 +435,10 @@ export function ProjectAiRecommendationsPage() {
                             </div>
                           ) : null}
                         </>
+                      ) : recommendation.status === "generated" ? (
+                        <p className="page-description">
+                          当前用户仅可查看推荐，不能接受或忽略。
+                        </p>
                       ) : (
                         <>
                           <p className="page-description">

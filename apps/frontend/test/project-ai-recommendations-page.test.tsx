@@ -40,7 +40,7 @@ describe("ProjectAiRecommendationsPage", () => {
     fetchMock.mockReset();
   });
 
-  test("renders recommendations and accepts a generated item", async () => {
+  test("renders recommendations and accepts a generated item after confirmation", async () => {
     let recommendationStatus = "generated";
 
     fetchMock.mockImplementation(async (input, init) => {
@@ -149,6 +149,18 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("生成人 engineer-001")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "接受" }));
+
+    expect(screen.getByRole("dialog", { name: "确认接受 AI 推荐" })).toBeInTheDocument();
+    expect(
+      screen.getByText("确认接受后，系统会按该推荐写入正式业务链并保留审计记录。"),
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).includes("/v1/ai/recommendations/ai-recommendation-001/accept"),
+      ),
+    ).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "确认接受" }));
 
     await waitFor(() => {
       expect(screen.getByText("定额推荐已接受。")).toBeInTheDocument();

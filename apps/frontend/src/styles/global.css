@@ -451,6 +451,14 @@ select {
   margin-top: 14px;
 }
 
+.action-confirmation {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(24, 92, 71, 0.18);
+  border-radius: 8px;
+  background: rgba(24, 92, 71, 0.06);
+}
+
 .summary-actions,
 .compare-actions {
   display: flex;

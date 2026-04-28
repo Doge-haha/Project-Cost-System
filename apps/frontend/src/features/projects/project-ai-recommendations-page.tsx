@@ -67,6 +67,7 @@ export function ProjectAiRecommendationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionTargetId, setActionTargetId] = useState<string | null>(null);
+  const [acceptTarget, setAcceptTarget] = useState<AiRecommendation | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const activeQuery = useMemo(() => readFilters(searchParams), [searchParams]);
 
@@ -167,6 +168,9 @@ export function ProjectAiRecommendationsPage() {
           action === "accept" ? "接受" : "忽略"
         }。`,
       );
+      if (action === "accept") {
+        setAcceptTarget(null);
+      }
     } catch (submitError) {
       setActionMessage(
         submitError instanceof ApiError
@@ -351,28 +355,66 @@ export function ProjectAiRecommendationsPage() {
                   生成人 {recommendation.createdBy}
                 </p>
                 {recommendation.status === "generated" ? (
-                  <div className="version-card-actions">
-                    <button
-                      className="connection-button secondary"
-                      disabled={actionTargetId === recommendation.id}
-                      onClick={() => {
-                        void handleRecommendation(recommendation, "ignore");
-                      }}
-                      type="button"
-                    >
-                      忽略
-                    </button>
-                    <button
-                      className="connection-button"
-                      disabled={actionTargetId === recommendation.id}
-                      onClick={() => {
-                        void handleRecommendation(recommendation, "accept");
-                      }}
-                      type="button"
-                    >
-                      接受
-                    </button>
-                  </div>
+                  <>
+                    <div className="version-card-actions">
+                      <button
+                        className="connection-button secondary"
+                        disabled={actionTargetId === recommendation.id}
+                        onClick={() => {
+                          void handleRecommendation(recommendation, "ignore");
+                        }}
+                        type="button"
+                      >
+                        忽略
+                      </button>
+                      <button
+                        className="connection-button"
+                        disabled={actionTargetId === recommendation.id}
+                        onClick={() => {
+                          setAcceptTarget(recommendation);
+                          setActionMessage(null);
+                        }}
+                        type="button"
+                      >
+                        接受
+                      </button>
+                    </div>
+                    {acceptTarget?.id === recommendation.id ? (
+                      <div
+                        aria-label="确认接受 AI 推荐"
+                        className="action-confirmation"
+                        role="dialog"
+                      >
+                        <p className="page-description">
+                          确认接受后，系统会按该推荐写入正式业务链并保留审计记录。
+                        </p>
+                        <p className="page-description">
+                          {formatRecommendationType(recommendation.recommendationType)} ·{" "}
+                          {recommendation.resourceType} · {recommendation.resourceId}
+                        </p>
+                        <div className="version-card-actions">
+                          <button
+                            className="connection-button secondary"
+                            disabled={actionTargetId === recommendation.id}
+                            onClick={() => setAcceptTarget(null)}
+                            type="button"
+                          >
+                            取消
+                          </button>
+                          <button
+                            className="connection-button"
+                            disabled={actionTargetId === recommendation.id}
+                            onClick={() => {
+                              void handleRecommendation(recommendation, "accept");
+                            }}
+                            type="button"
+                          >
+                            确认接受
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
                 ) : (
                   <>
                     <p className="page-description">

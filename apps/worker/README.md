@@ -35,3 +35,7 @@ npm --workspace @saas-pricing/worker run start
 - `MAX_ITERATIONS`：限制轮询次数，适合本地 smoke
 - `AI_RUNTIME_PYTHON`：覆盖 Python 可执行文件
 - `AI_RUNTIME_CLI_PATH`：覆盖 `apps/ai-runtime/app/cli.py` 路径
+- `LLM_API_KEY`：AI Runtime 调用真实 OpenAI-compatible LLM Provider 的密钥
+- `LLM_MODEL`：AI Runtime 调用的模型名称
+- `LLM_BASE_URL`：AI Runtime Provider 地址，默认 `https://api.openai.com/v1`
+- `LLM_PROVIDER`：Provider 标识，默认 `openai_compatible`

@@ -348,7 +348,7 @@ export type ProjectQuotaLine = {
   materialFee?: number | null;
   machineFee?: number | null;
   contentFactor: number;
-  sourceMode: "manual" | "ai" | "history_reference";
+  sourceMode: "manual" | "ai" | "history_reference" | "reference_knowledge";
 };
 
 export type QuotaSourceCandidate = {
@@ -362,7 +362,13 @@ export type QuotaSourceCandidate = {
   laborFee?: number | null;
   materialFee?: number | null;
   machineFee?: number | null;
-  sourceMode: "manual" | "ai" | "history_reference";
+  sourceMode: "manual" | "ai" | "history_reference" | "reference_knowledge";
+  sourceDataset: string;
+  sourceRegion?: string | null;
+  workContentSummary?: string | null;
+  resourceCompositionSummary?: string | null;
+  matchReason?: string | null;
+  matchScore?: number | null;
 };
 
 export type QuotaLineValidationIssue = {

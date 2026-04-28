@@ -32,6 +32,10 @@ import {
   type QuotaLineRecord,
 } from "../src/modules/quota/quota-line-repository.js";
 import {
+  InMemoryReferenceQuotaRepository,
+  type ReferenceQuotaRecord,
+} from "../src/modules/quota/reference-quota-repository.js";
+import {
   InMemoryPriceVersionRepository,
   type PriceVersionRecord,
 } from "../src/modules/pricing/price-version-repository.js";
@@ -214,6 +218,7 @@ const priceVersions: PriceVersionRecord[] = [
 function createQuotaApp(overrides?: {
   billItems?: typeof billItems;
   quotaLines?: QuotaLineRecord[];
+  referenceQuotas?: ReferenceQuotaRecord[];
 }) {
   return createApp({
     jwtSecret,
@@ -229,6 +234,9 @@ function createQuotaApp(overrides?: {
     ),
     quotaLineRepository: new InMemoryQuotaLineRepository(
       overrides?.quotaLines ?? quotaLines,
+    ),
+    referenceQuotaRepository: new InMemoryReferenceQuotaRepository(
+      overrides?.referenceQuotas ?? [],
     ),
     priceVersionRepository: new InMemoryPriceVersionRepository(priceVersions),
   });
@@ -695,6 +703,86 @@ test("GET /v1/projects/:id/quota-lines/candidates uses discipline default standa
         materialFee: 50,
         machineFee: 30,
         sourceMode: "manual",
+        sourceDataset: "js-2013-building",
+        sourceRegion: null,
+        workContentSummary: null,
+        resourceCompositionSummary: "人工费 120 / 材料费 50 / 机械费 30",
+        matchReason: "关键字命中定额名称",
+        matchScore: 0.9,
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/quota-lines/candidates includes read-only reference quota knowledge", async () => {
+  const app = createQuotaApp({
+    quotaLines: [],
+    referenceQuotas: [
+      {
+        id: "reference-quota-001",
+        sourceDataset: "ZH_SHANGHAI.csv",
+        sourceRegion: "上海",
+        standardSetCode: "js-2013-building",
+        disciplineCode: "building",
+        sourceQuotaId: "ddc-sh-010101099",
+        sourceSequence: 99,
+        chapterCode: "01",
+        quotaCode: "010101099",
+        quotaName: "参考库人工挖土方",
+        unit: "m3",
+        laborFee: 88,
+        materialFee: 12,
+        machineFee: 36,
+        workContentSummary: "挖土、装土、修边",
+        resourceCompositionSummary: "人工费 88 / 材料费 12 / 机械费 36",
+        searchText: "参考库人工挖土方 挖土 装土 修边",
+        metadata: {
+          categoryType: "建筑工程",
+          rowType: "quota",
+        },
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/quota-lines/candidates?disciplineCode=building&keyword=修边&chapterCode=01",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        sourceStandardSetCode: "js-2013-building",
+        sourceQuotaId: "ddc-sh-010101099",
+        sourceSequence: 99,
+        chapterCode: "01",
+        quotaCode: "010101099",
+        quotaName: "参考库人工挖土方",
+        unit: "m3",
+        laborFee: 88,
+        materialFee: 12,
+        machineFee: 36,
+        sourceMode: "reference_knowledge",
+        sourceDataset: "ZH_SHANGHAI.csv",
+        sourceRegion: "上海",
+        workContentSummary: "挖土、装土、修边",
+        resourceCompositionSummary: "人工费 88 / 材料费 12 / 机械费 36",
+        matchReason: "参考库关键字命中工作内容",
+        matchScore: 0.82,
       },
     ],
   });

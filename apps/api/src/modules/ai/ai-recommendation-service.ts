@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { AppError } from "../../shared/errors/app-error.js";
 import type { AuditLogService } from "../audit/audit-log-service.js";
 import type { BillItemService } from "../bill/bill-item-service.js";
@@ -49,6 +51,10 @@ export class AiRecommendationService {
     await this.assertProjectAccess(input, "edit");
     await this.expireSupersededRecommendations(input);
     const createdAt = new Date().toISOString();
+    const trace = buildAiAssistTrace({
+      inputPayload: input.inputPayload ?? {},
+      outputPayload: input.outputPayload,
+    });
     const created = await this.recommendationRepository.create({
       projectId: input.projectId,
       stageCode: input.stageCode ?? null,
@@ -56,8 +62,17 @@ export class AiRecommendationService {
       resourceType: input.resourceType,
       resourceId: input.resourceId,
       recommendationType: input.recommendationType,
-      inputPayload: input.inputPayload ?? {},
-      outputPayload: input.outputPayload,
+      inputPayload: {
+        ...(input.inputPayload ?? {}),
+        aiAssistTraceId: trace.aiAssistTraceId,
+        aiProvider: trace.aiProvider,
+        aiRequestSummary: trace.aiRequestSummary,
+      },
+      outputPayload: {
+        ...input.outputPayload,
+        aiAssistTraceId: trace.aiAssistTraceId,
+        aiResponseSummary: trace.aiResponseSummary,
+      },
       status: "generated",
       createdBy: input.userId,
       handledBy: null,
@@ -80,6 +95,7 @@ export class AiRecommendationService {
         resourceType: created.resourceType,
         resourceId: created.resourceId,
         status: created.status,
+        aiAssistTraceId: trace.aiAssistTraceId,
       },
     });
 
@@ -517,6 +533,57 @@ export class AiRecommendationService {
 function readString(payload: Record<string, unknown>, key: string): string | null {
   const value = payload[key];
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function buildAiAssistTrace(input: {
+  inputPayload: Record<string, unknown>;
+  outputPayload: Record<string, unknown>;
+}) {
+  const provider = readAiProvider(input.inputPayload);
+  return {
+    aiAssistTraceId: `ai-trace-${randomUUID()}`,
+    aiProvider: provider,
+    aiRequestSummary: summarizePayload(input.inputPayload),
+    aiResponseSummary: summarizePayload(input.outputPayload),
+  };
+}
+
+function readAiProvider(payload: Record<string, unknown>): {
+  provider: string;
+  model: string;
+} {
+  const providerPayload =
+    payload.aiProvider &&
+    typeof payload.aiProvider === "object" &&
+    !Array.isArray(payload.aiProvider)
+      ? (payload.aiProvider as Record<string, unknown>)
+      : {};
+  const provider =
+    typeof providerPayload.provider === "string" && providerPayload.provider.length > 0
+      ? providerPayload.provider
+      : "manual";
+  const model =
+    typeof providerPayload.model === "string" && providerPayload.model.length > 0
+      ? providerPayload.model
+      : "manual_payload";
+
+  return {
+    provider,
+    model,
+  };
+}
+
+function summarizePayload(payload: Record<string, unknown>): {
+  payloadKeys: string[];
+  valueCount: number;
+} {
+  const payloadKeys = Object.keys(payload)
+    .filter((key) => !["aiAssistTraceId", "aiProvider", "aiRequestSummary", "aiResponseSummary"].includes(key))
+    .sort();
+  return {
+    payloadKeys,
+    valueCount: payloadKeys.length,
+  };
 }
 
 function readNullableString(

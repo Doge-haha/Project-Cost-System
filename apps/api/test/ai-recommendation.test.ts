@@ -177,6 +177,20 @@ test("POST /v1/ai/bill-recommendations creates generated recommendation and audi
   assert.equal(response.statusCode, 201);
   assert.equal(response.json().recommendationType, "bill_recommendation");
   assert.equal(response.json().status, "generated");
+  assert.match(response.json().inputPayload.aiAssistTraceId, /^ai-trace-/);
+  assert.equal(response.json().inputPayload.aiProvider.provider, "manual");
+  assert.equal(response.json().inputPayload.aiProvider.model, "manual_payload");
+  assert.deepEqual(response.json().inputPayload.aiRequestSummary.payloadKeys, [
+    "source",
+  ]);
+  assert.equal(
+    response.json().outputPayload.aiAssistTraceId,
+    response.json().inputPayload.aiAssistTraceId,
+  );
+  assert.deepEqual(response.json().outputPayload.aiResponseSummary.payloadKeys, [
+    "items",
+    "reason",
+  ]);
 
   const listResponse = await app.inject({
     method: "GET",
@@ -198,6 +212,50 @@ test("POST /v1/ai/bill-recommendations creates generated recommendation and audi
   });
   assert.equal(auditResponse.statusCode, 200);
   assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(
+    auditResponse.json().items[0].afterPayload.aiAssistTraceId,
+    response.json().inputPayload.aiAssistTraceId,
+  );
+
+  await app.close();
+});
+
+test("POST /v1/ai/quota-recommendations preserves provided AI provider metadata", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      inputPayload: {
+        aiProvider: {
+          provider: "mock-provider",
+          model: "mock-model-v1",
+        },
+        candidateCount: 3,
+      },
+      outputPayload: {
+        quotaName: "挖土方",
+        reason: "清单名称匹配",
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().inputPayload.aiProvider.provider, "mock-provider");
+  assert.equal(response.json().inputPayload.aiProvider.model, "mock-model-v1");
+  assert.deepEqual(response.json().inputPayload.aiRequestSummary.payloadKeys, [
+    "candidateCount",
+  ]);
 
   await app.close();
 });

@@ -337,6 +337,16 @@ export function ProjectAiRecommendationsPage() {
                 <p className="page-description">
                   {formatRecommendationPayload(recommendation.outputPayload)}
                 </p>
+                {formatRecommendationTrace(recommendation.outputPayload) ? (
+                  <p className="page-description">
+                    {formatRecommendationTrace(recommendation.outputPayload)}
+                  </p>
+                ) : null}
+                {formatRecommendationProvider(recommendation.inputPayload) ? (
+                  <p className="page-description">
+                    {formatRecommendationProvider(recommendation.inputPayload)}
+                  </p>
+                ) : null}
                 <p className="page-description">
                   生成人 {recommendation.createdBy}
                 </p>
@@ -505,4 +515,39 @@ function formatRecommendationPayload(payload: Record<string, unknown>) {
   const quotaName = typeof payload.quotaName === "string" ? payload.quotaName : null;
   const warning = typeof payload.warning === "string" ? payload.warning : null;
   return [reason, itemName, quotaName, warning].filter(Boolean).join(" · ") || "查看详情";
+}
+
+function formatRecommendationTrace(payload: Record<string, unknown>) {
+  const traceId =
+    typeof payload.aiAssistTraceId === "string" ? payload.aiAssistTraceId : null;
+  const responseSummary =
+    payload.aiResponseSummary &&
+    typeof payload.aiResponseSummary === "object" &&
+    !Array.isArray(payload.aiResponseSummary)
+      ? (payload.aiResponseSummary as Record<string, unknown>)
+      : null;
+  const valueCount =
+    typeof responseSummary?.valueCount === "number" ? responseSummary.valueCount : null;
+
+  if (!traceId) {
+    return null;
+  }
+
+  return valueCount === null
+    ? `追溯 ${traceId}`
+    : `追溯 ${traceId} · 输出字段 ${valueCount}`;
+}
+
+function formatRecommendationProvider(payload: Record<string, unknown>) {
+  const providerPayload =
+    payload.aiProvider &&
+    typeof payload.aiProvider === "object" &&
+    !Array.isArray(payload.aiProvider)
+      ? (payload.aiProvider as Record<string, unknown>)
+      : null;
+  const provider =
+    typeof providerPayload?.provider === "string" ? providerPayload.provider : null;
+  const model = typeof providerPayload?.model === "string" ? providerPayload.model : null;
+
+  return provider && model ? `来源 ${provider} / ${model}` : null;
 }

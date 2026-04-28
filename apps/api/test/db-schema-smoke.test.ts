@@ -33,6 +33,9 @@ test("database migrations create project and bill core tables", async () => {
     await runtime.pool.query(
       "insert into quota_line (id, bill_item_id, source_standard_set_code, source_quota_id, source_sequence, chapter_code, quota_code, quota_name, unit, quantity, labor_fee, material_fee, machine_fee, content_factor, source_mode) values ('quota-line-001', 'bill-item-001', 'JS-2014', 'quota-001', 1, '01', '010101', '挖土方', 'm3', 10, 1, 2, 3, 1, 'manual')",
     );
+    await runtime.pool.query(
+      "insert into reference_quota (id, source_dataset, source_region, standard_set_code, discipline_code, source_quota_id, source_sequence, chapter_code, quota_code, quota_name, unit, labor_fee, material_fee, machine_fee, work_content_summary, resource_composition_summary, search_text, metadata) values ('reference-quota-001', 'ZH_SHANGHAI.csv', '上海', 'JS-2014', 'building', 'quota-ref-001', 1, '01', '010101', '参考挖土方', 'm3', 1, 2, 3, '挖土、装土', '人工费 1 / 材料费 2 / 机械费 3', '参考挖土方 挖土 装土', '{\"rowType\":\"quota\"}')",
+    );
 
     const versions = await runtime.pool.query(
       "select id, project_id, version_name from bill_version order by version_no",
@@ -42,6 +45,9 @@ test("database migrations create project and bill core tables", async () => {
     );
     const quotaLines = await runtime.pool.query(
       "select id, bill_item_id, quota_code from quota_line",
+    );
+    const referenceQuotas = await runtime.pool.query(
+      "select id, source_dataset, quota_code from reference_quota",
     );
 
     assert.deepEqual(versions.rows, [
@@ -62,6 +68,13 @@ test("database migrations create project and bill core tables", async () => {
       {
         id: "quota-line-001",
         billItemId: "bill-item-001",
+        quotaCode: "010101",
+      },
+    ]);
+    assert.deepEqual(referenceQuotas.rows, [
+      {
+        id: "reference-quota-001",
+        sourceDataset: "ZH_SHANGHAI.csv",
         quotaCode: "010101",
       },
     ]);

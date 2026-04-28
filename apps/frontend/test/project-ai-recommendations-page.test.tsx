@@ -61,10 +61,20 @@ describe("ProjectAiRecommendationsPage", () => {
               resourceType: "bill_item",
               resourceId: "bill-item-001",
               recommendationType: "quota_recommendation",
-              inputPayload: {},
+              inputPayload: {
+                aiProvider: {
+                  provider: "mock-provider",
+                  model: "mock-model-v1",
+                },
+              },
               outputPayload: {
                 quotaName: "挖土方",
                 reason: "清单名称匹配",
+                aiAssistTraceId: "ai-trace-001",
+                aiResponseSummary: {
+                  payloadKeys: ["quotaName", "reason"],
+                  valueCount: 2,
+                },
               },
               status: recommendationStatus,
               createdBy: "engineer-001",
@@ -134,6 +144,8 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("新点造价项目 · 待处理 1 条 · 共 1 条")).toBeInTheDocument();
     expect(screen.getByText("定额推荐 · 待处理")).toBeInTheDocument();
     expect(screen.getByText("清单名称匹配 · 挖土方")).toBeInTheDocument();
+    expect(screen.getByText("追溯 ai-trace-001 · 输出字段 2")).toBeInTheDocument();
+    expect(screen.getByText("来源 mock-provider / mock-model-v1")).toBeInTheDocument();
     expect(screen.getByText("生成人 engineer-001")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "接受" }));

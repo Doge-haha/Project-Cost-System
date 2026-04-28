@@ -152,6 +152,7 @@ export function createAppServices(
       billItemRepository: repositories.billItem,
       billVersionService,
       projectDisciplineRepository: repositories.projectDiscipline,
+      referenceQuotaRepository: repositories.referenceQuota,
     },
     auditLogService,
   );

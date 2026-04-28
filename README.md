@@ -84,6 +84,7 @@ npm run typecheck
 npm run docs:api
 npm run docs:api-routes
 npm run docs:openapi-current
+npm run docs:openspec
 ```
 
 API 持久化脚手架命令：

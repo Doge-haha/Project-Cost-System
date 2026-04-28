@@ -11,9 +11,9 @@
 
 ## ADDED Requirements
 
-### Requirement: 专业必须至少区分标准专业和业务视图专业
+### Requirement: MUST 专业必须至少区分标准专业和业务视图专业
 
-系统必须将专业至少区分为标准专业主数据和业务视图专业两层，避免把不同视图下的专业集合硬塞成单一枚举。
+MUST 系统必须将专业至少区分为标准专业主数据和业务视图专业两层，避免把不同视图下的专业集合硬塞成单一枚举。
 
 #### Scenario: 解释源专业集合
 
@@ -21,9 +21,9 @@
 - **WHEN** 设计目标模型
 - **THEN** 应能区分标准专业与业务视图专业
 
-### Requirement: 专业主数据必须保留源兼容字段
+### Requirement: MUST 专业主数据必须保留源兼容字段
 
-专业模型必须保留如 `source_markup`、`gb08_code`、`gb13_code`、`discipline_group`、`business_view_type`、`region_code` 等兼容字段。
+MUST 专业模型必须保留如 `source_markup`、`gb08_code`、`gb13_code`、`discipline_group`、`business_view_type`、`region_code` 等兼容字段。
 
 #### Scenario: 保存专业主数据
 
@@ -31,9 +31,9 @@
 - **WHEN** 持久化该记录
 - **THEN** 应保留必要源兼容字段用于追溯与映射
 
-### Requirement: 专业与定额集必须是一对多关系
+### Requirement: MUST 专业与定额集必须是一对多关系
 
-一个专业必须允许对应多个定额集，定额集负责计价依据和版本，专业负责业务分类。
+MUST 一个专业必须允许对应多个定额集，定额集负责计价依据和版本，专业负责业务分类。
 
 #### Scenario: 查询专业下的定额集
 
@@ -41,9 +41,9 @@
 - **WHEN** 系统展示其计价依据
 - **THEN** 该专业应可关联多个定额集
 
-### Requirement: 地区与业务视图差异必须可表达
+### Requirement: MUST 地区与业务视图差异必须可表达
 
-同一专业在不同地区或不同业务视图下，必须允许呈现不同名称、编码或集合关系。
+MUST 同一专业在不同地区或不同业务视图下，必须允许呈现不同名称、编码或集合关系。
 
 #### Scenario: 查看地区化专业集合
 

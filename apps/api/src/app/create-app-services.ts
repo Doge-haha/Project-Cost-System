@@ -7,6 +7,7 @@ import { ProjectService } from "../modules/project/project-service.js";
 import { BillVersionService } from "../modules/bill/bill-version-service.js";
 import { BillItemService } from "../modules/bill/bill-item-service.js";
 import { BillWorkItemService } from "../modules/bill/bill-work-item-service.js";
+import { BillSourceImportService } from "../modules/bill/bill-source-import-service.js";
 import { QuotaLineService } from "../modules/quota/quota-line-service.js";
 import { PriceVersionService } from "../modules/pricing/price-version-service.js";
 import { PriceItemService } from "../modules/pricing/price-item-service.js";
@@ -25,8 +26,12 @@ import { AuditLogService } from "../modules/audit/audit-log-service.js";
 import { ProcessDocumentService } from "../modules/process/process-document-service.js";
 import { AiRuntimePreviewService } from "../modules/ai/ai-runtime-preview-service.js";
 import { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
-import { KnowledgeService } from "../modules/knowledge/knowledge-service.js";
+import {
+  KNOWLEDGE_AUDIT_ACTIONS,
+  KnowledgeService,
+} from "../modules/knowledge/knowledge-service.js";
 import { ImportTaskService } from "../modules/import/import-task-service.js";
+import { MasterDataService } from "../modules/master-data/master-data-service.js";
 import type { AppRepositories } from "./create-app-repositories.js";
 
 export type AppServices = {
@@ -39,6 +44,7 @@ export type AppServices = {
   billVersionService: BillVersionService;
   billItemService: BillItemService;
   billWorkItemService: BillWorkItemService;
+  billSourceImportService: BillSourceImportService;
   quotaLineService: QuotaLineService;
   priceVersionService: PriceVersionService;
   priceItemService: PriceItemService;
@@ -51,6 +57,7 @@ export type AppServices = {
   reportExportTaskService: ReportExportTaskService;
   reviewSubmissionService: ReviewSubmissionService;
   processDocumentService: ProcessDocumentService;
+  masterDataService: MasterDataService;
 };
 
 export type CreateAppServiceOptions = {
@@ -111,6 +118,7 @@ export function createAppServices(
     repositories.importTask,
     repositories.priceVersion,
     repositories.feeTemplate,
+    repositories.masterData,
     auditLogService,
   );
   const billVersionService = new BillVersionService(
@@ -145,6 +153,17 @@ export function createAppServices(
     },
     auditLogService,
   );
+  const billSourceImportService = new BillSourceImportService({
+    projectRepository: repositories.project,
+    projectStageRepository: repositories.projectStage,
+    projectDisciplineRepository: repositories.projectDiscipline,
+    projectMemberRepository: repositories.projectMember,
+    billVersionRepository: repositories.billVersion,
+    billItemRepository: repositories.billItem,
+    billWorkItemRepository: repositories.billWorkItem,
+    importTaskService,
+    auditLogService,
+  });
   const quotaLineService = new QuotaLineService(
     repositories.quotaLine,
     {
@@ -182,6 +201,7 @@ export function createAppServices(
     repositories.projectDiscipline,
     repositories.projectMember,
   );
+  const masterDataService = new MasterDataService(repositories.masterData);
   const aiRecommendationService = new AiRecommendationService(
     repositories.aiRecommendation,
     {
@@ -265,6 +285,43 @@ export function createAppServices(
         result,
       });
 
+      for (const entry of persisted.knowledgeEntries) {
+        await auditLogService.writeAuditLog({
+          projectId: entry.projectId,
+          stageCode: entry.stageCode ?? null,
+          resourceType: "knowledge_entry",
+          resourceId: entry.id,
+          action: KNOWLEDGE_AUDIT_ACTIONS.createKnowledgeEntry,
+          operatorId: requestedBy,
+          beforePayload: null,
+          afterPayload: {
+            sourceJobId: jobId,
+            sourceType: entry.sourceType,
+            sourceAction: entry.sourceAction,
+            title: entry.title,
+            tags: entry.tags,
+          },
+        });
+      }
+
+      for (const entry of persisted.memoryEntries) {
+        await auditLogService.writeAuditLog({
+          projectId: entry.projectId,
+          stageCode: entry.stageCode ?? null,
+          resourceType: "memory_entry",
+          resourceId: entry.id,
+          action: KNOWLEDGE_AUDIT_ACTIONS.createMemoryEntry,
+          operatorId: requestedBy,
+          beforePayload: null,
+          afterPayload: {
+            sourceJobId: jobId,
+            memoryKey: entry.memoryKey,
+            subjectType: entry.subjectType,
+            subjectId: entry.subjectId,
+          },
+        });
+      }
+
       return {
         ...result,
         persisted: {
@@ -309,6 +366,7 @@ export function createAppServices(
     billVersionService,
     billItemService,
     billWorkItemService,
+    billSourceImportService,
     quotaLineService,
     priceVersionService,
     priceItemService,
@@ -321,5 +379,6 @@ export function createAppServices(
     reportExportTaskService,
     reviewSubmissionService,
     processDocumentService,
+    masterDataService,
   };
 }

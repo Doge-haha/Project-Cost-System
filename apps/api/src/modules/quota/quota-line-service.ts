@@ -12,6 +12,7 @@ import type { AuditLogService } from "../audit/audit-log-service.js";
 import type { BillItemRepository } from "../bill/bill-item-repository.js";
 import { BillItemService } from "../bill/bill-item-service.js";
 import { BillVersionService } from "../bill/bill-version-service.js";
+import { quotaLineSourceModes } from "../pricing/pricing-constants.js";
 import type { ProjectDisciplineRepository } from "../project/project-discipline-repository.js";
 import type {
   QuotaLineRecord,
@@ -23,12 +24,7 @@ import type {
   ReferenceQuotaRepository,
 } from "./reference-quota-repository.js";
 
-export const quotaLineSourceModeSchema = z.enum([
-  "manual",
-  "ai",
-  "history_reference",
-  "reference_knowledge",
-]);
+export const quotaLineSourceModeSchema = z.enum(quotaLineSourceModes);
 
 export const createQuotaLineSchema = z.object({
   sourceStandardSetCode: z.string().min(1),

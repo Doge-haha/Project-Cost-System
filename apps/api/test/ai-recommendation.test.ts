@@ -115,7 +115,10 @@ const billItems: BillItemRecord[] = [
   },
 ];
 
-function createRecommendationApp(input?: { billItems?: BillItemRecord[] }) {
+function createRecommendationApp(input?: {
+  billItems?: BillItemRecord[];
+  billVersions?: BillVersionRecord[];
+}) {
   return createApp({
     jwtSecret,
     projectRepository: new InMemoryProjectRepository(projects),
@@ -124,7 +127,9 @@ function createRecommendationApp(input?: { billItems?: BillItemRecord[] }) {
       disciplines,
     ),
     projectMemberRepository: new InMemoryProjectMemberRepository(members),
-    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billVersionRepository: new InMemoryBillVersionRepository(
+      input?.billVersions ?? billVersions,
+    ),
     billItemRepository: new InMemoryBillItemRepository(input?.billItems ?? billItems),
     quotaLineRepository: new InMemoryQuotaLineRepository([]),
     auditLogRepository: new InMemoryAuditLogRepository([]),
@@ -183,6 +188,18 @@ test("POST /v1/ai/bill-recommendations creates generated recommendation and audi
   assert.deepEqual(response.json().inputPayload.aiRequestSummary.payloadKeys, [
     "source",
   ]);
+  assert.deepEqual(response.json().inputPayload.recommendationContext, {
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    resourceType: "bill_version",
+    resourceId: "bill-version-001",
+    recommendationType: "bill_recommendation",
+    contextType: "bill_recommendation_input",
+    targetBillVersionId: "bill-version-001",
+    knowledgeHints: [],
+    memoryHints: [],
+  });
   assert.equal(
     response.json().outputPayload.aiAssistTraceId,
     response.json().inputPayload.aiAssistTraceId,
@@ -256,6 +273,18 @@ test("POST /v1/ai/quota-recommendations preserves provided AI provider metadata"
   assert.deepEqual(response.json().inputPayload.aiRequestSummary.payloadKeys, [
     "candidateCount",
   ]);
+  assert.deepEqual(response.json().inputPayload.recommendationContext, {
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    resourceType: "bill_item",
+    resourceId: "bill-item-001",
+    recommendationType: "quota_recommendation",
+    contextType: "quota_recommendation_input",
+    targetBillItemId: "bill-item-001",
+    knowledgeHints: [],
+    memoryHints: [],
+  });
 
   await app.close();
 });
@@ -382,6 +411,10 @@ test("POST /v1/ai/variance-warnings generates threshold-based warnings from summ
   assert.equal(response.json().summary.typeCounts.variance_warning, 1);
   assert.equal(response.json().items[0].resourceType, "bill_item");
   assert.equal(response.json().items[0].resourceId, "bill-item-001");
+  assert.equal(
+    response.json().items[0].inputPayload.recommendationContext.contextType,
+    "variance_warning_input",
+  );
   assert.equal(response.json().items[0].outputPayload.varianceAmount, 40);
   assert.equal(response.json().items[0].outputPayload.thresholdRate, 0.2);
 
@@ -394,6 +427,124 @@ test("POST /v1/ai/variance-warnings generates threshold-based warnings from summ
   });
   assert.equal(listResponse.statusCode, 200);
   assert.equal(listResponse.json().items.length, 1);
+
+  await app.close();
+});
+
+test("POST /v1/ai/variance-warnings generates upstream version compare warnings", async () => {
+  const app = createRecommendationApp({
+    billVersions: [
+      billVersions[0],
+      {
+        ...billVersions[0],
+        id: "bill-version-002",
+        versionNo: 2,
+        versionName: "估算版 V2",
+      },
+    ],
+    billItems: [
+      {
+        ...billItems[0],
+        billVersionId: "bill-version-001",
+        systemAmount: 100,
+        finalAmount: 100,
+      },
+      {
+        ...billItems[0],
+        id: "bill-item-002",
+        billVersionId: "bill-version-002",
+        systemAmount: 160,
+        finalAmount: 180,
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/variance-warnings",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      baseBillVersionId: "bill-version-001",
+      targetBillVersionId: "bill-version-002",
+      thresholdRate: 0.2,
+      thresholdAmount: 30,
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].resourceType, "bill_item_code");
+  assert.equal(response.json().items[0].resourceId, "bill-version-002:A-001");
+  assert.equal(response.json().items[0].outputPayload.systemVarianceAmount, 60);
+  assert.equal(response.json().items[0].outputPayload.finalVarianceAmount, 80);
+  assert.equal(response.json().items[0].outputPayload.systemVarianceRate, 0.6);
+  assert.equal(response.json().items[0].outputPayload.finalVarianceRate, 0.8);
+
+  await app.close();
+});
+
+test("POST /v1/ai/variance-warnings generates grouped variance warnings with configured thresholds", async () => {
+  const app = createRecommendationApp({
+    billItems: [
+      {
+        ...billItems[0],
+        systemAmount: 100,
+        finalAmount: 160,
+        systemUnitPrice: 10,
+        finalUnitPrice: 16,
+      },
+      {
+        id: "bill-item-002",
+        billVersionId: "bill-version-001",
+        parentId: null,
+        itemCode: "A-002",
+        itemName: "回填土",
+        quantity: 5,
+        unit: "m3",
+        sortNo: 2,
+        systemAmount: 100,
+        finalAmount: 102,
+        systemUnitPrice: 20,
+        finalUnitPrice: 20.4,
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/variance-warnings",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      billVersionId: "bill-version-001",
+      groupBy: "discipline",
+      thresholdConfig: {
+        project: { thresholdAmount: 999, thresholdRate: 0.99 },
+        stages: {
+          estimate: { thresholdAmount: 30, thresholdRate: 0.2 },
+        },
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].resourceType, "project_discipline");
+  assert.equal(response.json().items[0].resourceId, "building");
+  assert.equal(response.json().items[0].outputPayload.warning, "专业级偏差超过阈值");
+  assert.equal(response.json().items[0].outputPayload.thresholdSource, "stage_config");
+  assert.equal(response.json().items[0].outputPayload.varianceAmount, 62);
 
   await app.close();
 });
@@ -593,6 +744,57 @@ test("POST /v1/ai/recommendations/:id/accept transitions generated recommendatio
     },
   });
   assert.equal(repeatResponse.statusCode, 409);
+
+  await app.close();
+});
+
+test("POST /v1/ai/recommendations/expire-stale expires context-mismatched generated recommendations", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const createdResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      inputPayload: {
+        priceVersionId: "price-version-old",
+      },
+      outputPayload: {
+        quotaName: "挖土方",
+      },
+    },
+  });
+  assert.equal(createdResponse.statusCode, 201);
+
+  const staleResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/recommendations/expire-stale",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      resourceType: "bill_item",
+      recommendationType: "quota_recommendation",
+      inputFingerprintKey: "priceVersionId",
+      currentFingerprintValue: "price-version-new",
+      reason: "price_version_changed",
+    },
+  });
+
+  assert.equal(staleResponse.statusCode, 200);
+  assert.equal(staleResponse.json().items.length, 1);
+  assert.equal(staleResponse.json().items[0].id, createdResponse.json().id);
+  assert.equal(staleResponse.json().items[0].status, "expired");
+  assert.equal(staleResponse.json().items[0].statusReason, "price_version_changed");
 
   await app.close();
 });

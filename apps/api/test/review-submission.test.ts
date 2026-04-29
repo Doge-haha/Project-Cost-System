@@ -403,6 +403,23 @@ test("POST /v1/projects/:id/reviews/:reviewSubmissionId/approve approves the rev
   assert.equal(auditResponse.json().items.length, 1);
   assert.equal(auditResponse.json().items[0].afterPayload.status, "approved");
 
+  const stageAuditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=project_stage&action=update&operatorId=reviewer-001",
+    headers: {
+      authorization: `Bearer ${reviewerToken}`,
+    },
+  });
+
+  assert.equal(stageAuditResponse.statusCode, 200);
+  assert.equal(stageAuditResponse.json().items.length, 1);
+  assert.equal(stageAuditResponse.json().items[0].beforePayload.status, "submitted");
+  assert.equal(stageAuditResponse.json().items[0].afterPayload.status, "approved");
+  assert.equal(
+    stageAuditResponse.json().items[0].afterPayload.causeResourceType,
+    "review_submission",
+  );
+
   await app.close();
 });
 

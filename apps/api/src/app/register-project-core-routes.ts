@@ -21,6 +21,10 @@ const updateProjectDefaultFeeTemplateSchema = z.object({
   defaultFeeTemplateId: z.string().min(1).nullable(),
 });
 
+const updateProjectStatusSchema = z.object({
+  status: z.enum(["draft", "active", "archived"]),
+});
+
 const projectStageSetupSchema = z.object({
   stageCode: z.string().min(1),
   stageName: z.string().min(1),
@@ -33,11 +37,23 @@ const createProjectSchema = z.object({
   name: z.string().min(1),
   defaultPriceVersionId: z.string().min(1).nullable().optional(),
   defaultFeeTemplateId: z.string().min(1).nullable().optional(),
-  stages: z.array(projectStageSetupSchema).min(1),
+  stages: z.array(projectStageSetupSchema).min(1).optional(),
 });
 
 const updateProjectStagesSchema = z.object({
   stages: z.array(projectStageSetupSchema).min(1),
+});
+
+const projectDisciplineSetupSchema = z.object({
+  disciplineCode: z.string().min(1),
+  disciplineName: z.string().min(1),
+  defaultStandardSetCode: z.string().min(1).nullable().optional(),
+  status: z.enum(["enabled", "disabled"]).default("enabled"),
+  sortOrder: z.coerce.number().int().nonnegative(),
+});
+
+const updateProjectDisciplinesSchema = z.object({
+  disciplines: z.array(projectDisciplineSetupSchema).min(1),
 });
 
 const projectMemberScopeSchema = z.object({
@@ -141,6 +157,20 @@ export function registerProjectCoreRoutes(
     );
   });
 
+  app.put("/v1/projects/:projectId/status", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const payload = updateProjectStatusSchema.parse(request.body);
+
+    return transactionRunner.runInTransaction(async () =>
+      projectService.updateProjectStatus({
+        projectId,
+        userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
+        status: payload.status,
+      }),
+    );
+  });
+
   app.get("/v1/projects/:projectId/stages", async (request) => {
     const { projectId } = request.params as { projectId: string };
 
@@ -175,6 +205,20 @@ export function registerProjectCoreRoutes(
         projectId,
         userId: request.currentUser!.id,
         roleCodes: request.currentUser!.roleCodes,
+      }),
+    }));
+  });
+
+  app.put("/v1/projects/:projectId/disciplines", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const payload = updateProjectDisciplinesSchema.parse(request.body);
+
+    return transactionRunner.runInTransaction(async () => ({
+      items: await projectService.updateProjectDisciplines({
+        projectId,
+        userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
+        disciplines: payload.disciplines,
       }),
     }));
   });

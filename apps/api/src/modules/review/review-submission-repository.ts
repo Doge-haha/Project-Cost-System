@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { reviewSubmissions } from "../../infrastructure/database/schema.js";
+import type { ReviewSubmissionStatus } from "./review-submission-constants.js";
 
 export type ReviewSubmissionRecord = {
   id: string;
@@ -11,7 +12,7 @@ export type ReviewSubmissionRecord = {
   billVersionId: string;
   stageCode: string;
   disciplineCode: string;
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  status: ReviewSubmissionStatus;
   submittedBy: string;
   submittedAt: string;
   submissionComment?: string | null;

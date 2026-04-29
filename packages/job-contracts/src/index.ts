@@ -6,18 +6,23 @@ export const executableBackgroundJobTypes = [
 
 export type BackgroundJobType = (typeof executableBackgroundJobTypes)[number];
 
-export type BackgroundJobStatus =
-  | "queued"
-  | "processing"
-  | "completed"
-  | "failed";
+export const backgroundJobStatuses = [
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+] as const;
+
+export type BackgroundJobStatus = (typeof backgroundJobStatuses)[number];
 
 export type ReportExportJobPayload = {
   projectId: string;
-  reportType: "summary" | "variance";
+  reportType: "summary" | "variance" | "stage_bill";
   reportExportTaskId?: string | null;
   stageCode?: string | null;
   disciplineCode?: string | null;
+  reportTemplateId?: string | null;
+  outputFormat?: "json" | "excel" | "pdf" | null;
 };
 
 export type ProjectRecalculateJobPayload = {

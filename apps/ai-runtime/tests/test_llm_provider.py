@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import app.llm_provider as llm_provider
-from app.llm_provider import describe_llm_provider, generate_llm_completion
+from app.llm_provider import (
+    LlmProviderError,
+    describe_llm_provider,
+    generate_llm_completion,
+)
 from app.runtime_service import process_event_batch
 
 
@@ -43,7 +47,64 @@ def test_generate_llm_completion_calls_openai_compatible_chat(monkeypatch) -> No
 
     assert result["provider"]["configured"] is True
     assert result["content"] == "建议套用人工挖土方定额。"
+    assert result["attempts"] == 1
     assert result["usage"] == {"total_tokens": 12}
+
+
+def test_generate_llm_completion_retries_transient_provider_failures(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    def fake_post_json(url: str, payload: dict, *, api_key: str, timeout: float) -> dict:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise LlmProviderError(
+                "AI_PROVIDER_UNAVAILABLE",
+                "temporary provider outage",
+                retryable=True,
+            )
+        return {"choices": [{"message": {"content": "ok"}}]}
+
+    monkeypatch.setattr(llm_provider, "_post_json", fake_post_json)
+
+    result = generate_llm_completion(
+        {
+            "baseUrl": "http://llm.local/v1",
+            "apiKey": "secret",
+            "model": "cost-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "retryCount": 1,
+        }
+    )
+
+    assert calls["count"] == 2
+    assert result["attempts"] == 2
+    assert result["content"] == "ok"
+
+
+def test_generate_llm_completion_exposes_non_retryable_failure_code(monkeypatch) -> None:
+    def fake_post_json(url: str, payload: dict, *, api_key: str, timeout: float) -> dict:
+        raise LlmProviderError(
+            "AI_PROVIDER_BAD_RESPONSE",
+            "invalid provider response",
+        )
+
+    monkeypatch.setattr(llm_provider, "_post_json", fake_post_json)
+
+    try:
+        generate_llm_completion(
+            {
+                "baseUrl": "http://llm.local/v1",
+                "apiKey": "secret",
+                "model": "cost-model",
+                "messages": [{"role": "user", "content": "hello"}],
+                "retryCount": 3,
+            }
+        )
+    except LlmProviderError as error:
+        assert error.code == "AI_PROVIDER_BAD_RESPONSE"
+        assert error.retryable is False
+    else:
+        raise AssertionError("expected LlmProviderError")
 
 
 def test_process_event_batch_routes_llm_chat(monkeypatch) -> None:

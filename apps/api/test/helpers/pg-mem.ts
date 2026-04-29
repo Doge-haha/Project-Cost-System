@@ -29,7 +29,9 @@ export async function createPgMemDatabase() {
   ) {
     return Promise.resolve(
       originalPoolQuery.call(this, stripUnsupportedTypes(query), ...args),
-    ).then((result: any) => normalizeResultRows(result));
+    ).then((result: any) =>
+      typeof query === "string" ? normalizeResultRows(result) : result,
+    );
   };
   adapter.Client.prototype.query = function (
     query: unknown,
@@ -37,7 +39,9 @@ export async function createPgMemDatabase() {
   ) {
     return Promise.resolve(
       originalClientQuery.call(this, stripUnsupportedTypes(query), ...args),
-    ).then((result: any) => normalizeResultRows(result));
+    ).then((result: any) =>
+      typeof query === "string" ? normalizeResultRows(result) : result,
+    );
   };
   const pool = new adapter.Pool();
 

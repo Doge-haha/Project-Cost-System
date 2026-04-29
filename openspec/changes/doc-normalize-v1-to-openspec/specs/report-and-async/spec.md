@@ -122,7 +122,10 @@ MUST 导出任务和后台任务的关键状态切换至少应对排队、完成
 
 - `apps/api` 当前已有 `ReportExportTaskService`，支持 `queued`、`processing`、`completed`、`failed`。
 - `apps/api` 当前已有 `BackgroundJobService`，支持统一后台任务排队和处理状态。
-- `apps/worker` 当前已具备 `report_export`、`project_recalculate`、`knowledge_extraction_preview` 等任务处理骨架。
+- `apps/api` 当前导出创建请求已接收 `reportTemplateId` 和 `outputFormat`，并写入导出任务实体、后台任务 payload 与创建审计 payload。
+- `apps/worker` 当前已具备 `report_export`、`project_recalculate`、`knowledge_extraction_preview` 等任务处理骨架，报表导出任务结果会保留模板 ID 与输出格式元数据。
+- `apps/mcp-gateway` 当前 `export-summary-report` 工具已支持透传报表模板 ID 与输出格式。
+- `apps/frontend` 当前已提供项目报表中心入口，支持创建报表导出任务、查看任务列表、刷新任务状态、下载完成文件、失败任务重新发起，并区分任务列表与模板管理区；导出时可选择模板和输出格式，失败任务重发会沿用原任务元数据。
 - 当前报表导出结果以 JSON 预览和下载为主，距离完整模板化报表输出还有实现空间。
 
 这些现状说明任务执行主链已经存在，但完整报表平台能力仍属于后续演进范围。

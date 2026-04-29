@@ -78,6 +78,7 @@ MUST 审计日志虽然用于追溯，但仍必须受项目可见范围和日志
 
 - `apps/api/src/modules/audit/audit-log-service.ts` 当前已支持按项目、资源类型、资源标识、动作、操作者和时间范围过滤日志。
 - `apps/api/src/modules/audit/audit-log-repository.ts` 当前已定义统一的 `resourceType`、`resourceId`、`action`、`operatorId`、`beforePayload`、`afterPayload` 结构。
-- 当前仓库多条主链服务已经接入审计日志写入，但审计日志专题页和更丰富的审计分析能力仍主要停留在文档设计层。
+- 项目状态更新、阶段状态联动、清单版本提交/撤回/锁定/解锁、审核处理、定额行维护、计价结果计算和报表导出任务等主链动作已经接入审计日志写入。
+- 当前仓库审计日志底座和主链留痕已经存在，但审计日志专题页和更丰富的审计分析能力仍主要停留在文档设计层。
 
 这些现状说明审计日志底座已经存在，并且已经是统一能力，而不是零散附属实现。

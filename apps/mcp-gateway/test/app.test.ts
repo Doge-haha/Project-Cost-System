@@ -235,8 +235,15 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         name: "export-summary-report",
         uri: "/v1/tools/export-summary-report",
         mode: "invoke",
-        description: "Queue an export task for summary or variance report output",
-        parameters: ["projectId", "reportType", "stageCode?", "disciplineCode?"],
+        description: "Queue an export task for summary, variance, or stage bill report output",
+        parameters: [
+          "projectId",
+          "reportType",
+          "stageCode?",
+          "disciplineCode?",
+          "reportTemplateId?",
+          "outputFormat?",
+        ],
       },
       {
         name: "extract-knowledge",
@@ -2046,20 +2053,24 @@ test("GET /v1/resources/import-failure-context proxies filtered import failure s
 });
 
 test("POST /v1/tools/export-summary-report returns async job and report task references", async () => {
+  const requests: Array<Record<string, unknown>> = [];
   const app = createGatewayApp({
     jwtSecret,
     apiBaseUrl: "https://api.example.com",
     apiClient: {
-      exportSummaryReport: async () => ({
-        job: {
-          id: "background-job-002",
-          status: "queued",
-        },
-        result: {
-          id: "report-export-task-001",
-          status: "queued",
-        },
-      }),
+      exportSummaryReport: async (input) => {
+        requests.push(input);
+        return {
+          job: {
+            id: "background-job-002",
+            status: "queued",
+          },
+          result: {
+            id: "report-export-task-001",
+            status: "queued",
+          },
+        };
+      },
     } as never,
   });
   const token = await signAccessToken({
@@ -2077,6 +2088,8 @@ test("POST /v1/tools/export-summary-report returns async job and report task ref
     payload: {
       projectId: "project-001",
       reportType: "summary",
+      reportTemplateId: "tpl-standard-summary-v1",
+      outputFormat: "pdf",
     },
   });
 
@@ -2088,6 +2101,8 @@ test("POST /v1/tools/export-summary-report returns async job and report task ref
     target: {
       projectId: "project-001",
       reportType: "summary",
+      reportTemplateId: "tpl-standard-summary-v1",
+      outputFormat: "pdf",
     },
     result: {
       job: {
@@ -2118,6 +2133,14 @@ test("POST /v1/tools/export-summary-report returns async job and report task ref
       },
     },
   });
+  assert.deepEqual(requests, [
+    {
+      projectId: "project-001",
+      reportType: "summary",
+      reportTemplateId: "tpl-standard-summary-v1",
+      outputFormat: "pdf",
+    },
+  ]);
 
   await app.close();
 });

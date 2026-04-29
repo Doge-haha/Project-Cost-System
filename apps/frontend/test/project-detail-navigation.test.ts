@@ -40,6 +40,7 @@ describe("project detail navigation helpers", () => {
       aiRecommendationsPath: "/projects/project-001/ai-recommendations",
       billItemsPath: "/projects/project-001/bill-versions/version-002/items",
       knowledgePath: "/projects/project-001/knowledge",
+      reportsPath: "/projects/project-001/reports?billVersionId=version-002",
       summaryPath: "/projects/project-001/summary?billVersionId=version-002",
     });
   });

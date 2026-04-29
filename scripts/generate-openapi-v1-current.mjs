@@ -15,6 +15,7 @@ const methodOrder = new Map([
 ]);
 
 const queryParameterMap = new Map([
+  ["/v1/discipline-types", ["regionCode", "status"]],
   ["/v1/fee-templates", ["regionCode", "stageCode", "activeOnly"]],
   ["/v1/jobs", ["projectId", "requestedBy", "jobType", "status", "createdFrom", "createdTo", "completedFrom", "completedTo", "limit"]],
   ["/v1/price-versions", ["regionCode", "disciplineCode", "activeOnly"]],
@@ -36,6 +37,7 @@ const queryParameterMap = new Map([
   ["/v1/reports/summary", ["projectId", "billVersionId", "stageCode", "disciplineCode"]],
   ["/v1/reports/summary/details", ["projectId", "billVersionId", "stageCode", "disciplineCode", "limit"]],
   ["/v1/reports/version-compare", ["projectId", "baseBillVersionId", "targetBillVersionId"]],
+  ["/v1/standard-sets", ["disciplineCode", "regionCode", "status"]],
 ]);
 
 const integerQueryParameters = new Set(["page", "pageSize", "limit"]);
@@ -46,6 +48,40 @@ const enumQueryParameters = new Map([
   ["jobType", ["report_export", "project_recalculate", "knowledge_extraction"]],
   ["recommendationType", ["bill_recommendation", "quota_recommendation", "variance_warning"]],
   ["status", ["queued", "processing", "completed", "failed", "pending", "approved", "rejected", "cancelled", "draft", "submitted", "generated", "accepted", "ignored", "expired"]],
+]);
+
+const requestBodyPropertyMap = new Map([
+  [
+    "PUT /v1/projects/:projectId/status",
+    [
+      {
+        name: "status",
+        required: true,
+        enumValues: ["draft", "active", "archived"],
+      },
+    ],
+  ],
+  [
+    "PUT /v1/projects/:projectId/disciplines",
+    [
+      { name: "disciplines", required: true },
+    ],
+  ],
+  [
+    "POST /v1/reports/export",
+    [
+      { name: "projectId", required: true },
+      {
+        name: "reportType",
+        required: true,
+        enumValues: ["summary", "variance", "stage_bill"],
+      },
+      { name: "stageCode", required: false },
+      { name: "disciplineCode", required: false },
+      { name: "reportTemplateId", required: false },
+      { name: "outputFormat", required: false, enumValues: ["json", "excel", "pdf"] },
+    ],
+  ],
 ]);
 
 const parameterDescriptions = new Map([
@@ -82,6 +118,7 @@ const tagRules = [
   ["AI Recommendations", (route) => route.path.includes("/ai/recommendations") || route.path.includes("/ai/bill-recommendations") || route.path.includes("/ai/quota-recommendations") || route.path.includes("/ai/variance-warnings")],
   ["Import Tasks", (route) => route.path.includes("/import-tasks")],
   ["Knowledge", (route) => route.path.includes("/knowledge") || route.path.includes("/memory")],
+  ["Master Data", (route) => route.path === "/v1/discipline-types" || route.path === "/v1/standard-sets"],
   ["Reviews", (route) => route.path.includes("/reviews")],
   ["Process Documents", (route) => route.path.includes("/process-documents")],
   ["Bill Versions", (route) => route.path.includes("/bill-versions") && !route.path.includes("/items")],
@@ -195,6 +232,9 @@ function renderOperation(route) {
   }
 
   if (["post", "put"].includes(route.method)) {
+    const requestBodyProperties =
+      requestBodyPropertyMap.get(`${route.method.toUpperCase()} ${route.path}`) ??
+      [];
     lines.push(
       "      requestBody:",
       `        required: ${requestBodyRequiredFor(route)}`,
@@ -203,6 +243,7 @@ function renderOperation(route) {
       "            schema:",
       "              type: object",
       "              additionalProperties: true",
+      ...renderRequestBodyProperties(requestBodyProperties),
     );
   }
 
@@ -227,6 +268,30 @@ function renderOperation(route) {
   );
 
   return lines;
+}
+
+function renderRequestBodyProperties(properties) {
+  if (properties.length === 0) {
+    return [];
+  }
+
+  const requiredNames = properties
+    .filter((property) => property.required)
+    .map((property) => property.name);
+
+  return [
+    ...(requiredNames.length > 0
+      ? [`              required: [${requiredNames.join(", ")}]`]
+      : []),
+    "              properties:",
+    ...properties.flatMap((property) => [
+      `                ${property.name}:`,
+      "                  type: string",
+      ...(property.enumValues
+        ? [`                  enum: [${property.enumValues.join(", ")}]`]
+        : []),
+    ]),
+  ];
 }
 
 function renderErrorContent() {

@@ -21,13 +21,19 @@ test("BackgroundJobExecutor completes report export jobs with result payload", a
     payload: {
       projectId: "project-001",
       reportType: "summary",
+      reportTemplateId: "tpl-standard-summary-v1",
+      outputFormat: "excel",
     },
     createdAt: "2026-04-17T07:59:00.000Z",
   });
 
   assert.equal(executed.status, "completed");
   assert.equal(executed.completedAt, "2026-04-17T08:00:00.000Z");
-  assert.deepEqual(executed.result, { totalFinalAmount: 321 });
+  assert.deepEqual(executed.result, {
+    totalFinalAmount: 321,
+    reportTemplateId: "tpl-standard-summary-v1",
+    outputFormat: "excel",
+  });
 });
 
 test("BackgroundJobExecutor records failed execution details", async () => {

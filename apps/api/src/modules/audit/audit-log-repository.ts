@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { auditLogs } from "../../infrastructure/database/schema.js";
+import type { AuditLogAction } from "./audit-log-constants.js";
 
 export type AuditLogRecord = {
   id: string;
@@ -9,7 +10,7 @@ export type AuditLogRecord = {
   stageCode?: string | null;
   resourceType: string;
   resourceId: string;
-  action: string;
+  action: AuditLogAction;
   operatorId: string;
   beforePayload?: Record<string, unknown> | null;
   afterPayload?: Record<string, unknown> | null;
@@ -72,7 +73,7 @@ export class DbAuditLogRepository implements AuditLogRepository {
       stageCode: record.stageCode ?? null,
       resourceType: record.resourceType,
       resourceId: record.resourceId,
-      action: record.action,
+      action: record.action as AuditLogAction,
       operatorId: record.operatorId,
       beforePayload:
         record.beforePayload && typeof record.beforePayload === "object"
@@ -109,7 +110,7 @@ export class DbAuditLogRepository implements AuditLogRepository {
       stageCode: created.stageCode ?? null,
       resourceType: created.resourceType,
       resourceId: created.resourceId,
-      action: created.action,
+      action: created.action as AuditLogAction,
       operatorId: created.operatorId,
       beforePayload:
         created.beforePayload && typeof created.beforePayload === "object"

@@ -6,7 +6,10 @@ import { ProjectAuthorizationService } from "../project/project-authorization-se
 import type { ProjectDisciplineRepository } from "../project/project-discipline-repository.js";
 import type { ProjectMemberRepository } from "../project/project-member-repository.js";
 import type { ProjectRepository } from "../project/project-repository.js";
-import type { ProjectStageRepository } from "../project/project-stage-repository.js";
+import type {
+  ProjectStageRecord,
+  ProjectStageRepository,
+} from "../project/project-stage-repository.js";
 import type { BillVersionRepository } from "../bill/bill-version-repository.js";
 import type { AuditLogService } from "../audit/audit-log-service.js";
 import type {
@@ -241,10 +244,13 @@ export class ReviewSubmissionService {
       reviewComment: null,
       rejectionReason: null,
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: input.projectId,
       stageCode: version.stageCode,
       status: "submitted",
+      userId: input.userId,
+      causeResourceType: "review_submission",
+      causeResourceId: created.id,
     });
 
     await this.auditLogService.writeAuditLog({
@@ -290,10 +296,13 @@ export class ReviewSubmissionService {
       versionId: submission.billVersionId,
       versionStatus: "approved",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: input.projectId,
       stageCode: submission.stageCode,
       status: "approved",
+      userId: input.userId,
+      causeResourceType: "review_submission",
+      causeResourceId: submission.id,
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -346,10 +355,13 @@ export class ReviewSubmissionService {
       versionId: submission.billVersionId,
       versionStatus: "editable",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: input.projectId,
       stageCode: submission.stageCode,
       status: "active",
+      userId: input.userId,
+      causeResourceType: "review_submission",
+      causeResourceId: submission.id,
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -415,10 +427,13 @@ export class ReviewSubmissionService {
       versionId: submission.billVersionId,
       versionStatus: "editable",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: input.projectId,
       stageCode: submission.stageCode,
       status: "active",
+      userId: input.userId,
+      causeResourceType: "review_submission",
+      causeResourceId: submission.id,
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -534,6 +549,49 @@ export class ReviewSubmissionService {
     }
 
     return submission;
+  }
+
+  private async updateProjectStageStatusWithAudit(input: {
+    projectId: string;
+    stageCode: string;
+    status: ProjectStageRecord["status"];
+    userId: string;
+    causeResourceType: string;
+    causeResourceId: string;
+  }): Promise<ProjectStageRecord> {
+    const beforeStage = (
+      await this.dependencies.projectStageRepository.listByProjectId(input.projectId)
+    ).find((stage) => stage.stageCode === input.stageCode);
+    const before = beforeStage ? { ...beforeStage } : null;
+
+    const updated = await this.dependencies.projectStageRepository.updateStatus({
+      projectId: input.projectId,
+      stageCode: input.stageCode,
+      status: input.status,
+    });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: input.stageCode,
+      resourceType: "project_stage",
+      resourceId: updated.id,
+      action: "update",
+      operatorId: input.userId,
+      beforePayload: before
+        ? {
+            stageCode: before.stageCode,
+            status: before.status,
+          }
+        : null,
+      afterPayload: {
+        stageCode: updated.stageCode,
+        status: updated.status,
+        causeResourceType: input.causeResourceType,
+        causeResourceId: input.causeResourceId,
+      },
+    });
+
+    return updated;
   }
 
   private async createAuthorizationService(projectId: string) {

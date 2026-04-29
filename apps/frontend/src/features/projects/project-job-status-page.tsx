@@ -1373,6 +1373,31 @@ export function ProjectJobStatusPage() {
                 </div>
               ) : null}
               {filteredImportFailedItems.length > 0 ? (
+                selectedImportTask.sourceType === "source_bill" ? (
+                  <div className="project-list">
+                    <article className="project-link selected">
+                      <h3>源清单导入失败报告</h3>
+                      <p className="page-description">
+                        当前范围：{selectedFailureReasonLabel ?? "全部失败条目"} · 共{" "}
+                        {filteredImportFailedItems.length} 条
+                      </p>
+                      <ul className="inline-list">
+                        {filteredImportFailedItems.slice(0, 30).map((item) => (
+                          <li
+                            key={`${item.tableName ?? "table"}-${item.lineNo ?? "line"}-${item.reasonCode}-${item.sourceId ?? item.itemCode ?? item.errorMessage}`}
+                          >
+                            {item.reasonLabel} · {item.tableName ?? "源表"} 第{" "}
+                            {item.lineNo ?? "-"} 行 ·{" "}
+                            {item.itemCode ?? item.sourceId ?? "未识别"} ·{" "}
+                            {item.errorMessage}
+                          </li>
+                        ))}
+                      </ul>
+                    </article>
+                  </div>
+                ) : null
+              ) : null}
+              {filteredImportFailedItems.length > 0 ? (
                 <div className="project-list">
                   <article className="project-link selected">
                     <h3>当前筛选运营摘要</h3>

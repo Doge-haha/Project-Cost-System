@@ -94,6 +94,8 @@ test("report export job failure marks both background job and export task as fai
     reportType: "summary",
     stageCode: "estimate",
     disciplineCode: "building",
+    reportTemplateId: "tpl-standard-summary-v1",
+    outputFormat: "pdf",
     userId: "engineer-001",
   });
 
@@ -106,6 +108,8 @@ test("report export job failure marks both background job and export task as fai
       reportType: "summary",
       stageCode: "estimate",
       disciplineCode: "building",
+      reportTemplateId: "tpl-standard-summary-v1",
+      outputFormat: "pdf",
       reportExportTaskId: task.id,
     },
   });
@@ -142,7 +146,11 @@ test("report export job failure marks both background job and export task as fai
   assert.equal(failedJob.errorMessage, "summary aggregation failed");
   assert.equal(failedTask?.status, "failed");
   assert.equal(failedTask?.errorMessage, "summary aggregation failed");
+  assert.equal(failedTask?.reportTemplateId, "tpl-standard-summary-v1");
+  assert.equal(failedTask?.outputFormat, "pdf");
   assert.equal(failedTaskView.hasFailed, true);
+  assert.equal(failedTaskView.reportTemplateId, "tpl-standard-summary-v1");
+  assert.equal(failedTaskView.outputFormat, "pdf");
   assert.equal(failedTaskView.isDownloadReady, false);
   assert.equal(failedTaskView.isTerminal, true);
   assert.equal(failedTaskView.failureMessage, "summary aggregation failed");

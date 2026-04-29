@@ -8,6 +8,15 @@ export function formatFailureReasonLabel(reasonCode: string | null) {
   if (reasonCode === "parse_error") {
     return "解析失败";
   }
+  if (reasonCode === "duplicate_code") {
+    return "重复编码";
+  }
+  if (reasonCode === "unmapped_parent") {
+    return "父级无法映射";
+  }
+  if (reasonCode === "unmapped_work_item") {
+    return "工作内容无法挂接";
+  }
   return null;
 }
 

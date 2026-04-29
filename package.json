@@ -13,6 +13,7 @@
   "scripts": {
     "dev:deps:up": "docker compose -f deploy/docker/docker-compose.dev.yml up -d --wait",
     "dev:deps:down": "docker compose -f deploy/docker/docker-compose.dev.yml down",
+    "dev:local": "node scripts/dev-local.mjs",
     "docs:api": "npm run docs:api-routes && npm run docs:openapi-current",
     "docs:api-routes": "node scripts/generate-implemented-routes-doc.mjs",
     "docs:openapi-current": "node scripts/generate-openapi-v1-current.mjs",
@@ -23,7 +24,8 @@
     "test:packages": "npm run test --workspaces --if-present",
     "test:workspace": "node --test tests/*.test.mjs",
     "test:ai-runtime": "pytest apps/ai-runtime/tests",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "audit:prod": "npm audit --omit=dev"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",

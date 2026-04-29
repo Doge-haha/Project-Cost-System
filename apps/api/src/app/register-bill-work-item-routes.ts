@@ -17,6 +17,71 @@ export function registerBillWorkItemRoutes(
   const { transactionRunner, billWorkItemService } = input;
 
   app.get(
+    "/v1/projects/:projectId/bill-items/:itemId/work-items",
+    async (request) => {
+      const { projectId, itemId } = request.params as {
+        projectId: string;
+        itemId: string;
+      };
+
+      return transactionRunner.runInTransaction(async () => ({
+        items: await billWorkItemService.listProjectWorkItems({
+          projectId,
+          billItemId: itemId,
+          userId: request.currentUser!.id,
+        }),
+      }));
+    },
+  );
+
+  app.post(
+    "/v1/projects/:projectId/bill-items/:itemId/work-items",
+    async (request, reply) => {
+      const { projectId, itemId } = request.params as {
+        projectId: string;
+        itemId: string;
+      };
+      const payload = createBillWorkItemSchema.parse(request.body);
+
+      const created = await transactionRunner.runInTransaction(async () =>
+        billWorkItemService.createProjectWorkItem({
+          projectId,
+          billItemId: itemId,
+          workContent: payload.workContent,
+          sortNo: payload.sortNo,
+          userId: request.currentUser!.id,
+        }),
+      );
+
+      reply.status(201);
+      return created;
+    },
+  );
+
+  app.put(
+    "/v1/projects/:projectId/bill-items/:itemId/work-items/:workItemId",
+    async (request) => {
+      const { projectId, itemId, workItemId } = request.params as {
+        projectId: string;
+        itemId: string;
+        workItemId: string;
+      };
+      const payload = updateBillWorkItemSchema.parse(request.body);
+
+      return transactionRunner.runInTransaction(async () =>
+        billWorkItemService.updateProjectWorkItem({
+          projectId,
+          billItemId: itemId,
+          workItemId,
+          workContent: payload.workContent,
+          sortNo: payload.sortNo,
+          userId: request.currentUser!.id,
+        }),
+      );
+    },
+  );
+
+  app.get(
     "/v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId/work-items",
     async (request) => {
       const { projectId, billVersionId, itemId } = request.params as {

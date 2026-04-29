@@ -52,6 +52,20 @@ export class BillWorkItemService {
     return this.billWorkItemRepository.listByBillItemId(input.billItemId);
   }
 
+  async listProjectWorkItems(input: {
+    projectId: string;
+    billItemId: string;
+    userId: string;
+  }): Promise<BillWorkItemRecord[]> {
+    const billVersionId = await this.getBillVersionIdForItem(input.billItemId);
+    return this.listWorkItems({
+      projectId: input.projectId,
+      billVersionId,
+      billItemId: input.billItemId,
+      userId: input.userId,
+    });
+  }
+
   async createWorkItem(input: {
     projectId: string;
     billVersionId: string;
@@ -88,6 +102,24 @@ export class BillWorkItemService {
     });
 
     return created;
+  }
+
+  async createProjectWorkItem(input: {
+    projectId: string;
+    billItemId: string;
+    workContent: string;
+    sortNo: number;
+    userId: string;
+  }): Promise<BillWorkItemRecord> {
+    const billVersionId = await this.getBillVersionIdForItem(input.billItemId);
+    return this.createWorkItem({
+      projectId: input.projectId,
+      billVersionId,
+      billItemId: input.billItemId,
+      workContent: input.workContent,
+      sortNo: input.sortNo,
+      userId: input.userId,
+    });
   }
 
   async deleteWorkItem(input: {
@@ -167,6 +199,26 @@ export class BillWorkItemService {
     return updated;
   }
 
+  async updateProjectWorkItem(input: {
+    projectId: string;
+    billItemId: string;
+    workItemId: string;
+    workContent: string;
+    sortNo: number;
+    userId: string;
+  }): Promise<BillWorkItemRecord> {
+    const billVersionId = await this.getBillVersionIdForItem(input.billItemId);
+    return this.updateWorkItem({
+      projectId: input.projectId,
+      billVersionId,
+      billItemId: input.billItemId,
+      workItemId: input.workItemId,
+      workContent: input.workContent,
+      sortNo: input.sortNo,
+      userId: input.userId,
+    });
+  }
+
   private async assertBillItemInVersion(input: {
     billVersionId: string;
     billItemId: string;
@@ -181,5 +233,14 @@ export class BillWorkItemService {
         "Bill item must belong to the target bill version",
       );
     }
+  }
+
+  private async getBillVersionIdForItem(billItemId: string): Promise<string> {
+    const billItem = await this.dependencies.billItemRepository.findById(billItemId);
+    if (!billItem) {
+      throw new AppError(404, "BILL_ITEM_NOT_FOUND", "Bill item not found");
+    }
+
+    return billItem.billVersionId;
   }
 }

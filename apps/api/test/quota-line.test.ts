@@ -356,6 +356,19 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/quota-lines c
     sourceMode: "manual",
   });
 
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=quota_line&resourceId=quota-line-003&action=create",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(auditResponse.json().items[0].afterPayload.quotaCode, "010101002");
+  assert.equal(auditResponse.json().items[0].afterPayload.quantity, 80);
+
   await app.close();
 });
 
@@ -976,6 +989,21 @@ test("PUT /v1/projects/:id/quota-lines/:lineId updates a quota line", async () =
     contentFactor: 1.1,
     sourceMode: "manual",
   });
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=quota_line&resourceId=quota-line-001&action=update",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.equal(auditResponse.json().items[0].beforePayload.quotaName, "人工挖土方");
+  assert.equal(auditResponse.json().items[0].beforePayload.quantity, 100);
+  assert.equal(auditResponse.json().items[0].afterPayload.quotaName, "人工挖土方-更新");
+  assert.equal(auditResponse.json().items[0].afterPayload.quantity, 120);
 
   await app.close();
 });

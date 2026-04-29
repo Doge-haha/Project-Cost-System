@@ -21,6 +21,18 @@ export function setupAppBase(
   app: FastifyInstance,
   input: { jwtSecret: string },
 ) {
+  app.addHook("onRequest", async (_request, reply) => {
+    reply.header("access-control-allow-origin", "*");
+    reply.header(
+      "access-control-allow-headers",
+      "authorization, content-type",
+    );
+    reply.header(
+      "access-control-allow-methods",
+      "GET, POST, PUT, DELETE, OPTIONS",
+    );
+  });
+
   app.setErrorHandler((error, _request, reply) => {
     if (isAppError(error)) {
       reply.status(error.statusCode).send({
@@ -65,7 +77,12 @@ export function setupAppBase(
     checkedAt: new Date().toISOString(),
   }));
 
+  app.options("/*", async (_request, reply) => reply.status(204).send());
+
   app.addHook("preHandler", async (request) => {
+    if (request.method === "OPTIONS") {
+      return;
+    }
     if (!request.url.startsWith("/v1/")) {
       return;
     }

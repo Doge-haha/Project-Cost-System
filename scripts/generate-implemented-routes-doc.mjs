@@ -18,6 +18,7 @@ const SECTION_RULES = [
   ["Pricing / Fee / Engine", (route) => matchesAny(route.path, ["/v1/price-versions", "/v1/fee-templates", "/v1/engine"])],
   ["Reports", (route) => route.path.startsWith("/v1/reports")],
   ["Audit Logs", (route) => route.path.includes("/audit-logs")],
+  ["Master Data", (route) => matchesAny(route.path, ["/v1/discipline-types", "/v1/standard-sets"])],
   ["Background Jobs", (route) => route.path.startsWith("/v1/jobs") || route.path.endsWith("/recalculate")],
   ["AI Recommendations", (route) => route.path.includes("/ai/recommendations") || route.path.includes("/ai/bill-recommendations") || route.path.includes("/ai/quota-recommendations") || route.path.includes("/ai/variance-warnings")],
   ["AI Runtime / Knowledge", (route) => matchesAny(route.path, ["/v1/ai-runtime", "/ai-runtime/", "/knowledge-", "/memory-"])],

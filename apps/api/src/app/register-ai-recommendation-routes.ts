@@ -32,8 +32,30 @@ const generateVarianceWarningsSchema = z.object({
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
   billVersionId: z.string().min(1).optional(),
+  baseBillVersionId: z.string().min(1).optional(),
+  targetBillVersionId: z.string().min(1).optional(),
+  groupBy: z.enum(["discipline", "unit"]).optional(),
   thresholdAmount: z.number().nonnegative().optional(),
   thresholdRate: z.number().nonnegative().optional(),
+  thresholdConfig: z
+    .object({
+      project: z
+        .object({
+          thresholdAmount: z.number().nonnegative().optional(),
+          thresholdRate: z.number().nonnegative().optional(),
+        })
+        .optional(),
+      stages: z
+        .record(
+          z.string(),
+          z.object({
+            thresholdAmount: z.number().nonnegative().optional(),
+            thresholdRate: z.number().nonnegative().optional(),
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
   limit: z.number().int().positive().max(100).optional(),
   inputPayload: z.record(z.string(), z.unknown()).optional(),
   outputPayload: z.record(z.string(), z.unknown()).optional(),
@@ -41,6 +63,20 @@ const generateVarianceWarningsSchema = z.object({
 
 const transitionSchema = z.object({
   reason: z.string().min(1).optional(),
+});
+
+const expireStaleRecommendationsSchema = z.object({
+  projectId: z.string().min(1),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+  currentStageCode: z.string().min(1).optional(),
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  recommendationType: recommendationTypeSchema.optional(),
+  inputFingerprintKey: z.string().min(1).optional(),
+  currentFingerprintValue: z.unknown().optional(),
+  reason: z.string().min(1).optional(),
+  limit: z.number().int().positive().max(100).optional(),
 });
 
 export function registerAiRecommendationRoutes(
@@ -90,8 +126,12 @@ export function registerAiRecommendationRoutes(
         stageCode: payload.stageCode,
         disciplineCode: payload.disciplineCode,
         billVersionId: payload.billVersionId,
+        baseBillVersionId: payload.baseBillVersionId,
+        targetBillVersionId: payload.targetBillVersionId,
+        groupBy: payload.groupBy,
         thresholdAmount: payload.thresholdAmount,
         thresholdRate: payload.thresholdRate,
+        thresholdConfig: payload.thresholdConfig,
         limit: payload.limit,
         userId: request.currentUser!.id,
       }),
@@ -195,6 +235,22 @@ export function registerAiRecommendationRoutes(
         userId: request.currentUser!.id,
       }),
     );
+  });
+
+  app.post("/v1/ai/recommendations/expire-stale", async (request) => {
+    const payload = expireStaleRecommendationsSchema.parse(request.body ?? {});
+
+    const items = await transactionRunner.runInTransaction(() =>
+      aiRecommendationService.expireStaleRecommendations({
+        ...payload,
+        userId: request.currentUser!.id,
+      }),
+    );
+
+    return {
+      items,
+      summary: aiRecommendationService.summarizeRecommendations(items),
+    };
   });
 }
 

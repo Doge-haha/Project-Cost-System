@@ -143,6 +143,8 @@ export function registerReportRoutes(
         reportType: payload.reportType,
         stageCode: payload.stageCode,
         disciplineCode: payload.disciplineCode,
+        reportTemplateId: payload.reportTemplateId,
+        outputFormat: payload.outputFormat,
         userId: request.currentUser!.id,
       });
 

@@ -30,6 +30,10 @@ export interface ProjectRepository {
       defaultFeeTemplateId?: string | null;
     },
   ): Promise<ProjectRecord>;
+  updateStatus(
+    projectId: string,
+    status: ProjectRecord["status"],
+  ): Promise<ProjectRecord>;
   create(input: Omit<ProjectRecord, "id"> & { id?: string }): Promise<ProjectRecord>;
 }
 
@@ -75,6 +79,19 @@ export class InMemoryProjectRepository implements ProjectRepository {
       target.defaultFeeTemplateId = input.defaultFeeTemplateId ?? null;
     }
 
+    return target;
+  }
+
+  async updateStatus(
+    projectId: string,
+    status: ProjectRecord["status"],
+  ): Promise<ProjectRecord> {
+    const target = this.projects.find((project) => project.id === projectId);
+    if (!target) {
+      throw new Error("Project not found");
+    }
+
+    target.status = status;
     return target;
   }
 
@@ -154,6 +171,23 @@ export class DbProjectRepository implements ProjectRepository {
       if (existing) {
         return existing;
       }
+      throw new Error("Project not found");
+    }
+
+    return mapProjectRecord(updated);
+  }
+
+  async updateStatus(
+    projectId: string,
+    status: ProjectRecord["status"],
+  ): Promise<ProjectRecord> {
+    const [updated] = await this.db
+      .update(projects)
+      .set({ status })
+      .where(eq(projects.id, projectId))
+      .returning();
+
+    if (!updated) {
       throw new Error("Project not found");
     }
 

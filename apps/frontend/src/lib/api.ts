@@ -28,6 +28,8 @@ import type {
   ReviewSubmissionListResponse,
   SummaryDetailItem,
   SummaryResponse,
+  SourceBillImportResult,
+  SourceBillImportPreview,
   VarianceBreakdownGroupBy,
   VarianceBreakdownResponse,
   VersionCompareResponse,
@@ -483,6 +485,64 @@ export const apiClient = {
       },
     );
   },
+  importSourceBill(input: {
+    projectId: string;
+    stageCode: string;
+    disciplineCode: string;
+    versionName?: string;
+    sourceFileName?: string;
+    sourceBatchNo?: string;
+    sourceTables: {
+      ZaoJia_Qd_QdList: Array<Record<string, unknown>>;
+      ZaoJia_Qd_Qdxm: Array<Record<string, unknown>>;
+      ZaoJia_Qd_Gznr: Array<Record<string, unknown>>;
+    };
+  }) {
+    return request<SourceBillImportResult>(
+      `/v1/projects/${input.projectId}/bill-imports/source`,
+      undefined,
+      {
+        method: "POST",
+        body: {
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          versionName: input.versionName,
+          sourceFileName: input.sourceFileName,
+          sourceBatchNo: input.sourceBatchNo,
+          sourceTables: input.sourceTables,
+        },
+      },
+    );
+  },
+  previewSourceBill(input: {
+    projectId: string;
+    stageCode: string;
+    disciplineCode: string;
+    versionName?: string;
+    sourceFileName?: string;
+    sourceBatchNo?: string;
+    sourceTables: {
+      ZaoJia_Qd_QdList: Array<Record<string, unknown>>;
+      ZaoJia_Qd_Qdxm: Array<Record<string, unknown>>;
+      ZaoJia_Qd_Gznr: Array<Record<string, unknown>>;
+    };
+  }) {
+    return request<SourceBillImportPreview>(
+      `/v1/projects/${input.projectId}/bill-imports/source/preview`,
+      undefined,
+      {
+        method: "POST",
+        body: {
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          versionName: input.versionName,
+          sourceFileName: input.sourceFileName,
+          sourceBatchNo: input.sourceBatchNo,
+          sourceTables: input.sourceTables,
+        },
+      },
+    );
+  },
   retryBackgroundJob(
     jobId: string,
     retryContext?: {
@@ -765,9 +825,11 @@ export const apiClient = {
   },
   createReportExportTask(input: {
     projectId: string;
-    reportType: "summary" | "variance";
+    reportType: "summary" | "variance" | "stage_bill";
     stageCode?: string;
     disciplineCode?: string;
+    reportTemplateId?: string;
+    outputFormat?: "json" | "excel" | "pdf";
   }) {
     return request<CreateReportExportResponse>("/v1/reports/export", undefined, {
       method: "POST",

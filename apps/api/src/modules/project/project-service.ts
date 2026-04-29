@@ -38,6 +38,8 @@ import type {
   ImportTaskRecord,
   ImportTaskRepository,
 } from "../import/import-task-repository.js";
+import type { MasterDataRepository } from "../master-data/master-data-repository.js";
+import { standardProjectStageTemplates } from "./project-constants.js";
 
 export type ProjectWorkspacePermissionSummary = {
   roleCode: string;
@@ -45,6 +47,7 @@ export type ProjectWorkspacePermissionSummary = {
   canManageProject: boolean;
   canEditProject: boolean;
   canExportReports: boolean;
+  canImportBill: boolean;
   scopeSummary: string[];
   visibleStageCodes: string[];
   visibleDisciplineCodes: string[];
@@ -109,6 +112,7 @@ export class ProjectService {
     private readonly importTaskRepository?: ImportTaskRepository,
     private readonly priceVersionRepository?: PriceVersionRepository,
     private readonly feeTemplateRepository?: FeeTemplateRepository,
+    private readonly masterDataRepository?: MasterDataRepository,
     auditLogService?: AuditLogService,
   ) {
     this.auditLogService = requireDependency(
@@ -247,7 +251,7 @@ export class ProjectService {
     name: string;
     defaultPriceVersionId?: string | null;
     defaultFeeTemplateId?: string | null;
-    stages: Array<{
+    stages?: Array<{
       stageCode: string;
       stageName: string;
       status: ProjectStageRecord["status"];
@@ -261,7 +265,8 @@ export class ProjectService {
     members: ProjectMemberRecord[];
   }> {
     this.assertCanCreateProject(input.userId);
-    this.validateStageSetup(input.stages);
+    const stageSetup = input.stages ?? this.createDefaultStageSetup();
+    this.validateStageSetup(stageSetup);
     await this.validatePricingDefaults({
       defaultPriceVersionId: input.defaultPriceVersionId,
       defaultFeeTemplateId: input.defaultFeeTemplateId,
@@ -276,7 +281,7 @@ export class ProjectService {
     });
     const stages = await this.projectStageRepository.replaceByProjectId(
       project.id,
-      input.stages,
+      stageSetup,
     );
     const members = await this.projectMemberRepository.replaceByProjectId(project.id, [
       {
@@ -382,6 +387,60 @@ export class ProjectService {
     return this.projectDisciplineRepository.listByProjectId(input.projectId);
   }
 
+  async updateProjectDisciplines(input: {
+    projectId: string;
+    userId: string;
+    roleCodes: string[];
+    disciplines: Array<{
+      disciplineCode: string;
+      disciplineName: string;
+      defaultStandardSetCode?: string | null;
+      status: ProjectDisciplineRecord["status"];
+      sortOrder: number;
+    }>;
+  }): Promise<ProjectDisciplineRecord[]> {
+    await this.assertCanManageProject(input);
+    await this.validateProjectDisciplineSetup(input.disciplines);
+    const before = await this.projectDisciplineRepository.listByProjectId(
+      input.projectId,
+    );
+    const updated = await this.projectDisciplineRepository.replaceByProjectId(
+      input.projectId,
+      input.disciplines.map((discipline) => ({
+        ...discipline,
+        defaultStandardSetCode: discipline.defaultStandardSetCode ?? null,
+      })),
+    );
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      resourceType: "project_discipline",
+      resourceId: input.projectId,
+      action: "update",
+      operatorId: input.userId,
+      beforePayload: {
+        disciplines: before.map((discipline) => ({
+          disciplineCode: discipline.disciplineCode,
+          disciplineName: discipline.disciplineName,
+          defaultStandardSetCode: discipline.defaultStandardSetCode,
+          status: discipline.status,
+          sortOrder: discipline.sortOrder ?? 0,
+        })),
+      },
+      afterPayload: {
+        disciplines: updated.map((discipline) => ({
+          disciplineCode: discipline.disciplineCode,
+          disciplineName: discipline.disciplineName,
+          defaultStandardSetCode: discipline.defaultStandardSetCode,
+          status: discipline.status,
+          sortOrder: discipline.sortOrder ?? 0,
+        })),
+      },
+    });
+
+    return updated;
+  }
+
   async listProjectMembers(input: {
     projectId: string;
     userId: string;
@@ -481,6 +540,47 @@ export class ProjectService {
       afterPayload: {
         defaultPriceVersionId: updated.defaultPriceVersionId ?? null,
         defaultFeeTemplateId: updated.defaultFeeTemplateId ?? null,
+      },
+    });
+
+    return updated;
+  }
+
+  async updateProjectStatus(input: {
+    projectId: string;
+    userId: string;
+    roleCodes: string[];
+    status: ProjectRecord["status"];
+  }): Promise<ProjectRecord> {
+    await this.assertCanManageProject(input);
+    const before = {
+      ...(await this.getProject({
+        projectId: input.projectId,
+        userId: input.userId,
+        roleCodes: input.roleCodes,
+      })),
+    };
+
+    if (before.status === input.status) {
+      return before;
+    }
+
+    const updated = await this.projectRepository.updateStatus(
+      input.projectId,
+      input.status,
+    );
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      resourceType: "project",
+      resourceId: input.projectId,
+      action: "update_status",
+      operatorId: input.userId,
+      beforePayload: {
+        status: before.status,
+      },
+      afterPayload: {
+        status: updated.status,
       },
     });
 
@@ -628,6 +728,107 @@ export class ProjectService {
     }
   }
 
+  private createDefaultStageSetup(): Array<{
+    stageCode: string;
+    stageName: string;
+    status: ProjectStageRecord["status"];
+    sequenceNo: number;
+  }> {
+    return standardProjectStageTemplates.map((stage) => ({
+      ...stage,
+      status: "draft",
+    }));
+  }
+
+  private async validateProjectDisciplineSetup(
+    disciplines: Array<{
+      disciplineCode: string;
+      disciplineName: string;
+      defaultStandardSetCode?: string | null;
+      status: ProjectDisciplineRecord["status"];
+      sortOrder: number;
+    }>,
+  ): Promise<void> {
+    if (disciplines.length === 0) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "At least one project discipline must be configured",
+      );
+    }
+
+    const uniqueDisciplineCodes = new Set(
+      disciplines.map((discipline) => discipline.disciplineCode),
+    );
+    if (uniqueDisciplineCodes.size !== disciplines.length) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Duplicate discipline codes are not allowed",
+      );
+    }
+
+    const uniqueSortOrders = new Set(
+      disciplines.map((discipline) => discipline.sortOrder),
+    );
+    if (uniqueSortOrders.size !== disciplines.length) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "Duplicate discipline sort orders are not allowed",
+      );
+    }
+
+    if (!this.masterDataRepository) {
+      return;
+    }
+
+    const [disciplineTypes, standardSets] = await Promise.all([
+      this.masterDataRepository.listDisciplineTypes({ status: "active" }),
+      this.masterDataRepository.listStandardSets({ status: "active" }),
+    ]);
+    const disciplineTypesByCode = new Map(
+      disciplineTypes.map((disciplineType) => [
+        disciplineType.disciplineCode,
+        disciplineType,
+      ]),
+    );
+    const standardSetsByCode = new Map(
+      standardSets.map((standardSet) => [standardSet.standardSetCode, standardSet]),
+    );
+
+    for (const discipline of disciplines) {
+      if (!disciplineTypesByCode.has(discipline.disciplineCode)) {
+        throw new AppError(
+          422,
+          "DISCIPLINE_TYPE_NOT_FOUND",
+          "Discipline type does not exist",
+        );
+      }
+
+      if (!discipline.defaultStandardSetCode) {
+        continue;
+      }
+
+      const standardSet = standardSetsByCode.get(discipline.defaultStandardSetCode);
+      if (!standardSet) {
+        throw new AppError(
+          422,
+          "STANDARD_SET_NOT_FOUND",
+          "Standard set does not exist",
+        );
+      }
+
+      if (standardSet.disciplineCode !== discipline.disciplineCode) {
+        throw new AppError(
+          422,
+          "STANDARD_SET_DISCIPLINE_MISMATCH",
+          "Standard set does not match the discipline",
+        );
+      }
+    }
+  }
+
   private async validatePricingDefaults(input: {
     defaultPriceVersionId?: string | null;
     defaultFeeTemplateId?: string | null;
@@ -733,6 +934,7 @@ export class ProjectService {
         canManageProject: true,
         canEditProject: true,
         canExportReports: true,
+        canImportBill: true,
         scopeSummary: ["项目全部范围"],
         visibleStageCodes: input.stages.map((stage) => stage.stageCode),
         visibleDisciplineCodes: input.disciplines.map(
@@ -754,6 +956,7 @@ export class ProjectService {
       }),
       canEditProject: this.roleCanEdit(roleCode),
       canExportReports: this.roleCanExportReports(roleCode),
+      canImportBill: this.roleCanEdit(roleCode),
       scopeSummary: this.formatScopeSummary(input.currentMember),
       visibleStageCodes,
       visibleDisciplineCodes,

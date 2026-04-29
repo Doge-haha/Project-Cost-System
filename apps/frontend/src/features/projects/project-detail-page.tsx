@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import readXlsxFile from "read-excel-file/browser";
 
 import { apiClient, ApiError } from "../../lib/api";
 import type {
   AuditLogRecord,
   BillVersion,
   ProjectWorkspace,
+  SourceBillFailureItem,
+  SourceBillImportPreview,
   SummaryResponse,
 } from "../../lib/types";
 import { EmptyState } from "../shared/empty-state";
@@ -56,6 +59,17 @@ type ProjectDetailState = {
   recentActivity: AuditLogRecord[];
 };
 
+type ParsedSourceBillFile = {
+  fileName: string;
+  sourceTables: {
+    ZaoJia_Qd_QdList: Array<Record<string, unknown>>;
+    ZaoJia_Qd_Qdxm: Array<Record<string, unknown>>;
+    ZaoJia_Qd_Gznr: Array<Record<string, unknown>>;
+  };
+};
+
+type SourceBillImportStep = "idle" | "selected" | "previewed" | "imported";
+
 export function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.projectId;
@@ -91,6 +105,20 @@ export function ProjectDetailPage() {
   const [versionActionMessage, setVersionActionMessage] = useState<string | null>(null);
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [versionActionTargetId, setVersionActionTargetId] = useState<string | null>(null);
+  const [billImportMessage, setBillImportMessage] = useState<string | null>(null);
+  const [billImportError, setBillImportError] = useState<string | null>(null);
+  const [billImportRunning, setBillImportRunning] = useState(false);
+  const [billImportPreviewRunning, setBillImportPreviewRunning] = useState(false);
+  const [billImportStep, setBillImportStep] = useState<SourceBillImportStep>("idle");
+  const [billImportPreview, setBillImportPreview] =
+    useState<SourceBillImportPreview | null>(null);
+  const [billImportFailedItems, setBillImportFailedItems] = useState<
+    SourceBillFailureItem[]
+  >([]);
+  const [billImportFailureReasonFilter, setBillImportFailureReasonFilter] =
+    useState<string | null>(null);
+  const [selectedSourceBillFile, setSelectedSourceBillFile] =
+    useState<ParsedSourceBillFile | null>(null);
   const [selectedBillVersionId, setSelectedBillVersionId] = useState<string | null>(
     null,
   );
@@ -393,6 +421,144 @@ export function ProjectDetailPage() {
     }
   }
 
+  function getSourceBillImportContext() {
+    if (!state) {
+      return null;
+    }
+
+    const stageCode =
+      selectedBillVersion?.stageCode ??
+      state.workspace.currentStage?.stageCode ??
+      state.workspace.availableStages[0]?.stageCode;
+    const disciplineCode =
+      selectedBillVersion?.disciplineCode ??
+      state.workspace.disciplines[0]?.disciplineCode;
+
+    if (!stageCode || !disciplineCode) {
+      return null;
+    }
+
+    return {
+      stageCode,
+      disciplineCode,
+    };
+  }
+
+  async function readSourceBillFile(file: File) {
+    setBillImportMessage(null);
+    setBillImportError(null);
+    setBillImportPreview(null);
+    setBillImportFailedItems([]);
+    setBillImportFailureReasonFilter(null);
+    setBillImportStep("idle");
+
+    try {
+      const parsed = await parseSourceBillFile(file);
+      setSelectedSourceBillFile(parsed);
+      setBillImportStep("selected");
+      setBillImportMessage(
+        `已选择 ${parsed.fileName}，请先预览确认。`,
+      );
+    } catch (parseError) {
+      setSelectedSourceBillFile(null);
+      setBillImportError(
+        parseError instanceof Error ? parseError.message : "源清单文件解析失败。",
+      );
+    }
+  }
+
+  async function previewSourceBillImport() {
+    if (!projectId || !selectedSourceBillFile) {
+      return;
+    }
+
+    const context = getSourceBillImportContext();
+    if (!context) {
+      setBillImportError("缺少可导入阶段或专业。");
+      return;
+    }
+
+    setBillImportPreviewRunning(true);
+    setBillImportError(null);
+
+    try {
+      const preview = await apiClient.previewSourceBill({
+        projectId,
+        stageCode: context.stageCode,
+        disciplineCode: context.disciplineCode,
+        sourceFileName: selectedSourceBillFile.fileName,
+        sourceTables: selectedSourceBillFile.sourceTables,
+      });
+      setBillImportPreview(preview);
+      setBillImportFailedItems(preview.failedItems);
+      setBillImportStep("previewed");
+      setBillImportMessage(
+        `预览完成：版本 ${preview.summary.versionCount}，清单项 ${preview.summary.billItemCount}，工作内容 ${preview.summary.workItemCount}。`,
+      );
+    } catch (previewError) {
+      setBillImportError(
+        previewError instanceof ApiError
+          ? previewError.message
+          : "源清单预览失败，请稍后重试。",
+      );
+    } finally {
+      setBillImportPreviewRunning(false);
+    }
+  }
+
+  async function runSourceBillImport() {
+    if (!projectId || !state) {
+      return;
+    }
+
+    const context = getSourceBillImportContext();
+    if (!context) {
+      setBillImportError("缺少可导入阶段或专业。");
+      return;
+    }
+    if (!selectedSourceBillFile) {
+      setBillImportError("请先选择源清单文件。");
+      return;
+    }
+    if (billImportStep !== "previewed" || !billImportPreview) {
+      setBillImportError("请先完成导入预览并确认数量后再落库。");
+      return;
+    }
+
+    setBillImportRunning(true);
+    setBillImportError(null);
+
+    try {
+      const result = await apiClient.importSourceBill({
+        projectId,
+        stageCode: context.stageCode,
+        disciplineCode: context.disciplineCode,
+        sourceFileName: selectedSourceBillFile.fileName,
+        sourceTables: selectedSourceBillFile.sourceTables,
+      });
+      setBillImportMessage(
+        `导入${result.importTask.status === "completed" ? "完成" : "失败"}：清单项 ${result.summary.billItemCount}，工作内容 ${result.summary.workItemCount}，失败 ${result.summary.failedItemCount}`,
+      );
+      setBillImportStep("imported");
+      setBillImportPreview({
+        summary: result.summary,
+        failedItems: result.failedItems ?? [],
+      });
+      setBillImportFailedItems(result.failedItems ?? []);
+      setBillImportError(result.summary.failureDetails.join("\n") || null);
+      setSelectedBillVersionId(result.billVersion.id);
+      await loadProjectDetail();
+    } catch (importError) {
+      setBillImportError(
+        importError instanceof ApiError
+          ? importError.message
+          : "源清单导入失败，请稍后重试。",
+      );
+    } finally {
+      setBillImportRunning(false);
+    }
+  }
+
   if (loading) {
     return <LoadingState title="正在加载项目详情" />;
   }
@@ -449,7 +615,17 @@ export function ProjectDetailPage() {
     permissionSummary.canManageProject ? "可管理项目" : "不可管理项目",
     permissionSummary.canEditProject ? "可编辑授权范围" : "仅可查看授权范围",
   ];
+  const canImportBill = permissionSummary.canImportBill ?? permissionSummary.canEditProject;
   const importLatestTask = workspace.importStatus.latestTask;
+  const sourceBillFailureSummary = buildSourceBillFailureSummary(billImportFailedItems);
+  const filteredSourceBillFailures = billImportFailureReasonFilter
+    ? billImportFailedItems.filter(
+        (item) => item.reasonCode === billImportFailureReasonFilter,
+      )
+    : billImportFailedItems;
+  const sourceBillRepairTemplateHref = buildSourceBillRepairTemplateHref(
+    filteredSourceBillFailures,
+  );
   const refreshNotice = buildProjectDetailRefreshNotice({
     refreshSource,
     refreshItemName,
@@ -723,7 +899,148 @@ export function ProjectDetailPage() {
             >
               打开导入跟进
             </Link>
+            {canImportBill ? (
+              <>
+                <label className="connection-button secondary">
+                  选择源清单文件
+                  <input
+                    accept=".json,.csv,.xlsx,.xls,application/json,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                    aria-label="选择源清单文件"
+                    className="visually-hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void readSourceBillFile(file);
+                      }
+                    }}
+                    type="file"
+                  />
+                </label>
+                <button
+                  className="connection-button secondary"
+                  disabled={
+                    billImportPreviewRunning ||
+                    billImportRunning ||
+                    !selectedSourceBillFile
+                  }
+                  onClick={() => {
+                    void previewSourceBillImport();
+                  }}
+                  type="button"
+                >
+                  {billImportPreviewRunning ? "预览中" : "预览导入"}
+                </button>
+                <button
+                  className="connection-button secondary"
+                  disabled={
+                    billImportRunning ||
+                    !selectedSourceBillFile ||
+                    billImportStep !== "previewed"
+                  }
+                  onClick={() => {
+                    void runSourceBillImport();
+                  }}
+                  type="button"
+                >
+                  {billImportRunning ? "导入中" : "确认导入"}
+                </button>
+              </>
+            ) : null}
           </div>
+          {billImportPreview ? (
+            <div className="project-list">
+              <article className="project-link selected">
+                <h3>源清单导入预览</h3>
+                <p className="page-description">
+                  文件 {selectedSourceBillFile?.fileName ?? "未选择"} · 状态{" "}
+                  {billImportStep === "imported" ? "已导入" : "待确认"}
+                </p>
+                <p className="page-description">
+                  版本 {billImportPreview.summary.versionCount} · 清单项{" "}
+                  {billImportPreview.summary.billItemCount} · 工作内容{" "}
+                  {billImportPreview.summary.workItemCount} · 失败{" "}
+                  {billImportPreview.summary.failedItemCount}
+                </p>
+                <p className="page-description">
+                  措施项 {billImportPreview.summary.measureItemCount} · 费用项{" "}
+                  {billImportPreview.summary.feeItemCount} · 清单特征{" "}
+                  {billImportPreview.summary.featureItemCount} · 定额线索{" "}
+                  {billImportPreview.summary.quotaClueCount}
+                </p>
+              </article>
+            </div>
+          ) : null}
+          {sourceBillFailureSummary.length > 0 ? (
+            <div className="project-list">
+              <article className="project-link selected">
+                <h3>源清单失败报告</h3>
+                <p className="page-description">
+                  当前范围：{billImportFailureReasonFilter ?? "全部"} ·{" "}
+                  {filteredSourceBillFailures.length} 条
+                </p>
+                <p className="page-description">
+                  <a
+                    className="breadcrumbs-link"
+                    download="source-bill-fix-template.csv"
+                    href={sourceBillRepairTemplateHref}
+                  >
+                    下载修复模板
+                  </a>
+                </p>
+                <div className="version-card-actions">
+                  <button
+                    className={
+                      billImportFailureReasonFilter === null
+                        ? "connection-button primary"
+                        : "connection-button secondary"
+                    }
+                    onClick={() => {
+                      setBillImportFailureReasonFilter(null);
+                    }}
+                    type="button"
+                  >
+                    全部
+                  </button>
+                  {sourceBillFailureSummary.map((item) => (
+                    <button
+                      className={
+                        billImportFailureReasonFilter === item.reasonCode
+                          ? "connection-button primary"
+                          : "connection-button secondary"
+                      }
+                      key={item.reasonCode}
+                      onClick={() => {
+                        setBillImportFailureReasonFilter(item.reasonCode);
+                      }}
+                      type="button"
+                    >
+                      {item.reasonLabel} · {item.count}
+                    </button>
+                  ))}
+                </div>
+                <ul className="inline-list">
+                  {filteredSourceBillFailures.slice(0, 20).map((item) => (
+                    <li
+                      key={`${item.tableName}-${item.lineNo ?? "line"}-${item.reasonCode}-${item.sourceId ?? item.itemCode ?? "row"}`}
+                    >
+                      {item.reasonLabel} · {item.tableName} 第 {item.lineNo ?? "-"} 行 ·{" "}
+                      {item.itemCode ?? item.sourceId ?? "未识别"} · {item.errorMessage}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            </div>
+          ) : null}
+          {billImportMessage ? (
+            <p className="page-description">{billImportMessage}</p>
+          ) : null}
+          {billImportError ? (
+            <ul className="inline-list">
+              {billImportError.split("\n").map((detail) => (
+                <li key={detail}>{detail}</li>
+              ))}
+            </ul>
+          ) : null}
           <ul className="inline-list">
             <li>{workspace.importStatus.note}</li>
             {importLatestTask ? (
@@ -981,6 +1298,12 @@ export function ProjectDetailPage() {
                   当前版本汇总、系统值、最终值与偏差摘要
                 </p>
               </Link>
+              <Link className="project-link" to={navigation.reportsPath}>
+                <h3>打开报表中心</h3>
+                <p className="page-description">
+                  发起汇总/偏差/阶段清单导出，跟踪报表任务状态和下载结果
+                </p>
+              </Link>
               <Link className="project-link" to={navigation.auditLogsPath}>
                 <h3>查看审计日志</h3>
                 <p className="page-description">
@@ -1010,4 +1333,317 @@ export function ProjectDetailPage() {
       </section>
     </div>
   );
+}
+
+async function parseSourceBillFile(file: File): Promise<ParsedSourceBillFile> {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
+    return parseSourceBillWorkbook(file);
+  }
+
+  const content = await readTextFile(file);
+  if (lowerName.endsWith(".csv")) {
+    return {
+      fileName: file.name,
+      sourceTables: tablesFromNamedRows("ZaoJia_Qd_Qdxm", parseCsvRows(content)),
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error("源清单文件必须是 JSON、CSV 或 Excel 格式。");
+  }
+
+  const root =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  const rawTables =
+    root.sourceTables && typeof root.sourceTables === "object"
+      ? (root.sourceTables as Record<string, unknown>)
+      : root;
+  const sourceTables = {
+    ZaoJia_Qd_QdList: readRows(rawTables, ["ZaoJia_Qd_QdList", "qdList", "billLists"]),
+    ZaoJia_Qd_Qdxm: readRows(rawTables, ["ZaoJia_Qd_Qdxm", "qdxm", "billItems", "items"]),
+    ZaoJia_Qd_Gznr: readRows(rawTables, ["ZaoJia_Qd_Gznr", "gznr", "workItems", "workContents"]),
+  };
+
+  if (
+    sourceTables.ZaoJia_Qd_QdList.length === 0 &&
+    sourceTables.ZaoJia_Qd_Qdxm.length === 0 &&
+    sourceTables.ZaoJia_Qd_Gznr.length === 0
+  ) {
+    throw new Error("源清单文件未包含可识别表：ZaoJia_Qd_QdList、ZaoJia_Qd_Qdxm、ZaoJia_Qd_Gznr。");
+  }
+
+  return {
+    fileName: file.name,
+    sourceTables,
+  };
+}
+
+async function parseSourceBillWorkbook(file: File): Promise<ParsedSourceBillFile> {
+  const content = await readArrayBufferFile(file);
+  if (isLegacyXlsWorkbook(content)) {
+    throw new Error(
+      "暂不支持 Excel 97-2003 .xls 源清单文件，请先另存为 .xlsx、CSV 或 JSON 后再导入。",
+    );
+  }
+
+  const sheets = await readXlsxFile(content);
+  const tables = emptySourceTables();
+
+  for (const sheet of sheets) {
+    mergeSourceTables(tables, tablesFromNamedRows(sheet.sheet, rowsFromWorkbookCells(sheet.data)));
+  }
+
+  if (
+    tables.ZaoJia_Qd_QdList.length === 0 &&
+    tables.ZaoJia_Qd_Qdxm.length === 0 &&
+    tables.ZaoJia_Qd_Gznr.length === 0
+  ) {
+    throw new Error("Excel 文件未包含可识别工作表或表头。");
+  }
+
+  return {
+    fileName: file.name,
+    sourceTables: tables,
+  };
+}
+
+function rowsFromWorkbookCells(rows: unknown[][]): Array<Record<string, unknown>> {
+  const headers = (rows[0] ?? []).map((header) => String(header ?? "").trim());
+  return rows.slice(1).map((row) =>
+    Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])),
+  );
+}
+
+function isLegacyXlsWorkbook(content: ArrayBuffer) {
+  const signature = new Uint8Array(content.slice(0, 8));
+  const oleSignature = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
+  return oleSignature.every((value, index) => signature[index] === value);
+}
+
+function emptySourceTables(): ParsedSourceBillFile["sourceTables"] {
+  return {
+    ZaoJia_Qd_QdList: [],
+    ZaoJia_Qd_Qdxm: [],
+    ZaoJia_Qd_Gznr: [],
+  };
+}
+
+function mergeSourceTables(
+  target: ParsedSourceBillFile["sourceTables"],
+  source: ParsedSourceBillFile["sourceTables"],
+) {
+  target.ZaoJia_Qd_QdList.push(...source.ZaoJia_Qd_QdList);
+  target.ZaoJia_Qd_Qdxm.push(...source.ZaoJia_Qd_Qdxm);
+  target.ZaoJia_Qd_Gznr.push(...source.ZaoJia_Qd_Gznr);
+}
+
+function tablesFromNamedRows(
+  tableName: string,
+  rows: Array<Record<string, unknown>>,
+): ParsedSourceBillFile["sourceTables"] {
+  const normalizedName = tableName.toLowerCase();
+  const tables = emptySourceTables();
+  if (normalizedName.includes("qdlist") || normalizedName.includes("清单版本")) {
+    tables.ZaoJia_Qd_QdList = rows;
+  } else if (
+    normalizedName.includes("gznr") ||
+    normalizedName.includes("工作内容")
+  ) {
+    tables.ZaoJia_Qd_Gznr = rows;
+  } else if (
+    normalizedName.includes("qdxm") ||
+    normalizedName.includes("清单项") ||
+    normalizedName.includes("措施项") ||
+    normalizedName.includes("费用项")
+  ) {
+    tables.ZaoJia_Qd_Qdxm = rows;
+  } else if (rows.some((row) => readCell(row, ["Gznr", "gznr", "工作内容"]))) {
+    tables.ZaoJia_Qd_Gznr = rows;
+  } else if (rows.some((row) => readCell(row, ["Qdmc", "QdMc", "清单名称"]))) {
+    tables.ZaoJia_Qd_QdList = rows;
+  } else {
+    tables.ZaoJia_Qd_Qdxm = rows;
+  }
+  return tables;
+}
+
+function parseCsvRows(content: string): Array<Record<string, unknown>> {
+  const rows = parseCsv(content);
+  const headers = rows[0]?.map((header) => header.trim()) ?? [];
+  return rows.slice(1).map((row) =>
+    Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])),
+  );
+}
+
+function parseCsv(content: string): string[][] {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = "";
+  let quoted = false;
+
+  for (let index = 0; index < content.length; index += 1) {
+    const char = content[index];
+    const nextChar = content[index + 1];
+    if (char === '"' && quoted && nextChar === '"') {
+      currentCell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      currentRow.push(currentCell);
+      currentCell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && nextChar === "\n") {
+        index += 1;
+      }
+      currentRow.push(currentCell);
+      rows.push(currentRow);
+      currentRow = [];
+      currentCell = "";
+    } else {
+      currentCell += char;
+    }
+  }
+
+  currentRow.push(currentCell);
+  rows.push(currentRow);
+  return rows.filter((row) => row.some((cell) => cell.trim().length > 0));
+}
+
+function readCell(row: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+  return null;
+}
+
+function readRows(row: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = row[key];
+    if (Array.isArray(value)) {
+      return value.filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === "object" && !Array.isArray(item),
+      );
+    }
+  }
+  return [];
+}
+
+function readTextFile(file: File): Promise<string> {
+  if (typeof file.text === "function") {
+    return file.text();
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      resolve(String(reader.result ?? ""));
+    });
+    reader.addEventListener("error", () => {
+      reject(reader.error ?? new Error("源清单文件读取失败。"));
+    });
+    reader.readAsText(file);
+  });
+}
+
+function readArrayBufferFile(file: File): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === "function") {
+    return file.arrayBuffer();
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      resolve(reader.result as ArrayBuffer);
+    });
+    reader.addEventListener("error", () => {
+      reject(reader.error ?? new Error("源清单文件读取失败。"));
+    });
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function buildSourceBillFailureSummary(items: SourceBillFailureItem[]) {
+  const counts = new Map<string, { reasonCode: string; reasonLabel: string; count: number }>();
+  for (const item of items) {
+    const current = counts.get(item.reasonCode) ?? {
+      reasonCode: item.reasonCode,
+      reasonLabel: item.reasonLabel,
+      count: 0,
+    };
+    current.count += 1;
+    counts.set(item.reasonCode, current);
+  }
+  return [...counts.values()];
+}
+
+function buildSourceBillRepairTemplateHref(items: SourceBillFailureItem[]) {
+  return `data:text/csv;charset=utf-8,${encodeURIComponent(
+    buildSourceBillRepairTemplateCsv(items),
+  )}`;
+}
+
+function buildSourceBillRepairTemplateCsv(items: SourceBillFailureItem[]) {
+  const keyColumns = Array.from(new Set(items.flatMap((item) => item.keys ?? [])));
+  const headers = [
+    "tableName",
+    "lineNo",
+    "reasonCode",
+    "reasonLabel",
+    "sourceId",
+    "itemCode",
+    "errorMessage",
+    ...keyColumns,
+  ];
+  const rows = items.map((item) =>
+    headers.map((header) => {
+      if ((item.keys ?? []).includes(header)) {
+        return "";
+      }
+      return readSourceBillFailureTemplateValue(item, header);
+    }),
+  );
+  return [headers, ...rows].map((row) => row.map(escapeCsvTemplateCell).join(",")).join("\n");
+}
+
+function readSourceBillFailureTemplateValue(
+  item: SourceBillFailureItem,
+  key: string,
+) {
+  switch (key) {
+    case "tableName":
+      return item.tableName ?? "";
+    case "lineNo":
+      return item.lineNo ?? "";
+    case "reasonCode":
+      return item.reasonCode;
+    case "reasonLabel":
+      return item.reasonLabel;
+    case "sourceId":
+      return item.sourceId ?? "";
+    case "itemCode":
+      return item.itemCode ?? "";
+    case "errorMessage":
+      return item.errorMessage;
+    default:
+      return "";
+  }
+}
+
+function escapeCsvTemplateCell(value: unknown) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }

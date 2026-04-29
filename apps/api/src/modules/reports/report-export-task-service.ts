@@ -8,13 +8,16 @@ import { SummaryService } from "./summary-service.js";
 import type {
   ReportExportTaskRecord,
   ReportExportTaskRepository,
+  ReportExportTaskType,
 } from "./report-export-task-repository.js";
 
 export const createReportExportTaskSchema = z.object({
   projectId: z.string().min(1),
-  reportType: z.enum(["summary", "variance"]),
+  reportType: z.enum(["summary", "variance", "stage_bill"]),
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
+  reportTemplateId: z.string().min(1).optional(),
+  outputFormat: z.enum(["json", "excel", "pdf"]).optional(),
 });
 
 export class ReportExportTaskService {
@@ -34,9 +37,11 @@ export class ReportExportTaskService {
 
   async createReportExportTask(input: {
     projectId: string;
-    reportType: "summary" | "variance";
+    reportType: ReportExportTaskType;
     stageCode?: string;
     disciplineCode?: string;
+    reportTemplateId?: string;
+    outputFormat?: "json" | "excel" | "pdf";
     userId: string;
   }): Promise<ReportExportTaskRecord> {
     const project = await this.projectRepository.findById(input.projectId);
@@ -51,6 +56,8 @@ export class ReportExportTaskService {
       requestedBy: input.userId,
       stageCode: input.stageCode ?? null,
       disciplineCode: input.disciplineCode ?? null,
+      reportTemplateId: input.reportTemplateId ?? null,
+      outputFormat: input.outputFormat ?? "json",
       createdAt: new Date().toISOString(),
       completedAt: null,
       errorMessage: null,
@@ -71,6 +78,8 @@ export class ReportExportTaskService {
         reportType: created.reportType,
         status: created.status,
         disciplineCode: created.disciplineCode,
+        reportTemplateId: input.reportTemplateId ?? null,
+        outputFormat: input.outputFormat ?? "json",
       },
     });
 
@@ -96,21 +105,7 @@ export class ReportExportTaskService {
     });
 
     try {
-      const resultPreview =
-        task.reportType === "summary"
-          ? await this.summaryService.getSummary({
-              projectId: task.projectId,
-              stageCode: task.stageCode ?? undefined,
-              disciplineCode: task.disciplineCode ?? undefined,
-              userId: input.userId,
-            })
-          : await this.summaryService.getSummaryDetails({
-              projectId: task.projectId,
-              stageCode: task.stageCode ?? undefined,
-              disciplineCode: task.disciplineCode ?? undefined,
-              limit: 20,
-              userId: input.userId,
-            });
+      const resultPreview = await this.buildExportPreview(task, input.userId);
       const downloadFileName = `${task.reportType}-${task.id}.json`;
       const downloadContentType = "application/json; charset=utf-8";
       const downloadContentLength = Buffer.byteLength(
@@ -231,5 +226,37 @@ export class ReportExportTaskService {
         task.downloadContentType ?? "application/json; charset=utf-8",
       content: JSON.stringify(task.resultPreview ?? {}, null, 2),
     };
+  }
+
+  private async buildExportPreview(
+    task: ReportExportTaskRecord,
+    userId: string,
+  ): Promise<Record<string, unknown>> {
+    if (task.reportType === "summary") {
+      return this.summaryService.getSummary({
+        projectId: task.projectId,
+        stageCode: task.stageCode ?? undefined,
+        disciplineCode: task.disciplineCode ?? undefined,
+        userId,
+      });
+    }
+
+    const details = await this.summaryService.getSummaryDetails({
+      projectId: task.projectId,
+      stageCode: task.stageCode ?? undefined,
+      disciplineCode: task.disciplineCode ?? undefined,
+      limit: task.reportType === "stage_bill" ? 100 : 20,
+      userId,
+    });
+
+    return task.reportType === "stage_bill"
+      ? {
+          ...details,
+          reportType: task.reportType,
+          projectId: task.projectId,
+          stageCode: task.stageCode ?? null,
+          disciplineCode: task.disciplineCode ?? null,
+        }
+      : details;
   }
 }

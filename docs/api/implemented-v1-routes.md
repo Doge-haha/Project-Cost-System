@@ -11,10 +11,10 @@
 
 摘要：
 
-- 路由总数：92
-- 分组总数：15
-- 方法分布：GET 40 / POST 37 / PUT 11 / DELETE 4
-- 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
+- 路由总数：109
+- 分组总数：16
+- 方法分布：GET 46 / POST 43 / PUT 16 / DELETE 4
+- 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-source-import-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-master-data-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
 
@@ -29,20 +29,31 @@
 - `GET /v1/projects/:projectId/ai/quota-recommendations`
 - `GET /v1/projects/:projectId/ai/recommendations`
 - `GET /v1/projects/:projectId/ai/variance-warnings`
+- `POST /v1/projects/:projectId/bill-imports/source`
+- `POST /v1/projects/:projectId/bill-imports/source/preview`
+- `GET /v1/projects/:projectId/bill-items`
+- `POST /v1/projects/:projectId/bill-items`
+- `PUT /v1/projects/:projectId/bill-items/:itemId`
+- `GET /v1/projects/:projectId/bill-items/:itemId/work-items`
+- `POST /v1/projects/:projectId/bill-items/:itemId/work-items`
+- `PUT /v1/projects/:projectId/bill-items/:itemId/work-items/:workItemId`
 - `PUT /v1/projects/:projectId/default-fee-template`
 - `PUT /v1/projects/:projectId/default-price-version`
 - `PUT /v1/projects/:projectId/default-pricing-config`
 - `GET /v1/projects/:projectId/disciplines`
+- `PUT /v1/projects/:projectId/disciplines`
 - `GET /v1/projects/:projectId/members`
 - `PUT /v1/projects/:projectId/members`
 - `GET /v1/projects/:projectId/stages`
 - `PUT /v1/projects/:projectId/stages`
+- `PUT /v1/projects/:projectId/status`
 - `GET /v1/projects/:projectId/workspace`
 
 ## Bill Versions
 
 - `GET /v1/projects/:projectId/bill-versions`
 - `POST /v1/projects/:projectId/bill-versions`
+- `GET /v1/projects/:projectId/bill-versions/:billVersionId`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/copy-from`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/lock`
 - `POST /v1/projects/:projectId/bill-versions/:billVersionId/recalculate`
@@ -59,6 +70,9 @@
 - `DELETE /v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId`
 - `PUT /v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId`
 - `PUT /v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId/manual-pricing`
+- `PUT /v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId/move`
+- `POST /v1/projects/:projectId/bill-versions/:billVersionId/items/batch`
+- `GET /v1/projects/:projectId/bill-versions/:billVersionId/items/tree`
 
 ## Bill Work Items
 
@@ -117,6 +131,11 @@
 
 - `GET /v1/projects/:projectId/audit-logs`
 
+## Master Data
+
+- `GET /v1/discipline-types`
+- `GET /v1/standard-sets`
+
 ## Background Jobs
 
 - `GET /v1/jobs`
@@ -135,6 +154,7 @@
 - `POST /v1/ai/recommendations/:recommendationId/accept`
 - `POST /v1/ai/recommendations/:recommendationId/expire`
 - `POST /v1/ai/recommendations/:recommendationId/ignore`
+- `POST /v1/ai/recommendations/expire-stale`
 - `POST /v1/ai/variance-warnings`
 
 ## AI Runtime / Knowledge

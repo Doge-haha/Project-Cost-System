@@ -187,6 +187,14 @@ npm --workspace saas-pricing-frontend run dev
 
 推荐的本地联调启动顺序：
 
+一键内存演示联调：
+
+```bash
+npm run dev:local
+```
+
+该命令会同时启动 API、MCP Gateway、worker 和 frontend，并自动注入演示项目与 Bearer Token。
+
 1. `docker compose -f deploy/docker/docker-compose.dev.yml up -d --wait`
 2. `DATABASE_URL=... JWT_SECRET=... npm --workspace @saas-pricing/api run start`
 3. `JWT_SECRET=... API_BASE_URL=http://localhost:3000 npm --workspace @saas-pricing/mcp-gateway run start`

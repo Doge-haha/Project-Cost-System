@@ -5,6 +5,9 @@ export type ParsedImportTaskFailedItem = {
   reasonCode: string;
   reasonLabel: string;
   errorMessage: string;
+  tableName?: string | null;
+  sourceId?: string | null;
+  itemCode?: string | null;
   projectId: string | null;
   resourceType: string | null;
   action: string | null;
@@ -104,6 +107,9 @@ export function parseImportTaskFailedItems(task: ImportTask): ParsedImportTaskFa
           typeof item.errorMessage === "string" && item.errorMessage.length > 0
             ? item.errorMessage
             : "系统未记录",
+        tableName: typeof item.tableName === "string" ? item.tableName : null,
+        sourceId: typeof item.sourceId === "string" ? item.sourceId : null,
+        itemCode: typeof item.itemCode === "string" ? item.itemCode : null,
         projectId: typeof item.projectId === "string" ? item.projectId : null,
         resourceType,
         action,

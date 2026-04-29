@@ -14,6 +14,16 @@ export type BillItemRecord = {
   quantity: number;
   unit: string;
   sortNo: number;
+  sourceBillId?: string | null;
+  sourceSequence?: number | null;
+  sourceLevelCode?: string | null;
+  isMeasureItem?: boolean | null;
+  sourceReferencePrice?: number | null;
+  sourceFeeId?: string | null;
+  measureCategory?: string | null;
+  measureFeeFlag?: boolean | null;
+  measureCategorySubtype?: string | null;
+  featureRuleText?: string | null;
   systemUnitPrice?: number | null;
   manualUnitPrice?: number | null;
   finalUnitPrice?: number | null;
@@ -96,6 +106,36 @@ export class InMemoryBillItemRepository implements BillItemRepository {
     target.quantity = input.quantity;
     target.unit = input.unit;
     target.sortNo = input.sortNo;
+    if (input.sourceBillId !== undefined) {
+      target.sourceBillId = input.sourceBillId;
+    }
+    if (input.sourceSequence !== undefined) {
+      target.sourceSequence = input.sourceSequence;
+    }
+    if (input.sourceLevelCode !== undefined) {
+      target.sourceLevelCode = input.sourceLevelCode;
+    }
+    if (input.isMeasureItem !== undefined) {
+      target.isMeasureItem = input.isMeasureItem;
+    }
+    if (input.sourceReferencePrice !== undefined) {
+      target.sourceReferencePrice = input.sourceReferencePrice;
+    }
+    if (input.sourceFeeId !== undefined) {
+      target.sourceFeeId = input.sourceFeeId;
+    }
+    if (input.measureCategory !== undefined) {
+      target.measureCategory = input.measureCategory;
+    }
+    if (input.measureFeeFlag !== undefined) {
+      target.measureFeeFlag = input.measureFeeFlag;
+    }
+    if (input.measureCategorySubtype !== undefined) {
+      target.measureCategorySubtype = input.measureCategorySubtype;
+    }
+    if (input.featureRuleText !== undefined) {
+      target.featureRuleText = input.featureRuleText;
+    }
     target.systemUnitPrice = input.systemUnitPrice ?? target.systemUnitPrice ?? null;
     target.manualUnitPrice = input.manualUnitPrice ?? target.manualUnitPrice ?? null;
     target.finalUnitPrice = input.finalUnitPrice ?? target.finalUnitPrice ?? null;
@@ -195,6 +235,16 @@ export class DbBillItemRepository implements BillItemRepository {
         quantity: input.quantity,
         unit: input.unit,
         sortNo: input.sortNo,
+        sourceBillId: input.sourceBillId ?? null,
+        sourceSequence: input.sourceSequence ?? null,
+        sourceLevelCode: input.sourceLevelCode ?? null,
+        isMeasureItem: input.isMeasureItem ?? null,
+        sourceReferencePrice: input.sourceReferencePrice ?? null,
+        sourceFeeId: input.sourceFeeId ?? null,
+        measureCategory: input.measureCategory ?? null,
+        measureFeeFlag: input.measureFeeFlag ?? null,
+        measureCategorySubtype: input.measureCategorySubtype ?? null,
+        featureRuleText: input.featureRuleText ?? null,
         systemUnitPrice: input.systemUnitPrice ?? null,
         manualUnitPrice: input.manualUnitPrice ?? null,
         finalUnitPrice: input.finalUnitPrice ?? null,
@@ -221,6 +271,16 @@ export class DbBillItemRepository implements BillItemRepository {
         quantity: input.quantity,
         unit: input.unit,
         sortNo: input.sortNo,
+        sourceBillId: input.sourceBillId ?? null,
+        sourceSequence: input.sourceSequence ?? null,
+        sourceLevelCode: input.sourceLevelCode ?? null,
+        isMeasureItem: input.isMeasureItem ?? null,
+        sourceReferencePrice: input.sourceReferencePrice ?? null,
+        sourceFeeId: input.sourceFeeId ?? null,
+        measureCategory: input.measureCategory ?? null,
+        measureFeeFlag: input.measureFeeFlag ?? null,
+        measureCategorySubtype: input.measureCategorySubtype ?? null,
+        featureRuleText: input.featureRuleText ?? null,
         systemUnitPrice: input.systemUnitPrice ?? null,
         manualUnitPrice: input.manualUnitPrice ?? null,
         finalUnitPrice: input.finalUnitPrice ?? null,
@@ -309,7 +369,7 @@ export class DbBillItemRepository implements BillItemRepository {
 }
 
 function mapBillItemRecord(record: typeof billItems.$inferSelect): BillItemRecord {
-  return {
+  const mapped: BillItemRecord = {
     id: record.id,
     billVersionId: record.billVersionId,
     parentId: record.parentId ?? null,
@@ -325,4 +385,36 @@ function mapBillItemRecord(record: typeof billItems.$inferSelect): BillItemRecor
     finalAmount: record.finalAmount ?? null,
     calculatedAt: record.calculatedAt?.toISOString() ?? null,
   };
+  if (record.sourceBillId !== null) {
+    mapped.sourceBillId = record.sourceBillId;
+  }
+  if (record.sourceSequence !== null) {
+    mapped.sourceSequence = record.sourceSequence;
+  }
+  if (record.sourceLevelCode !== null) {
+    mapped.sourceLevelCode = record.sourceLevelCode;
+  }
+  if (record.isMeasureItem !== null) {
+    mapped.isMeasureItem = record.isMeasureItem;
+  }
+  if (record.sourceReferencePrice !== null) {
+    mapped.sourceReferencePrice = record.sourceReferencePrice;
+  }
+  if (record.sourceFeeId !== null) {
+    mapped.sourceFeeId = record.sourceFeeId;
+  }
+  if (record.measureCategory !== null) {
+    mapped.measureCategory = record.measureCategory;
+  }
+  if (record.measureFeeFlag !== null) {
+    mapped.measureFeeFlag = record.measureFeeFlag;
+  }
+  if (record.measureCategorySubtype !== null) {
+    mapped.measureCategorySubtype = record.measureCategorySubtype;
+  }
+  if (record.featureRuleText !== null) {
+    mapped.featureRuleText = record.featureRuleText;
+  }
+
+  return mapped;
 }

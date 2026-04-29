@@ -4,8 +4,7 @@ import { desc, eq } from "drizzle-orm";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { importTasks } from "../../infrastructure/database/schema.js";
-
-export type ImportTaskStatus = "queued" | "processing" | "completed" | "failed";
+import type { ImportTaskStatus } from "./import-task-constants.js";
 
 export type ImportTaskRecord = {
   id: string;

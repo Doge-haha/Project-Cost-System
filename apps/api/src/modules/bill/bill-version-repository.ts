@@ -4,6 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { billVersions } from "../../infrastructure/database/schema.js";
+import type { BillVersionStatus } from "./bill-constants.js";
 
 export type BillVersionRecord = {
   id: string;
@@ -12,8 +13,13 @@ export type BillVersionRecord = {
   disciplineCode: string;
   versionNo: number;
   versionName: string;
-  versionStatus: "editable" | "submitted" | "approved" | "locked" | "rejected";
+  versionStatus: BillVersionStatus;
   sourceVersionId: string | null;
+  sourceStageId?: string | null;
+  sourceSpecCode?: string | null;
+  sourceSpecName?: string | null;
+  sourceVisibleFlag?: boolean | null;
+  sourceDefaultFlag?: boolean | null;
 };
 
 export interface BillVersionRepository {
@@ -30,6 +36,11 @@ export interface BillVersionRepository {
     disciplineCode: string;
     versionName: string;
     sourceVersionId?: string | null;
+    sourceStageId?: string | null;
+    sourceSpecCode?: string | null;
+    sourceSpecName?: string | null;
+    sourceVisibleFlag?: boolean | null;
+    sourceDefaultFlag?: boolean | null;
   }): Promise<BillVersionRecord>;
   updateStatus(input: {
     versionId: string;
@@ -71,6 +82,11 @@ export class InMemoryBillVersionRepository implements BillVersionRepository {
     disciplineCode: string;
     versionName: string;
     sourceVersionId?: string | null;
+    sourceStageId?: string | null;
+    sourceSpecCode?: string | null;
+    sourceSpecName?: string | null;
+    sourceVisibleFlag?: boolean | null;
+    sourceDefaultFlag?: boolean | null;
   }): Promise<BillVersionRecord> {
     const currentVersions = this.versions.filter(
       (version) =>
@@ -95,6 +111,21 @@ export class InMemoryBillVersionRepository implements BillVersionRepository {
       versionStatus: "editable",
       sourceVersionId: input.sourceVersionId ?? null,
     };
+    if (input.sourceStageId !== undefined) {
+      created.sourceStageId = input.sourceStageId;
+    }
+    if (input.sourceSpecCode !== undefined) {
+      created.sourceSpecCode = input.sourceSpecCode;
+    }
+    if (input.sourceSpecName !== undefined) {
+      created.sourceSpecName = input.sourceSpecName;
+    }
+    if (input.sourceVisibleFlag !== undefined) {
+      created.sourceVisibleFlag = input.sourceVisibleFlag;
+    }
+    if (input.sourceDefaultFlag !== undefined) {
+      created.sourceDefaultFlag = input.sourceDefaultFlag;
+    }
 
     this.versions.push(created);
     return created;
@@ -162,6 +193,11 @@ export class DbBillVersionRepository implements BillVersionRepository {
     disciplineCode: string;
     versionName: string;
     sourceVersionId?: string | null;
+    sourceStageId?: string | null;
+    sourceSpecCode?: string | null;
+    sourceSpecName?: string | null;
+    sourceVisibleFlag?: boolean | null;
+    sourceDefaultFlag?: boolean | null;
   }): Promise<BillVersionRecord> {
     const [aggregate] = await this.db
       .select({
@@ -187,6 +223,11 @@ export class DbBillVersionRepository implements BillVersionRepository {
         versionName: input.versionName,
         versionStatus: "editable",
         sourceVersionId: input.sourceVersionId ?? null,
+        sourceStageId: input.sourceStageId ?? null,
+        sourceSpecCode: input.sourceSpecCode ?? null,
+        sourceSpecName: input.sourceSpecName ?? null,
+        sourceVisibleFlag: input.sourceVisibleFlag ?? null,
+        sourceDefaultFlag: input.sourceDefaultFlag ?? null,
       })
       .returning();
 
@@ -216,7 +257,7 @@ export class DbBillVersionRepository implements BillVersionRepository {
 function mapBillVersionRecord(
   record: typeof billVersions.$inferSelect,
 ): BillVersionRecord {
-  return {
+  const mapped: BillVersionRecord = {
     id: record.id,
     projectId: record.projectId,
     stageCode: record.stageCode,
@@ -226,4 +267,21 @@ function mapBillVersionRecord(
     versionStatus: record.versionStatus as BillVersionRecord["versionStatus"],
     sourceVersionId: record.sourceVersionId ?? null,
   };
+  if (record.sourceStageId !== null) {
+    mapped.sourceStageId = record.sourceStageId;
+  }
+  if (record.sourceSpecCode !== null) {
+    mapped.sourceSpecCode = record.sourceSpecCode;
+  }
+  if (record.sourceSpecName !== null) {
+    mapped.sourceSpecName = record.sourceSpecName;
+  }
+  if (record.sourceVisibleFlag !== null) {
+    mapped.sourceVisibleFlag = record.sourceVisibleFlag;
+  }
+  if (record.sourceDefaultFlag !== null) {
+    mapped.sourceDefaultFlag = record.sourceDefaultFlag;
+  }
+
+  return mapped;
 }

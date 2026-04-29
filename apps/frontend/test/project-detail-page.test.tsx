@@ -19,6 +19,194 @@ function LocationProbe() {
   return <div data-testid="location-search">{location.search}</div>;
 }
 
+function createSourceBillWorkbookFile() {
+  const entries = new Map<string, string>();
+  entries.set(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`,
+  );
+  entries.set(
+    "_rels/.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`,
+  );
+  entries.set(
+    "xl/_rels/workbook.xml.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
+</Relationships>`,
+  );
+  entries.set(
+    "xl/workbook.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="QdList" sheetId="1" r:id="rId1"/>
+    <sheet name="Qdxm" sheetId="2" r:id="rId2"/>
+    <sheet name="Gznr" sheetId="3" r:id="rId3"/>
+  </sheets>
+</workbook>`,
+  );
+  entries.set(
+    "xl/worksheets/sheet1.xml",
+    worksheetXml([
+      ["QdID", "Qdmc", "QdGf"],
+      ["list-001", "招标清单", "GB50500-2013"],
+    ]),
+  );
+  entries.set(
+    "xl/worksheets/sheet2.xml",
+    worksheetXml([
+      ["QdID", "Qdbh", "Xmmc", "Dw", "Gcl"],
+      ["item-001", "010101001001", "平整场地", "m2", "120"],
+    ]),
+  );
+  entries.set(
+    "xl/worksheets/sheet3.xml",
+    worksheetXml([
+      ["QdID", "Gznr"],
+      ["item-001", "清理、平整"],
+    ]),
+  );
+
+  return new File([zipStored(entries)], "source-bill.xlsx", {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+function createLegacySourceBillWorkbookFile() {
+  return new File(
+    [
+      new Uint8Array([
+        0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00, 0x00, 0x00, 0x00,
+      ]),
+    ],
+    "legacy-source-bill.xls",
+    { type: "application/vnd.ms-excel" },
+  );
+}
+
+function worksheetXml(rows: string[][]) {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>
+    ${rows
+      .map(
+        (row, rowIndex) =>
+          `<row r="${rowIndex + 1}">${row
+            .map(
+              (cell, cellIndex) =>
+                `<c r="${columnName(cellIndex)}${rowIndex + 1}" t="inlineStr"><is><t>${escapeXml(
+                  cell,
+                )}</t></is></c>`,
+            )
+            .join("")}</row>`,
+      )
+      .join("")}
+  </sheetData>
+</worksheet>`;
+}
+
+function columnName(index: number) {
+  return String.fromCharCode("A".charCodeAt(0) + index);
+}
+
+function escapeXml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function zipStored(entries: Map<string, string>) {
+  const encoder = new TextEncoder();
+  const chunks: Uint8Array[] = [];
+  const centralDirectory: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const [name, content] of entries) {
+    const nameBytes = encoder.encode(name);
+    const contentBytes = encoder.encode(content);
+    const crc = crc32(contentBytes);
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    writeUint32(localHeader, 0, 0x04034b50);
+    writeUint16(localHeader, 4, 20);
+    writeUint16(localHeader, 8, 0);
+    writeUint32(localHeader, 14, crc);
+    writeUint32(localHeader, 18, contentBytes.length);
+    writeUint32(localHeader, 22, contentBytes.length);
+    writeUint16(localHeader, 26, nameBytes.length);
+    localHeader.set(nameBytes, 30);
+    chunks.push(localHeader, contentBytes);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    writeUint32(centralHeader, 0, 0x02014b50);
+    writeUint16(centralHeader, 4, 20);
+    writeUint16(centralHeader, 6, 20);
+    writeUint32(centralHeader, 16, crc);
+    writeUint32(centralHeader, 20, contentBytes.length);
+    writeUint32(centralHeader, 24, contentBytes.length);
+    writeUint16(centralHeader, 28, nameBytes.length);
+    writeUint32(centralHeader, 42, offset);
+    centralHeader.set(nameBytes, 46);
+    centralDirectory.push(centralHeader);
+    offset += localHeader.length + contentBytes.length;
+  }
+
+  const centralSize = centralDirectory.reduce((sum, chunk) => sum + chunk.length, 0);
+  const end = new Uint8Array(22);
+  writeUint32(end, 0, 0x06054b50);
+  writeUint16(end, 8, entries.size);
+  writeUint16(end, 10, entries.size);
+  writeUint32(end, 12, centralSize);
+  writeUint32(end, 16, offset);
+  const size = chunks
+    .concat(centralDirectory, end)
+    .reduce((sum, chunk) => sum + chunk.length, 0);
+  const output = new Uint8Array(size);
+  let cursor = 0;
+  for (const chunk of chunks.concat(centralDirectory, end)) {
+    output.set(chunk, cursor);
+    cursor += chunk.length;
+  }
+  return output.buffer.slice(0);
+}
+
+function crc32(bytes: Uint8Array) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1;
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function writeUint16(bytes: Uint8Array, offset: number, value: number) {
+  bytes[offset] = value & 0xff;
+  bytes[offset + 1] = (value >>> 8) & 0xff;
+}
+
+function writeUint32(bytes: Uint8Array, offset: number, value: number) {
+  writeUint16(bytes, offset, value & 0xffff);
+  writeUint16(bytes, offset + 2, value >>> 16);
+}
+
 describe("ProjectDetailPage", () => {
   const fetchMock = vi.fn<typeof fetch>();
   const clipboardWriteText = vi.fn<(value: string) => Promise<void>>();
@@ -54,7 +242,7 @@ describe("ProjectDetailPage", () => {
       sourceLabel: "审核处理页",
     });
 
-    fetchMock.mockImplementation(async (input) => {
+    fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));
 
       if (url.pathname === "/v1/projects/project-001/workspace") {
@@ -217,6 +405,109 @@ describe("ProjectDetailPage", () => {
         });
       }
 
+      if (
+        url.pathname === "/v1/projects/project-001/bill-imports/source/preview" &&
+        init?.method === "POST"
+      ) {
+        const payload = JSON.parse(String(init.body ?? "{}")) as {
+          sourceFileName?: string;
+          sourceTables: {
+            ZaoJia_Qd_QdList: unknown[];
+            ZaoJia_Qd_Qdxm: unknown[];
+            ZaoJia_Qd_Gznr: unknown[];
+          };
+        };
+        expect(payload.sourceFileName).toBe("source-bill.csv");
+        expect(payload.sourceTables.ZaoJia_Qd_Qdxm).toHaveLength(2);
+
+        return createJsonResponse({
+          summary: {
+            versionCount: 1,
+            billItemCount: 2,
+            workItemCount: 0,
+            failedItemCount: 1,
+            measureItemCount: 1,
+            feeItemCount: 1,
+            featureItemCount: 1,
+            quotaClueCount: 1,
+            failureDetails: ["ZaoJia_Qd_Qdxm[1] 重复编码 010101001001，已按源行保留"],
+          },
+          failedItems: [
+            {
+              lineNo: 2,
+              tableName: "ZaoJia_Qd_Qdxm",
+              sourceId: "item-002",
+              itemCode: "010101001001",
+              reasonCode: "duplicate_code",
+              reasonLabel: "重复编码",
+              errorMessage: "重复编码 010101001001，已按源行保留",
+              projectId: null,
+              resourceType: "bill_item",
+              action: "create",
+              keys: ["Qdbh"],
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-imports/source" &&
+        init?.method === "POST"
+      ) {
+        const payload = JSON.parse(String(init.body ?? "{}")) as {
+          sourceFileName?: string;
+          sourceTables: {
+            ZaoJia_Qd_QdList: unknown[];
+            ZaoJia_Qd_Qdxm: unknown[];
+            ZaoJia_Qd_Gznr: unknown[];
+          };
+        };
+        expect(payload.sourceFileName).toBe("source-bill.csv");
+        expect(payload.sourceTables.ZaoJia_Qd_QdList).toHaveLength(0);
+        expect(payload.sourceTables.ZaoJia_Qd_Qdxm).toHaveLength(2);
+        expect(payload.sourceTables.ZaoJia_Qd_Gznr).toHaveLength(0);
+
+        return createJsonResponse({
+          billVersion: {
+            id: "version-import-001",
+            versionName: "源清单导入版",
+            stageCode: "estimate",
+            disciplineCode: "building",
+            versionStatus: "editable",
+          },
+          importTask: {
+            id: "import-task-source-001",
+            status: "failed",
+          },
+          summary: {
+            versionCount: 1,
+            billItemCount: 1,
+            workItemCount: 0,
+            failedItemCount: 1,
+            measureItemCount: 1,
+            feeItemCount: 1,
+            featureItemCount: 1,
+            quotaClueCount: 1,
+            failureDetails: ["ZaoJia_Qd_Qdxm[1] 重复编码 010101001001，已按源行保留"],
+          },
+          failedItems: [
+            {
+              lineNo: 2,
+              tableName: "ZaoJia_Qd_Qdxm",
+              sourceId: "item-002",
+              itemCode: "010101001001",
+              reasonCode: "duplicate_code",
+              reasonLabel: "重复编码",
+              errorMessage: "重复编码 010101001001，已按源行保留",
+              projectId: null,
+              resourceType: "bill_item",
+              action: "create",
+              keys: ["Qdbh"],
+            },
+          ],
+        });
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -287,6 +578,7 @@ describe("ProjectDetailPage", () => {
     );
     expect(screen.queryByRole("link", { name: "打开最近协作入口" })).not.toBeInTheDocument();
     expect(screen.getByText("导入状态")).toBeInTheDocument();
+    expect(screen.getByLabelText("选择源清单文件")).toBeInTheDocument();
     expect(screen.getByText("当前协作视角：缺少必填字段")).toBeInTheDocument();
     expect(
       screen.getAllByText("当前协作处理单元：缺少必填字段 · 资源 bill_item · 动作 create").length,
@@ -300,6 +592,42 @@ describe("ProjectDetailPage", () => {
       "href",
       "/projects/project-001/inbox?focus=import&failureReason=missing_field&failureResourceType=bill_item&failureAction=create",
     );
+    const sourceBillFile = new File(
+      [
+        [
+          "QdID,Qdbh,Xmmc,Dw,Gcl,measureFlag,feeId,featureText,quotaCode",
+          "item-001,010101001001,平整场地,m2,1,,,,",
+          "item-002,010101001001,重复编码行,m2,,是,fee-001,三类土,1-1",
+        ].join("\n"),
+      ],
+      "source-bill.csv",
+      { type: "text/csv" },
+    );
+    fireEvent.change(screen.getByLabelText("选择源清单文件"), {
+      target: { files: [sourceBillFile] },
+    });
+    expect(await screen.findByText("已选择 source-bill.csv，请先预览确认。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
+    expect(await screen.findByText("源清单导入预览")).toBeInTheDocument();
+    expect(screen.getByText(/版本 1 · 清单项 2 · 工作内容 0 · 失败 1/)).toBeInTheDocument();
+    expect(screen.getByText(/措施项 1 · 费用项 1 · 清单特征 1 · 定额线索 1/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重复编码 · 1" })).toBeInTheDocument();
+    const repairTemplateLink = screen.getByRole("link", { name: "下载修复模板" });
+    expect(repairTemplateLink).toHaveAttribute(
+      "download",
+      "source-bill-fix-template.csv",
+    );
+    expect(decodeURIComponent(repairTemplateLink.getAttribute("href") ?? "")).toContain(
+      "tableName,lineNo,reasonCode,reasonLabel,sourceId,itemCode,errorMessage,Qdbh",
+    );
+    expect(decodeURIComponent(repairTemplateLink.getAttribute("href") ?? "")).toContain(
+      "ZaoJia_Qd_Qdxm,2,duplicate_code,重复编码,item-002,010101001001",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
+    expect(await screen.findByText("导入失败：清单项 1，工作内容 0，失败 1")).toBeInTheDocument();
+    expect(
+      screen.getByText("ZaoJia_Qd_Qdxm[1] 重复编码 010101001001，已按源行保留"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "复制当前协作链接" }));
     await waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(
@@ -1219,6 +1547,270 @@ describe("ProjectDetailPage", () => {
     });
 
     expect(screen.getAllByTestId("location-search").at(-1)).toHaveTextContent("");
+  });
+
+  test("parses Excel source bill workbooks by QdList Qdxm and Gznr sheets", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse({
+          project: {
+            id: "project-001",
+            code: "PRJ-001",
+            name: "新点造价项目",
+            status: "draft",
+          },
+          currentStage: {
+            id: "stage-001",
+            stageCode: "bid_bill",
+            stageName: "招标清单",
+            status: "active",
+            sequenceNo: 1,
+          },
+          availableStages: [
+            {
+              id: "stage-001",
+              stageCode: "bid_bill",
+              stageName: "招标清单",
+              status: "active",
+              sequenceNo: 1,
+            },
+          ],
+          disciplines: [
+            {
+              id: "discipline-001",
+              disciplineCode: "building",
+              disciplineName: "建筑工程",
+              status: "enabled",
+            },
+          ],
+          billVersions: [],
+          currentUser: {
+            userId: "user-001",
+            displayName: "Owner User",
+            memberId: "member-001",
+            permissionSummary: {
+              roleCode: "project_owner",
+              roleLabel: "项目负责人",
+              canManageProject: true,
+              canEditProject: true,
+              scopeSummary: ["项目全部范围"],
+              visibleStageCodes: ["bid_bill"],
+              visibleDisciplineCodes: ["building"],
+            },
+          },
+          todoSummary: {
+            totalCount: 0,
+            pendingReviewCount: 0,
+            pendingProcessDocumentCount: 0,
+            draftProcessDocumentCount: 0,
+            items: [],
+          },
+          riskSummary: {
+            totalCount: 0,
+            rejectedReviewCount: 0,
+            rejectedProcessDocumentCount: 0,
+            failedJobCount: 0,
+            items: [],
+          },
+          importStatus: {
+            mode: "import_task",
+            totalCount: 0,
+            queuedCount: 0,
+            processingCount: 0,
+            completedCount: 0,
+            failedCount: 0,
+            latestTask: null,
+            note: "导入状态已切换为正式导入任务模型，工作台摘要与导入任务记录保持一致。",
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        return createJsonResponse({
+          totalSystemAmount: 0,
+          totalFinalAmount: 0,
+          varianceAmount: 0,
+          itemCount: 0,
+          billVersionCount: 0,
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/audit-logs") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-imports/source/preview" &&
+        init?.method === "POST"
+      ) {
+        const payload = JSON.parse(String(init.body ?? "{}")) as {
+          sourceFileName?: string;
+          sourceTables: {
+            ZaoJia_Qd_QdList: Array<Record<string, unknown>>;
+            ZaoJia_Qd_Qdxm: Array<Record<string, unknown>>;
+            ZaoJia_Qd_Gznr: Array<Record<string, unknown>>;
+          };
+        };
+        expect(payload.sourceFileName).toBe("source-bill.xlsx");
+        expect(payload.sourceTables.ZaoJia_Qd_QdList).toEqual([
+          { QdID: "list-001", Qdmc: "招标清单", QdGf: "GB50500-2013" },
+        ]);
+        expect(payload.sourceTables.ZaoJia_Qd_Qdxm).toEqual([
+          {
+            QdID: "item-001",
+            Qdbh: "010101001001",
+            Xmmc: "平整场地",
+            Dw: "m2",
+            Gcl: "120",
+          },
+        ]);
+        expect(payload.sourceTables.ZaoJia_Qd_Gznr).toEqual([
+          { QdID: "item-001", Gznr: "清理、平整" },
+        ]);
+
+        return createJsonResponse({
+          summary: {
+            versionCount: 1,
+            billItemCount: 1,
+            workItemCount: 1,
+            failedItemCount: 0,
+            measureItemCount: 0,
+            feeItemCount: 0,
+            featureItemCount: 0,
+            quotaClueCount: 0,
+            failureDetails: [],
+          },
+          failedItems: [],
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001"]}>
+        <Routes>
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("选择源清单文件")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("选择源清单文件"), {
+      target: { files: [createSourceBillWorkbookFile()] },
+    });
+    expect(await screen.findByText("已选择 source-bill.xlsx，请先预览确认。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
+
+    expect(await screen.findByText("源清单导入预览")).toBeInTheDocument();
+    expect(screen.getByText(/版本 1 · 清单项 1 · 工作内容 1 · 失败 0/)).toBeInTheDocument();
+  });
+
+  test("rejects legacy xls source bill workbooks with a clear compatibility message", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse({
+          project: {
+            id: "project-001",
+            code: "PRJ-001",
+            name: "新点造价项目",
+            status: "draft",
+          },
+          currentStage: null,
+          availableStages: [],
+          disciplines: [],
+          billVersions: [],
+          currentUser: {
+            userId: "user-001",
+            displayName: "Owner User",
+            memberId: "member-001",
+            permissionSummary: {
+              roleCode: "project_owner",
+              roleLabel: "项目负责人",
+              canManageProject: true,
+              canEditProject: true,
+              scopeSummary: ["项目全部范围"],
+              visibleStageCodes: [],
+              visibleDisciplineCodes: [],
+            },
+          },
+          todoSummary: {
+            totalCount: 0,
+            pendingReviewCount: 0,
+            pendingProcessDocumentCount: 0,
+            draftProcessDocumentCount: 0,
+            items: [],
+          },
+          riskSummary: {
+            totalCount: 0,
+            rejectedReviewCount: 0,
+            rejectedProcessDocumentCount: 0,
+            failedJobCount: 0,
+            items: [],
+          },
+          importStatus: {
+            mode: "import_task",
+            totalCount: 0,
+            queuedCount: 0,
+            processingCount: 0,
+            completedCount: 0,
+            failedCount: 0,
+            latestTask: null,
+            note: "导入状态已切换为正式导入任务模型，工作台摘要与导入任务记录保持一致。",
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/reports/summary") {
+        return createJsonResponse({
+          totalSystemAmount: 0,
+          totalFinalAmount: 0,
+          varianceAmount: 0,
+          itemCount: 0,
+          billVersionCount: 0,
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/audit-logs") {
+        return createJsonResponse({ items: [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001"]}>
+        <Routes>
+          <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("选择源清单文件")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("选择源清单文件"), {
+      target: { files: [createLegacySourceBillWorkbookFile()] },
+    });
+
+    expect(
+      await screen.findByText(
+        "暂不支持 Excel 97-2003 .xls 源清单文件，请先另存为 .xlsx、CSV 或 JSON 后再导入。",
+      ),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("/bill-imports/source/preview"),
+      expect.anything(),
+    );
   });
 
   test("shows bill version lock and unlock actions from workspace status", async () => {

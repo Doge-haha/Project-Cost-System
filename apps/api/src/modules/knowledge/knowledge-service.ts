@@ -12,6 +12,10 @@ import type {
   MemoryEntryRecord,
   MemoryEntryRepository,
 } from "./memory-entry-repository.js";
+import type {
+  KnowledgeSourceType,
+  MemorySubjectType,
+} from "./knowledge-constants.js";
 
 type ExtractionBatchResult = {
   runtime?: string;
@@ -20,7 +24,7 @@ type ExtractionBatchResult = {
     knowledgeCandidates?: Array<{
       title: string;
       summary: string;
-      source_type: string;
+      source_type: KnowledgeSourceType;
       source_action: string;
       project_id: string;
       stage_code?: string | null;
@@ -29,7 +33,7 @@ type ExtractionBatchResult = {
     }>;
     memoryCandidates?: Array<{
       memory_key: string;
-      subject_type: string;
+      subject_type: MemorySubjectType;
       subject_id: string;
       content: string;
       project_id: string;

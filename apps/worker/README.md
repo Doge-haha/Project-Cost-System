@@ -19,6 +19,7 @@
 - `background-job-executor` 单任务执行器
 - `background-job-queue` 队列抽象
 - `queue-backed-worker` 单次 drain 入口
+- `report_export` payload 透传 `reportTemplateId` 与 `outputFormat`
 - 可独立回归的 worker 测试
 
 本地启动：

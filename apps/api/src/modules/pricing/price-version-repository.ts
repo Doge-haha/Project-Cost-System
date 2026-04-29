@@ -1,4 +1,5 @@
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
+import type { PriceVersionStatus } from "./pricing-constants.js";
 
 export type PriceVersionRecord = {
   id: string;
@@ -6,7 +7,7 @@ export type PriceVersionRecord = {
   versionName: string;
   regionCode: string;
   disciplineCode: string;
-  status: "active" | "inactive";
+  status: PriceVersionStatus;
 };
 
 export interface PriceVersionRepository {

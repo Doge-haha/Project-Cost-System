@@ -23,6 +23,7 @@ tags:
   - name: Bill Work Items
   - name: Import Tasks
   - name: Knowledge
+  - name: Master Data
   - name: Pricing
   - name: Process Documents
   - name: Projects
@@ -407,6 +408,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/recommendations/expire-stale:
+    post:
+      operationId: postAiRecommendationsExpireStale
+      summary: POST /v1/ai/recommendations/expire-stale
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/ai/variance-warnings:
     post:
       operationId: postAiVarianceWarnings
@@ -429,6 +476,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/discipline-types:
+    get:
+      operationId: getDisciplineTypes
+      summary: GET /v1/discipline-types
+      tags:
+        - Master Data
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: regionCode
+        in: query
+        description: Region code.
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
         '401':
           description: Unauthorized
           content:
@@ -1794,6 +1894,444 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-imports/source:
+    post:
+      operationId: postProjectsByProjectIdBillImportsSource
+      summary: POST /v1/projects/:projectId/bill-imports/source
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-imports/source/preview:
+    post:
+      operationId: postProjectsByProjectIdBillImportsSourcePreview
+      summary: POST /v1/projects/:projectId/bill-imports/source/preview
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-items:
+    get:
+      operationId: getProjectsByProjectIdBillItems
+      summary: GET /v1/projects/:projectId/bill-items
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: postProjectsByProjectIdBillItems
+      summary: POST /v1/projects/:projectId/bill-items
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-items/{itemId}:
+    put:
+      operationId: putProjectsByProjectIdBillItemsByItemId
+      summary: PUT /v1/projects/:projectId/bill-items/:itemId
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: itemId
+        in: path
+        description: itemId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-items/{itemId}/work-items:
+    get:
+      operationId: getProjectsByProjectIdBillItemsByItemIdWorkItems
+      summary: GET /v1/projects/:projectId/bill-items/:itemId/work-items
+      tags:
+        - Bill Work Items
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: itemId
+        in: path
+        description: itemId path parameter.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: postProjectsByProjectIdBillItemsByItemIdWorkItems
+      summary: POST /v1/projects/:projectId/bill-items/:itemId/work-items
+      tags:
+        - Bill Work Items
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: itemId
+        in: path
+        description: itemId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-items/{itemId}/work-items/{workItemId}:
+    put:
+      operationId: putProjectsByProjectIdBillItemsByItemIdWorkItemsByWorkItemId
+      summary: PUT /v1/projects/:projectId/bill-items/:itemId/work-items/:workItemId
+      tags:
+        - Bill Work Items
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: itemId
+        in: path
+        description: itemId path parameter.
+        required: true
+        schema:
+          type: string
+      - name: workItemId
+        in: path
+        description: workItemId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/projects/{projectId}/bill-versions:
     get:
       operationId: getProjectsByProjectIdBillVersions
@@ -1892,6 +2430,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-versions/{billVersionId}:
+    get:
+      operationId: getProjectsByProjectIdBillVersionsByBillVersionId
+      summary: GET /v1/projects/:projectId/bill-versions/:billVersionId
+      tags:
+        - Bill Versions
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: billVersionId
+        in: path
+        description: Bill version id.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
         '401':
           description: Unauthorized
           content:
@@ -2207,6 +2797,71 @@ paths:
     put:
       operationId: putProjectsByProjectIdBillVersionsByBillVersionIdItemsByItemIdManualPricing
       summary: PUT /v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId/manual-pricing
+      tags:
+        - Bill Items
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: billVersionId
+        in: path
+        description: Bill version id.
+        required: true
+        schema:
+          type: string
+      - name: itemId
+        in: path
+        description: itemId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-versions/{billVersionId}/items/{itemId}/move:
+    put:
+      operationId: putProjectsByProjectIdBillVersionsByBillVersionIdItemsByItemIdMove
+      summary: PUT /v1/projects/:projectId/bill-versions/:billVersionId/items/:itemId/move
       tags:
         - Bill Items
       security:
@@ -2618,6 +3273,117 @@ paths:
       responses:
         '204':
           description: No Content
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-versions/{billVersionId}/items/batch:
+    post:
+      operationId: postProjectsByProjectIdBillVersionsByBillVersionIdItemsBatch
+      summary: POST /v1/projects/:projectId/bill-versions/:billVersionId/items/batch
+      tags:
+        - Bill Items
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: billVersionId
+        in: path
+        description: Bill version id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/bill-versions/{billVersionId}/items/tree:
+    get:
+      operationId: getProjectsByProjectIdBillVersionsByBillVersionIdItemsTree
+      summary: GET /v1/projects/:projectId/bill-versions/:billVersionId/items/tree
+      tags:
+        - Bill Items
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      - name: billVersionId
+        in: path
+        description: Bill version id.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
         '401':
           description: Unauthorized
           content:
@@ -3281,6 +4047,62 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      operationId: putProjectsByProjectIdDisciplines
+      summary: PUT /v1/projects/:projectId/disciplines
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [disciplines]
+              properties:
+                disciplines:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
         '401':
           description: Unauthorized
           content:
@@ -4909,6 +5731,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/projects/{projectId}/status:
+    put:
+      operationId: putProjectsByProjectIdStatus
+      summary: PUT /v1/projects/:projectId/status
+      tags:
+        - Projects
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: projectId
+        in: path
+        description: Project id.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [draft, active, archived]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/projects/{projectId}/workspace:
     get:
       operationId: getProjectsByProjectIdWorkspace
@@ -4976,6 +5856,22 @@ paths:
             schema:
               type: object
               additionalProperties: true
+              required: [projectId, reportType]
+              properties:
+                projectId:
+                  type: string
+                reportType:
+                  type: string
+                  enum: [summary, variance, stage_bill]
+                stageCode:
+                  type: string
+                disciplineCode:
+                  type: string
+                reportTemplateId:
+                  type: string
+                outputFormat:
+                  type: string
+                  enum: [json, excel, pdf]
       responses:
         '202':
           description: Accepted
@@ -5300,6 +6196,65 @@ paths:
         required: false
         schema:
           type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/standard-sets:
+    get:
+      operationId: getStandardSets
+      summary: GET /v1/standard-sets
+      tags:
+        - Master Data
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: disciplineCode
+        in: query
+        description: Project discipline code.
+        required: false
+        schema:
+          type: string
+      - name: regionCode
+        in: query
+        description: Region code.
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
       responses:
         '200':
           description: Success

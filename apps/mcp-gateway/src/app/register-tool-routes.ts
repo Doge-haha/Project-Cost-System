@@ -103,6 +103,8 @@ export function registerToolRoutes(
       target: {
         projectId: payload.projectId,
         reportType: payload.reportType,
+        reportTemplateId: payload.reportTemplateId,
+        outputFormat: payload.outputFormat,
       },
       result,
       execution:

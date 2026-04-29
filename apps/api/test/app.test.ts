@@ -51,6 +51,12 @@ import {
   InMemoryImportTaskRepository,
   type ImportTaskRecord,
 } from "../src/modules/import/import-task-repository.js";
+import {
+  InMemoryMasterDataRepository,
+  type DisciplineTypeRecord,
+  type StandardSetRecord,
+} from "../src/modules/master-data/master-data-repository.js";
+import { defaultSourceSystemCode } from "../src/modules/master-data/master-data-constants.js";
 
 const jwtSecret = "test-secret-1234567890";
 const seededProjects: ProjectRecord[] = [
@@ -87,6 +93,62 @@ const seededDisciplines: ProjectDisciplineRecord[] = [
     disciplineName: "建筑工程",
     defaultStandardSetCode: "js-2013-building",
     status: "enabled",
+  },
+];
+const seededDisciplineTypes: DisciplineTypeRecord[] = [
+  {
+    id: "discipline-type-001",
+    disciplineCode: "building",
+    disciplineName: "建筑工程",
+    disciplineGroup: "construction",
+    businessViewType: "cost",
+    regionCode: "JS",
+    sourceMarkup: "ZY-BUILDING",
+    gb08Code: "GB08-BUILDING",
+    gb13Code: "GB13-BUILDING",
+    sourceSystem: defaultSourceSystemCode,
+    status: "active",
+  },
+  {
+    id: "discipline-type-002",
+    disciplineCode: "installation",
+    disciplineName: "安装工程",
+    disciplineGroup: "construction",
+    businessViewType: "cost",
+    regionCode: "JS",
+    sourceMarkup: "ZY-INSTALLATION",
+    gb08Code: null,
+    gb13Code: null,
+    sourceSystem: defaultSourceSystemCode,
+    status: "inactive",
+  },
+];
+const seededStandardSets: StandardSetRecord[] = [
+  {
+    id: "standard-set-001",
+    standardSetCode: "JS-2014",
+    standardSetName: "江苏省建筑与装饰工程计价定额 2014",
+    disciplineCode: "building",
+    regionCode: "JS",
+    versionYear: 2014,
+    standardType: "quota",
+    sourceFieldCode: "DekID",
+    sourceMarkup: "012014jz",
+    sourceSystem: defaultSourceSystemCode,
+    status: "active",
+  },
+  {
+    id: "standard-set-002",
+    standardSetCode: "JS-2014-INSTALL",
+    standardSetName: "江苏省安装工程计价定额 2014",
+    disciplineCode: "installation",
+    regionCode: "JS",
+    versionYear: 2014,
+    standardType: "quota",
+    sourceFieldCode: "DekID",
+    sourceMarkup: "012014az",
+    sourceSystem: defaultSourceSystemCode,
+    status: "inactive",
   },
 ];
 const seededMembers: ProjectMemberRecord[] = [
@@ -510,6 +572,33 @@ test("GET /health stays public", async () => {
   await app.close();
 });
 
+test("OPTIONS preflight stays public and returns CORS headers", async () => {
+  const app = createApp({ jwtSecret });
+
+  const response = await app.inject({
+    method: "OPTIONS",
+    url: "/v1/projects",
+    headers: {
+      origin: "http://localhost:5173",
+      "access-control-request-method": "GET",
+      "access-control-request-headers": "authorization,content-type",
+    },
+  });
+
+  assert.equal(response.statusCode, 204);
+  assert.equal(response.headers["access-control-allow-origin"], "*");
+  assert.equal(
+    response.headers["access-control-allow-headers"],
+    "authorization, content-type",
+  );
+  assert.equal(
+    response.headers["access-control-allow-methods"],
+    "GET, POST, PUT, DELETE, OPTIONS",
+  );
+
+  await app.close();
+});
+
 test("signAccessToken rejects insecure JWT secrets", async () => {
   await assert.rejects(
     () =>
@@ -586,6 +675,179 @@ test("GET /v1/projects/:id/disciplines returns the project's enabled disciplines
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.json(), {
     items: seededDisciplines,
+  });
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/disciplines updates configured disciplines", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(seededProjects),
+    projectStageRepository: new InMemoryProjectStageRepository(seededStages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      seededDisciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(seededMembers),
+    auditLogRepository: new InMemoryAuditLogRepository([]),
+    masterDataRepository: new InMemoryMasterDataRepository({
+      disciplineTypes: seededDisciplineTypes,
+      standardSets: seededStandardSets,
+    }),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Discipline Manager",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/disciplines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      disciplines: [
+        {
+          disciplineCode: "building",
+          disciplineName: "建筑工程",
+          defaultStandardSetCode: "JS-2014",
+          status: "disabled",
+          sortOrder: 2,
+        },
+      ],
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json().items, [
+    {
+      id: response.json().items[0].id,
+      projectId: "project-001",
+      disciplineCode: "building",
+      disciplineName: "建筑工程",
+      defaultStandardSetCode: "JS-2014",
+      status: "disabled",
+      sortOrder: 2,
+    },
+  ]);
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/disciplines rejects unknown standard sets", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(seededProjects),
+    projectStageRepository: new InMemoryProjectStageRepository(seededStages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      seededDisciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(seededMembers),
+    masterDataRepository: new InMemoryMasterDataRepository({
+      disciplineTypes: seededDisciplineTypes,
+      standardSets: seededStandardSets,
+    }),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Discipline Manager",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/disciplines",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      disciplines: [
+        {
+          disciplineCode: "building",
+          disciplineName: "建筑工程",
+          defaultStandardSetCode: "missing-standard-set",
+          status: "enabled",
+          sortOrder: 1,
+        },
+      ],
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.equal(response.json().error.code, "STANDARD_SET_NOT_FOUND");
+
+  await app.close();
+});
+
+test("GET /v1/standard-sets filters master data by discipline and status", async () => {
+  const app = createApp({
+    jwtSecret,
+    masterDataRepository: new InMemoryMasterDataRepository({
+      disciplineTypes: seededDisciplineTypes,
+      standardSets: seededStandardSets,
+    }),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Master Data User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/standard-sets?disciplineCode=building&status=active",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [seededStandardSets[0]],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/discipline-types filters master data by region", async () => {
+  const app = createApp({
+    jwtSecret,
+    masterDataRepository: new InMemoryMasterDataRepository({
+      disciplineTypes: seededDisciplineTypes,
+      standardSets: seededStandardSets,
+    }),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Master Data User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/discipline-types?regionCode=JS&status=active",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [seededDisciplineTypes[0]],
   });
 
   await app.close();
@@ -749,6 +1011,7 @@ test("GET /v1/projects/:id/workspace returns aggregated project workspace data f
       canManageProject: true,
       canEditProject: true,
       canExportReports: true,
+      canImportBill: true,
       scopeSummary: ["项目全部范围"],
       visibleStageCodes: ["estimate", "budget"],
       visibleDisciplineCodes: ["building"],
@@ -806,6 +1069,7 @@ test("GET /v1/projects/:id/workspace filters bill versions and permission scope 
     canManageProject: false,
     canEditProject: true,
     canExportReports: true,
+    canImportBill: true,
     scopeSummary: ["阶段：estimate", "专业：building"],
     visibleStageCodes: ["estimate"],
     visibleDisciplineCodes: ["building"],
@@ -919,6 +1183,52 @@ test("POST /v1/projects creates a draft project with configured stages", async (
   await app.close();
 });
 
+test("POST /v1/projects expands the standard stage template when stages are omitted", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository([]),
+    projectStageRepository: new InMemoryProjectStageRepository([]),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      code: "PRJ-STAGE-TEMPLATE",
+      name: "默认阶段模板项目",
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 201);
+  assert.deepEqual(
+    createResponse.json().stages.map((stage: { stageCode: string }) => stage.stageCode),
+    [
+      "estimate",
+      "target_cost",
+      "bid_bill",
+      "control_price",
+      "bid_quote",
+      "contract_bill",
+      "construction",
+      "settlement",
+      "retrospective",
+    ],
+  );
+
+  await app.close();
+});
+
 test("PUT /v1/projects/:id/stages updates stage ordering and writes audit logs", async () => {
   const app = createApp({
     jwtSecret,
@@ -991,6 +1301,64 @@ test("PUT /v1/projects/:id/stages updates stage ordering and writes audit logs",
     ),
     ["budget", "estimate"],
   );
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/status updates project status and writes audit logs", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(
+      seededProjects.map((project) => ({ ...project })),
+    ),
+    projectStageRepository: new InMemoryProjectStageRepository(
+      seededStages.map((stage) => ({ ...stage })),
+    ),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      seededDisciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(seededMembers),
+    auditLogRepository: new InMemoryAuditLogRepository([]),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/status",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      status: "archived",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().status, "archived");
+
+  const auditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=project&resourceId=project-001&action=update_status",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(auditResponse.statusCode, 200);
+  assert.equal(auditResponse.json().items.length, 1);
+  assert.deepEqual(auditResponse.json().items[0].beforePayload, {
+    status: "draft",
+  });
+  assert.deepEqual(auditResponse.json().items[0].afterPayload, {
+    status: "archived",
+  });
 
   await app.close();
 });
@@ -3117,6 +3485,37 @@ test("GET /v1/projects/:projectId/knowledge-entries and /memory-entries expose p
   assert.equal(knowledgeResponse.json().items[0].sourceType, "review_submission");
   assert.equal(memoryResponse.json().items[0].sourceJobId, jobId);
   assert.equal(memoryResponse.json().items[0].subjectId, "reviewer-001");
+
+  const knowledgeAuditResponse = await app.inject({
+    method: "GET",
+    url:
+      "/v1/projects/project-001/audit-logs?resourceType=knowledge_entry&action=knowledge_entry.create",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+  const memoryAuditResponse = await app.inject({
+    method: "GET",
+    url:
+      "/v1/projects/project-001/audit-logs?resourceType=memory_entry&action=memory_entry.create",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(knowledgeAuditResponse.statusCode, 200);
+  assert.equal(memoryAuditResponse.statusCode, 200);
+  assert.equal(knowledgeAuditResponse.json().items.length, 1);
+  assert.equal(memoryAuditResponse.json().items.length, 1);
+  assert.equal(knowledgeAuditResponse.json().items[0].operatorId, "user-001");
+  assert.equal(
+    knowledgeAuditResponse.json().items[0].afterPayload.sourceJobId,
+    jobId,
+  );
+  assert.equal(
+    memoryAuditResponse.json().items[0].afterPayload.subjectId,
+    "reviewer-001",
+  );
 
   await app.close();
 });

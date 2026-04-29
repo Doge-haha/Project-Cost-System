@@ -13,6 +13,24 @@ test("createRuntimeAppOptions returns in-memory mode when DATABASE_URL is absent
   assert.equal(result.close, undefined);
 });
 
+test("createRuntimeAppOptions can seed memory mode for local demos", async () => {
+  const result = createRuntimeAppOptions({
+    APP_STORAGE_MODE: "memory",
+    APP_DEMO_SEED: "1",
+  });
+
+  assert.equal(result.mode, "memory");
+  assert.equal(result.appOptions.appRuntimeMode, "memory");
+  assert.ok(result.appOptions.projectRepository);
+
+  const page = await result.appOptions.projectRepository!.listPage({
+    page: 1,
+    pageSize: 10,
+  });
+  assert.equal(page.total, 1);
+  assert.equal(page.items[0].id, "project-001");
+});
+
 test("createRuntimeAppOptions returns database-backed options when DATABASE_URL is present", () => {
   const result = createRuntimeAppOptions({
     DATABASE_URL: "postgres://postgres:postgres@localhost:5432/saas_pricing",

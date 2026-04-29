@@ -2401,6 +2401,8 @@ test("POST /v1/reports/export queues a summary export task that completes when t
       reportType: "summary",
       stageCode: "estimate",
       disciplineCode: "building",
+      reportTemplateId: "tpl-standard-summary-v1",
+      outputFormat: "pdf",
     },
   });
 
@@ -2409,7 +2411,17 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   assert.equal(createResponse.json().job.status, "queued");
   assert.equal(createResponse.json().result.status, "queued");
   assert.equal(createResponse.json().result.reportType, "summary");
+  assert.equal(
+    createResponse.json().result.reportTemplateId,
+    "tpl-standard-summary-v1",
+  );
+  assert.equal(createResponse.json().result.outputFormat, "pdf");
   assert.equal(backgroundJobSink.jobs.length, 1);
+  assert.equal(
+    backgroundJobSink.jobs[0]?.payload.reportTemplateId,
+    "tpl-standard-summary-v1",
+  );
+  assert.equal(backgroundJobSink.jobs[0]?.payload.outputFormat, "pdf");
 
   const taskId = createResponse.json().result.id as string;
   const queryResponse = await app.inject({
@@ -2423,6 +2435,8 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   assert.equal(queryResponse.statusCode, 200);
   assert.equal(queryResponse.json().id, taskId);
   assert.equal(queryResponse.json().status, "queued");
+  assert.equal(queryResponse.json().reportTemplateId, "tpl-standard-summary-v1");
+  assert.equal(queryResponse.json().outputFormat, "pdf");
   assert.equal(queryResponse.json().resultPreview, null);
 
   const processResponse = await app.inject({
@@ -2459,6 +2473,11 @@ test("POST /v1/reports/export queues a summary export task that completes when t
 
   assert.equal(completedTaskResponse.statusCode, 200);
   assert.equal(completedTaskResponse.json().status, "completed");
+  assert.equal(
+    completedTaskResponse.json().reportTemplateId,
+    "tpl-standard-summary-v1",
+  );
+  assert.equal(completedTaskResponse.json().outputFormat, "pdf");
   assert.equal(completedTaskResponse.json().isDownloadReady, true);
   assert.equal(completedTaskResponse.json().isTerminal, true);
   assert.equal(completedTaskResponse.json().hasFailed, false);
@@ -2539,6 +2558,14 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   assert.equal(createAuditResponse.json().items[0].resourceId, taskId);
   assert.equal(createAuditResponse.json().items[0].afterPayload.status, "queued");
   assert.equal(
+    createAuditResponse.json().items[0].afterPayload.reportTemplateId,
+    "tpl-standard-summary-v1",
+  );
+  assert.equal(
+    createAuditResponse.json().items[0].afterPayload.outputFormat,
+    "pdf",
+  );
+  assert.equal(
     createAuditResponse.json().items[0].afterPayload.disciplineCode,
     "building",
   );
@@ -2556,6 +2583,103 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   assert.equal(
     backgroundAuditResponse.json().items[0].resourceId,
     createResponse.json().job.id,
+  );
+
+  await app.close();
+});
+
+test("POST /v1/reports/export queues a stage bill export task with scoped details", async () => {
+  const app = createPricingApp({
+    projectDefaults: {
+      defaultPriceVersionId: "price-version-001",
+      defaultFeeTemplateId: "fee-template-001",
+    },
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+  const operatorToken = await signAccessToken(
+    {
+      sub: "ops-001",
+      roleCodes: ["system_admin"],
+      displayName: "Ops Admin",
+    },
+    jwtSecret,
+  );
+
+  await app.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+    },
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/reports/export",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      reportType: "stage_bill",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      reportTemplateId: "tpl-standard-stage-bill-v1",
+      outputFormat: "excel",
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 202);
+  assert.equal(createResponse.json().result.reportType, "stage_bill");
+  assert.equal(
+    createResponse.json().result.reportTemplateId,
+    "tpl-standard-stage-bill-v1",
+  );
+  assert.equal(createResponse.json().result.outputFormat, "excel");
+
+  const processResponse = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${createResponse.json().job.id}/process`,
+    headers: {
+      authorization: `Bearer ${operatorToken}`,
+    },
+  });
+
+  assert.equal(processResponse.statusCode, 200);
+  assert.equal(processResponse.json().status, "completed");
+
+  const taskId = createResponse.json().result.id as string;
+  const completedTaskResponse = await app.inject({
+    method: "GET",
+    url: `/v1/reports/export/${taskId}`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(completedTaskResponse.statusCode, 200);
+  assert.equal(completedTaskResponse.json().status, "completed");
+  assert.equal(completedTaskResponse.json().resultPreview.reportType, "stage_bill");
+  assert.equal(completedTaskResponse.json().resultPreview.stageCode, "estimate");
+  assert.equal(completedTaskResponse.json().resultPreview.disciplineCode, "building");
+  assert.ok(completedTaskResponse.json().resultPreview.items.length > 0);
+  assert.equal(
+    completedTaskResponse.json().resultPreview.items[0].stageCode,
+    "estimate",
+  );
+  assert.equal(
+    completedTaskResponse.json().downloadFileName,
+    `stage_bill-${taskId}.json`,
   );
 
   await app.close();

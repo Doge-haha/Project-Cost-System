@@ -42,6 +42,11 @@ type ExtractionBatchResult = {
 
 type RecommendationFeedbackStatus = "accepted" | "ignored" | "expired";
 
+export const KNOWLEDGE_AUDIT_ACTIONS = {
+  createKnowledgeEntry: "knowledge_entry.create",
+  createMemoryEntry: "memory_entry.create",
+} as const;
+
 export class KnowledgeService {
   constructor(
     private readonly knowledgeEntryRepository: KnowledgeEntryRepository,
@@ -237,6 +242,138 @@ export class KnowledgeService {
     };
   }
 
+  async persistProjectRetrospective(input: {
+    projectId: string;
+    stageCode?: string | null;
+    title: string;
+    summary: string;
+    tags?: string[];
+    sourceId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<KnowledgeEntryRecord> {
+    const createdAt = new Date().toISOString();
+    return this.knowledgeEntryRepository.create({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: null,
+      sourceType: "project_retrospective",
+      sourceAction: "conclusion",
+      title: input.title,
+      summary: input.summary,
+      tags: ["project_retrospective", ...(input.tags ?? [])],
+      metadata: {
+        ...(input.metadata ?? {}),
+        sourceId: input.sourceId ?? null,
+      },
+      createdAt,
+    });
+  }
+
+  async persistReviewRejectionTags(input: {
+    projectId: string;
+    stageCode?: string | null;
+    reviewSubmissionId: string;
+    reason: string;
+    tags: string[];
+    operatorId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<KnowledgeEntryRecord> {
+    const normalizedTags = Array.from(
+      new Set(["review_rejection", "reject", ...input.tags]),
+    );
+    const createdAt = new Date().toISOString();
+
+    return this.knowledgeEntryRepository.create({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: null,
+      sourceType: "review_submission",
+      sourceAction: "reject",
+      title: "Review rejection reason",
+      summary: input.reason,
+      tags: normalizedTags,
+      metadata: {
+        ...(input.metadata ?? {}),
+        reviewSubmissionId: input.reviewSubmissionId,
+        operatorId: input.operatorId ?? null,
+      },
+      createdAt,
+    });
+  }
+
+  async persistProjectPreference(input: {
+    projectId: string;
+    stageCode?: string | null;
+    preferenceKey: string;
+    content: string;
+    sourceJobId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<MemoryEntryRecord> {
+    return this.persistPreferenceMemory({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: input.sourceJobId ?? null,
+      memoryKey: [input.projectId, "project", input.preferenceKey].join(":"),
+      subjectType: "project",
+      subjectId: input.projectId,
+      content: input.content,
+      metadata: {
+        ...(input.metadata ?? {}),
+        preferenceKey: input.preferenceKey,
+      },
+    });
+  }
+
+  async persistOrganizationPreference(input: {
+    projectId: string;
+    organizationId: string;
+    preferenceKey: string;
+    content: string;
+    sourceJobId?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<MemoryEntryRecord> {
+    return this.persistPreferenceMemory({
+      projectId: input.projectId,
+      stageCode: null,
+      sourceJobId: input.sourceJobId ?? null,
+      memoryKey: [input.organizationId, "organization", input.preferenceKey].join(
+        ":",
+      ),
+      subjectType: "organization",
+      subjectId: input.organizationId,
+      content: input.content,
+      metadata: {
+        ...(input.metadata ?? {}),
+        preferenceKey: input.preferenceKey,
+      },
+    });
+  }
+
+  async persistAiRuntimeFeedback(input: {
+    projectId: string;
+    stageCode?: string | null;
+    sourceJobId: string;
+    feedbackKey: string;
+    content: string;
+    status: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<MemoryEntryRecord> {
+    return this.persistPreferenceMemory({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      sourceJobId: input.sourceJobId,
+      memoryKey: [input.projectId, "ai_runtime", input.feedbackKey].join(":"),
+      subjectType: "ai_runtime",
+      subjectId: input.sourceJobId,
+      content: input.content,
+      metadata: {
+        ...(input.metadata ?? {}),
+        feedbackKey: input.feedbackKey,
+        status: input.status,
+      },
+    });
+  }
+
   async persistRecommendationFeedback(input: {
     projectId: string;
     stageCode?: string | null;
@@ -340,6 +477,15 @@ export class KnowledgeService {
         "You do not have permission to access this resource",
       );
     }
+  }
+
+  private async persistPreferenceMemory(
+    input: Omit<MemoryEntryRecord, "id" | "createdAt">,
+  ): Promise<MemoryEntryRecord> {
+    return this.memoryEntryRepository.create({
+      ...input,
+      createdAt: new Date().toISOString(),
+    });
   }
 }
 

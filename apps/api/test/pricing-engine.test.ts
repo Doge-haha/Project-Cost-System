@@ -404,6 +404,55 @@ test("POST /v1/engine/calculate calculates system and final price from quota lin
   await app.close();
 });
 
+test("POST /v1/engine/calculate requires edit permission because it persists pricing", async () => {
+  const app = createPricingApp({
+    members: [
+      ...members,
+      {
+        id: "member-reviewer-001",
+        projectId: "project-001",
+        userId: "reviewer-001",
+        displayName: "Reviewer",
+        roleCode: "reviewer",
+        scopes: [
+          { scopeType: "stage", scopeValue: "estimate" },
+          { scopeType: "discipline", scopeValue: "building" },
+        ],
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "reviewer-001",
+      roleCodes: ["reviewer"],
+      displayName: "Reviewer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+      priceVersionId: "price-version-001",
+    },
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.deepEqual(response.json(), {
+    error: {
+      code: "FORBIDDEN",
+      message: "You do not have permission to access this resource",
+    },
+  });
+
+  await app.close();
+});
+
 test("POST /v1/engine/calculate rejects inactive price versions", async () => {
   const app = createPricingApp({
     priceVersions: [

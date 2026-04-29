@@ -153,7 +153,7 @@ export class CalculateService {
         billVersionId: billItem.billVersionId,
         userId: input.userId,
       },
-      "view",
+      "edit",
     );
 
     const project = await this.dependencies.projectRepository.findById(

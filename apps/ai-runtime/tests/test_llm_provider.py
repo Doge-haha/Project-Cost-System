@@ -46,6 +46,92 @@ def test_generate_llm_completion_calls_openai_compatible_chat(monkeypatch) -> No
     assert result["usage"] == {"total_tokens": 12}
 
 
+def test_generate_llm_completion_rejects_missing_messages() -> None:
+    try:
+        generate_llm_completion({"apiKey": "secret", "model": "cost-model"})
+    except ValueError as error:
+        assert str(error) == "messages must be a non-empty list"
+    else:
+        raise AssertionError("generate_llm_completion should reject missing messages")
+
+
+def test_generate_llm_completion_rejects_malformed_messages() -> None:
+    try:
+        generate_llm_completion(
+            {
+                "apiKey": "secret",
+                "model": "cost-model",
+                "messages": [{"role": "tool", "content": "hello"}],
+            }
+        )
+    except ValueError as error:
+        assert str(error) == "messages must contain role/content objects"
+    else:
+        raise AssertionError("generate_llm_completion should reject malformed messages")
+
+
+def test_generate_llm_completion_requires_configuration(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+
+    try:
+        generate_llm_completion(
+            {
+                "messages": [{"role": "user", "content": "hello"}],
+            }
+        )
+    except ValueError as error:
+        assert str(error) == "LLM_API_KEY and LLM_MODEL are required"
+    else:
+        raise AssertionError("generate_llm_completion should require LLM config")
+
+
+def test_generate_llm_completion_rejects_missing_response_content(monkeypatch) -> None:
+    monkeypatch.setattr(
+        llm_provider,
+        "_post_json",
+        lambda *args, **kwargs: {"choices": [{"message": {}}]},
+    )
+
+    try:
+        generate_llm_completion(
+            {
+                "apiKey": "secret",
+                "model": "cost-model",
+                "messages": [{"role": "user", "content": "hello"}],
+            }
+        )
+    except ValueError as error:
+        assert str(error) == "LLM provider response missing content"
+    else:
+        raise AssertionError("generate_llm_completion should reject missing content")
+
+
+def test_generate_llm_completion_can_include_raw_response(monkeypatch) -> None:
+    raw_response = {
+        "choices": [{"message": {"content": "ok"}}],
+        "usage": {"total_tokens": 3},
+    }
+    monkeypatch.setattr(
+        llm_provider,
+        "_post_json",
+        lambda *args, **kwargs: raw_response,
+    )
+
+    result = generate_llm_completion(
+        {
+            "apiKey": "secret",
+            "model": "cost-model",
+            "messages": [{"role": "user", "content": "hello"}],
+            "includeRaw": True,
+            "maxTokens": 10,
+        }
+    )
+
+    assert result["content"] == "ok"
+    assert result["raw"] == raw_response
+
+
 def test_process_event_batch_routes_llm_chat(monkeypatch) -> None:
     monkeypatch.setattr(
         "app.runtime_service.generate_llm_completion",

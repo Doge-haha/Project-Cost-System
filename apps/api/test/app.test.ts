@@ -2184,6 +2184,132 @@ test("POST /v1/jobs/:jobId/retry rejects scoped retry when only part of the sele
   await app.close();
 });
 
+test("POST /v1/jobs/:jobId/retry checks import retry limit before rebuilding scoped retry payload", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(seededProjects),
+    projectStageRepository: new InMemoryProjectStageRepository(seededStages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      seededDisciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(seededMembers),
+    backgroundJobRepository: new InMemoryBackgroundJobRepository([
+      {
+        id: "background-job-014",
+        jobType: "knowledge_extraction",
+        status: "failed",
+        requestedBy: "user-001",
+        projectId: "project-001",
+        payload: {
+          projectId: "project-001",
+          source: "audit_log",
+          importTaskId: "import-task-014",
+          events: [
+            {
+              projectId: "project-001",
+              resourceType: "bill_item",
+              action: "create",
+            },
+          ],
+        },
+        result: null,
+        errorMessage: "runtime unavailable",
+        createdAt: "2026-04-18T10:00:00.000Z",
+        completedAt: "2026-04-18T10:05:00.000Z",
+      },
+    ]),
+    importTaskRepository: new InMemoryImportTaskRepository([
+      {
+        id: "import-task-014",
+        projectId: "project-001",
+        sourceType: "audit_log",
+        sourceLabel: "审计日志筛选导入",
+        sourceFileName: "review-events.xlsx",
+        sourceBatchNo: "audit-20260418-014",
+        status: "failed",
+        requestedBy: "user-001",
+        totalItemCount: 1,
+        importedItemCount: 0,
+        memoryItemCount: 0,
+        failedItemCount: 1,
+        latestJobId: "background-job-014",
+        latestErrorMessage: "runtime unavailable",
+        failureDetails: ["runtime unavailable"],
+        retryCount: 3,
+        retryLimit: 3,
+        canRetry: false,
+        metadata: {
+          retryHistory: [],
+          failedItems: [
+            {
+              lineNo: 4,
+              reasonCode: "missing_field",
+              reasonLabel: "缺少必填字段",
+              errorMessage: "缺少工程量",
+              projectId: "project-001",
+              resourceType: "bill_item",
+              action: "create",
+              keys: ["projectId", "resourceType", "action", "name"],
+              retryEventSnapshot: {
+                projectId: "project-001",
+                resourceType: "bill_item",
+                action: "create",
+                name: "某清单项",
+              },
+            },
+          ],
+        },
+        createdAt: "2026-04-18T10:00:00.000Z",
+        completedAt: "2026-04-18T10:05:00.000Z",
+      },
+    ]),
+  });
+  const ownerToken = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const retryResponse = await app.inject({
+    method: "POST",
+    url: "/v1/jobs/background-job-014/retry",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+    payload: {
+      failureReason: "missing_field",
+      failureResourceType: "bill_item",
+      failureAction: "create",
+    },
+  });
+
+  assert.equal(retryResponse.statusCode, 409);
+  assert.deepEqual(retryResponse.json(), {
+    error: {
+      code: "IMPORT_TASK_RETRY_LIMIT_REACHED",
+      message: "Import task retry limit reached",
+    },
+  });
+
+  const jobsResponse = await app.inject({
+    method: "GET",
+    url: "/v1/jobs?projectId=project-001&status=failed",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(jobsResponse.statusCode, 200);
+  assert.equal(jobsResponse.json().items[0].id, "background-job-014");
+  assert.equal(jobsResponse.json().items[0].status, "failed");
+  assert.equal("retryEvents" in jobsResponse.json().items[0].payload, false);
+
+  await app.close();
+});
+
 test("POST /v1/jobs/:jobId/retry rebuilds scoped retry events from formal failureSnapshots metadata", async () => {
   const app = createApp({
     jwtSecret,

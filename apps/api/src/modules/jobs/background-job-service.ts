@@ -411,6 +411,14 @@ export class BackgroundJobService {
       (value) => value !== null,
     );
     const importTaskId = this.readImportTaskId(job);
+    const isKnowledgeExtractionImportRetry =
+      job.jobType === "knowledge_extraction" && importTaskId;
+    if (isKnowledgeExtractionImportRetry) {
+      await requireDependency(
+        this.importTaskService,
+        "importTaskService",
+      ).assertImportTaskRetryable(importTaskId);
+    }
     const {
       retryContext: _previousRetryContext,
       retryEvents: _previousRetryEvents,
@@ -421,11 +429,7 @@ export class BackgroundJobService {
       retryContext,
     };
 
-    if (
-      job.jobType === "knowledge_extraction" &&
-      importTaskId &&
-      hasRetryContext
-    ) {
+    if (isKnowledgeExtractionImportRetry && hasRetryContext) {
       const importTaskService = requireDependency(
         this.importTaskService,
         "importTaskService",

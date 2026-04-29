@@ -224,13 +224,7 @@ export class ImportTaskService {
     };
   }): Promise<ImportTaskRecord> {
     const task = await this.requireTask(input.taskId);
-    if (task.retryCount >= task.retryLimit) {
-      throw new AppError(
-        409,
-        "IMPORT_TASK_RETRY_LIMIT_REACHED",
-        "Import task retry limit reached",
-      );
-    }
+    this.assertRetryLimitAvailable(task);
 
     const retryHistory = Array.isArray(task.metadata.retryHistory)
       ? task.metadata.retryHistory
@@ -316,6 +310,11 @@ export class ImportTaskService {
     });
 
     return retried;
+  }
+
+  async assertImportTaskRetryable(taskId: string): Promise<void> {
+    const task = await this.requireTask(taskId);
+    this.assertRetryLimitAvailable(task);
   }
 
   async buildRetryEventsFromSnapshots(input: {
@@ -469,6 +468,16 @@ export class ImportTaskService {
     }
 
     return task;
+  }
+
+  private assertRetryLimitAvailable(task: ImportTaskRecord): void {
+    if (task.retryCount >= task.retryLimit) {
+      throw new AppError(
+        409,
+        "IMPORT_TASK_RETRY_LIMIT_REACHED",
+        "Import task retry limit reached",
+      );
+    }
   }
 
   private async assertProjectVisible(projectId: string, userId: string): Promise<void> {

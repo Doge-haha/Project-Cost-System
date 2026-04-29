@@ -2,6 +2,7 @@ import { AppError } from "../../shared/errors/app-error.js";
 import type { ProjectDisciplineRecord } from "./project-discipline-repository.js";
 import type { ProjectMemberRecord } from "./project-member-repository.js";
 import type { ProjectStageRecord } from "./project-stage-repository.js";
+import { platformRoleCodes } from "./project-constants.js";
 
 export type AuthorizationContext = {
   projectId: string;
@@ -34,6 +35,8 @@ const ROLE_POLICIES: Record<string, RolePolicy> = {
     canEdit: false,
   },
 };
+
+const supportedRoleCodes = new Set<string>(platformRoleCodes);
 
 export class ProjectAuthorizationService {
   constructor(
@@ -145,6 +148,14 @@ export class ProjectAuthorizationService {
   }
 
   private getRolePolicy(roleCode: string): RolePolicy {
+    if (!supportedRoleCodes.has(roleCode)) {
+      throw new AppError(
+        500,
+        "INVALID_ROLE_CODE",
+        `Unsupported project role code: ${roleCode}`,
+      );
+    }
+
     const policy = ROLE_POLICIES[roleCode];
     if (!policy) {
       throw new AppError(

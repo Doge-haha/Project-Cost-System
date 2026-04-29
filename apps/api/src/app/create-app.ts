@@ -24,6 +24,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     knowledgeService: services.knowledgeService,
     processDocumentService: services.processDocumentService,
     importTaskService: services.importTaskService,
+    masterDataService: services.masterDataService,
   });
 
   registerBusinessRoutes(app, {
@@ -31,6 +32,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     billVersionService: services.billVersionService,
     billItemService: services.billItemService,
     billWorkItemService: services.billWorkItemService,
+    billSourceImportService: services.billSourceImportService,
     quotaLineService: services.quotaLineService,
     priceVersionService: services.priceVersionService,
     priceItemService: services.priceItemService,

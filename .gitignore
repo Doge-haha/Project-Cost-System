@@ -26,3 +26,5 @@ coverage/
 tmp/
 
 docs/work-log-*.md
+# Added by code-review-graph
+.code-review-graph/

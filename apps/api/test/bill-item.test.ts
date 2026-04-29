@@ -172,6 +172,7 @@ const quotaLines: QuotaLineRecord[] = [
 
 function createBillItemApp(overrides?: {
   quotaLineRepository?: InMemoryQuotaLineRepository;
+  billItemRecords?: BillItemRecord[];
   billVersionOverrides?: {
     billVersionId: string;
     versionStatus: BillVersionRecord["versionStatus"];
@@ -196,7 +197,9 @@ function createBillItemApp(overrides?: {
     ),
     projectMemberRepository: new InMemoryProjectMemberRepository(members),
     billVersionRepository: new InMemoryBillVersionRepository(seededBillVersions),
-    billItemRepository: new InMemoryBillItemRepository(billItems),
+    billItemRepository: new InMemoryBillItemRepository(
+      overrides?.billItemRecords ?? billItems,
+    ),
     billWorkItemRepository: new InMemoryBillWorkItemRepository(billWorkItems),
     quotaLineRepository:
       overrides?.quotaLineRepository ??
@@ -225,7 +228,145 @@ test("GET /v1/projects/:id/bill-versions/:versionId/items returns the version it
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.json(), {
-    items: billItems,
+    items: [billItems[0]],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/bill-items filters by version, stage, discipline, and keyword", async () => {
+  const extraBillItems = [
+    ...billItems,
+    {
+      id: "bill-item-002",
+      billVersionId: "bill-version-002",
+      parentId: null,
+      itemCode: "B.1",
+      itemName: "安装工程",
+      quantity: 20,
+      unit: "m",
+      sortNo: 1,
+    },
+  ];
+  const app = createBillItemApp({ billItemRecords: extraBillItems });
+  const token = await signAccessToken(
+    {
+      sub: "owner-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-items?stageCode=estimate&disciplineCode=building&keyword=土石方",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [billItems[0]],
+  });
+
+  const versionResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-items?billVersionId=bill-version-002",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(versionResponse.statusCode, 200);
+  assert.deepEqual(versionResponse.json(), {
+    items: [extraBillItems[1]],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/bill-items only returns versions in the member scope", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-items?stageCode=estimate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [billItems[0]],
+  });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/bill-versions/:versionId/items/tree returns nested bill items", async () => {
+  const app = createBillItemApp({
+    billItemRecords: [
+      ...billItems,
+      {
+        id: "bill-item-002",
+        billVersionId: "bill-version-001",
+        parentId: "bill-item-001",
+        itemCode: "A.1.1",
+        itemName: "机械挖土方",
+        quantity: 50,
+        unit: "m3",
+        sortNo: 2,
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/tree",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        ...billItems[0],
+        children: [
+          {
+            id: "bill-item-002",
+            billVersionId: "bill-version-001",
+            parentId: "bill-item-001",
+            itemCode: "A.1.1",
+            itemName: "机械挖土方",
+            quantity: 50,
+            unit: "m3",
+            sortNo: 2,
+            children: [],
+          },
+        ],
+      },
+    ],
   });
 
   await app.close();
@@ -258,6 +399,33 @@ test("GET /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items ret
   await app.close();
 });
 
+test("GET /v1/projects/:id/bill-items/:itemId/work-items returns work items for the bill item", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-items/bill-item-001/work-items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    items: billWorkItems,
+  });
+
+  await app.close();
+});
+
 test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items creates a work item", async () => {
   const app = createBillItemApp();
   const token = await signAccessToken(
@@ -272,6 +440,40 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items cr
   const response = await app.inject({
     method: "POST",
     url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/work-items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      workContent: "人工清底",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(response.json(), {
+    id: "work-item-002",
+    billItemId: "bill-item-001",
+    workContent: "人工清底",
+    sortNo: 2,
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-items/:itemId/work-items creates a work item", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-items/bill-item-001/work-items",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -360,6 +562,40 @@ test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId/work-items/:wo
   await app.close();
 });
 
+test("PUT /v1/projects/:id/bill-items/:itemId/work-items/:workItemId updates a work item", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/bill-items/bill-item-001/work-items/work-item-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      workContent: "机械清底并外运",
+      sortNo: 3,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    id: "work-item-001",
+    billItemId: "bill-item-001",
+    workContent: "机械清底并外运",
+    sortNo: 3,
+  });
+
+  await app.close();
+});
+
 test("POST /v1/projects/:id/bill-versions/:versionId/items creates a child item within the same version", async () => {
   const app = createBillItemApp();
   const token = await signAccessToken(
@@ -397,6 +633,297 @@ test("POST /v1/projects/:id/bill-versions/:versionId/items creates a child item 
     quantity: 50,
     unit: "m3",
     sortNo: 2,
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-versions/:versionId/items/batch creates root items", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/batch",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      items: [
+        {
+          itemCode: "A.2",
+          itemName: "砌筑工程",
+          quantity: 30,
+          unit: "m3",
+          sortNo: 2,
+        },
+        {
+          itemCode: "A.3",
+          itemName: "混凝土工程",
+          quantity: 40,
+          unit: "m3",
+          sortNo: 3,
+        },
+      ],
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(response.json(), {
+    items: [
+      {
+        id: "bill-item-002",
+        billVersionId: "bill-version-001",
+        parentId: null,
+        itemCode: "A.2",
+        itemName: "砌筑工程",
+        quantity: 30,
+        unit: "m3",
+        sortNo: 2,
+      },
+      {
+        id: "bill-item-003",
+        billVersionId: "bill-version-001",
+        parentId: null,
+        itemCode: "A.3",
+        itemName: "混凝土工程",
+        quantity: 40,
+        unit: "m3",
+        sortNo: 3,
+      },
+    ],
+  });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-versions/:versionId/items/batch rejects duplicate item codes", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/batch",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      items: [
+        {
+          itemCode: "A.1",
+          itemName: "重复编码",
+          quantity: 1,
+          unit: "m3",
+          sortNo: 2,
+        },
+      ],
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.equal(response.json().error.code, "VALIDATION_ERROR");
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-items creates an item using billVersionId in payload", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billVersionId: "bill-version-001",
+      parentId: "bill-item-001",
+      itemCode: "A.1.1",
+      itemName: "机械挖土方",
+      quantity: 50,
+      unit: "m3",
+      sortNo: 2,
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.deepEqual(response.json(), {
+    id: "bill-item-002",
+    billVersionId: "bill-version-001",
+    parentId: "bill-item-001",
+    itemCode: "A.1.1",
+    itemName: "机械挖土方",
+    quantity: 50,
+    unit: "m3",
+    sortNo: 2,
+  });
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/bill-items/:itemId updates an item using billVersionId in payload", async () => {
+  const app = createBillItemApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/bill-items/bill-item-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billVersionId: "bill-version-001",
+      parentId: null,
+      itemCode: "A.1",
+      itemName: "土石方工程（调整）",
+      quantity: 120,
+      unit: "m3",
+      sortNo: 1,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().itemName, "土石方工程（调整）");
+  assert.equal(response.json().quantity, 120);
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId/move updates parent and sort order", async () => {
+  const app = createBillItemApp({
+    billItemRecords: [
+      ...billItems,
+      {
+        id: "bill-item-002",
+        billVersionId: "bill-version-001",
+        parentId: "bill-item-001",
+        itemCode: "A.1.1",
+        itemName: "机械挖土方",
+        quantity: 50,
+        unit: "m3",
+        sortNo: 2,
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-002/move",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      parentId: null,
+      sortNo: 1,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().parentId, null);
+  assert.equal(response.json().sortNo, 1);
+
+  const treeResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/tree",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(treeResponse.statusCode, 200);
+  assert.deepEqual(
+    treeResponse.json().items.map((item: { id: string }) => item.id),
+    ["bill-item-001", "bill-item-002"],
+  );
+  assert.deepEqual(treeResponse.json().items[0].children, []);
+
+  await app.close();
+});
+
+test("PUT /v1/projects/:id/bill-versions/:versionId/items/:itemId rejects cyclic parent updates", async () => {
+  const app = createBillItemApp({
+    billItemRecords: [
+      ...billItems,
+      {
+        id: "bill-item-002",
+        billVersionId: "bill-version-001",
+        parentId: "bill-item-001",
+        itemCode: "A.1.1",
+        itemName: "机械挖土方",
+        quantity: 50,
+        unit: "m3",
+        sortNo: 2,
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      parentId: "bill-item-002",
+      itemCode: "A.1",
+      itemName: "土石方工程",
+      quantity: 100,
+      unit: "m3",
+      sortNo: 1,
+    },
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: {
+      code: "VALIDATION_ERROR",
+      message: "Bill item parent cannot be itself or one of its descendants",
+    },
   });
 
   await app.close();

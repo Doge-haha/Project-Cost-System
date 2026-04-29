@@ -2,9 +2,11 @@ import type { WorkerProcessorResult } from "./contracts.js";
 
 type ReportExportPayload = {
   projectId: string;
-  reportType: "summary" | "variance";
+  reportType: "summary" | "variance" | "stage_bill";
   stageCode?: string | null;
   disciplineCode?: string | null;
+  reportTemplateId?: string | null;
+  outputFormat?: "json" | "excel" | "pdf" | null;
   requestedBy: string;
 };
 
@@ -42,12 +44,24 @@ export async function processReportExportJob(
             stageCode: payload.stageCode ?? undefined,
             disciplineCode: payload.disciplineCode ?? undefined,
             userId: payload.requestedBy,
-            limit: 20,
+            limit: payload.reportType === "stage_bill" ? 100 : 20,
           });
 
     return {
       status: "completed",
-      result,
+      result: {
+        ...(payload.reportType === "stage_bill"
+          ? {
+              reportType: payload.reportType,
+              projectId: payload.projectId,
+              stageCode: payload.stageCode ?? null,
+              disciplineCode: payload.disciplineCode ?? null,
+            }
+          : {}),
+        ...result,
+        reportTemplateId: payload.reportTemplateId ?? null,
+        outputFormat: payload.outputFormat ?? "json",
+      },
     };
   } catch (error) {
     return {

@@ -88,6 +88,7 @@ export type ProjectWorkspace = {
       canManageProject: boolean;
       canEditProject: boolean;
       canExportReports?: boolean;
+      canImportBill?: boolean;
       scopeSummary: string[];
       visibleStageCodes: string[];
       visibleDisciplineCodes: string[];
@@ -206,6 +207,42 @@ export type ImportTaskListResponse = {
     totalCount: number;
     statusCounts: Record<ImportTask["status"], number>;
   };
+};
+
+export type SourceBillImportResult = {
+  billVersion: BillVersion;
+  importTask: ImportTask;
+  summary: {
+    versionCount: number;
+    billItemCount: number;
+    workItemCount: number;
+    failedItemCount: number;
+    measureItemCount: number;
+    feeItemCount: number;
+    featureItemCount: number;
+    quotaClueCount: number;
+    failureDetails: string[];
+  };
+  failedItems?: SourceBillFailureItem[];
+};
+
+export type SourceBillFailureItem = {
+  lineNo: number | null;
+  tableName: string;
+  sourceId: string | null;
+  itemCode: string | null;
+  reasonCode: string;
+  reasonLabel: string;
+  errorMessage: string;
+  projectId: string | null;
+  resourceType: string | null;
+  action: string | null;
+  keys: string[];
+};
+
+export type SourceBillImportPreview = {
+  summary: SourceBillImportResult["summary"];
+  failedItems: SourceBillFailureItem[];
 };
 
 export type AuditLogRecord = {
@@ -484,11 +521,13 @@ export type VersionCompareResponse = {
 export type ReportExportTask = {
   id: string;
   projectId: string;
-  reportType: "summary" | "variance";
+  reportType: "summary" | "variance" | "stage_bill";
   status: "queued" | "processing" | "completed" | "failed";
   requestedBy: string;
   stageCode?: string | null;
   disciplineCode?: string | null;
+  reportTemplateId?: string | null;
+  outputFormat?: "json" | "excel" | "pdf" | null;
   createdAt: string;
   completedAt?: string | null;
   errorMessage?: string | null;

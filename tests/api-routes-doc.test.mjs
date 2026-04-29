@@ -240,6 +240,15 @@ test("current OpenAPI document marks request bodies as required where needed", (
   assert.match(content, /\/v1\/projects\/\{projectId\}\/reviews\/\{reviewSubmissionId\}\/approve:[\s\S]*post:[\s\S]*requestBody:\n        required: false/);
 });
 
+test("current OpenAPI document describes report export request body fields", () => {
+  const content = readFileSync(openApiPath, "utf8");
+
+  assert.match(content, /\/v1\/reports\/export:[\s\S]*required: \[projectId, reportType\]/);
+  assert.match(content, /\/v1\/reports\/export:[\s\S]*reportType:\n                  type: string\n                  enum: \[summary, variance, stage_bill\]/);
+  assert.match(content, /\/v1\/reports\/export:[\s\S]*reportTemplateId:\n                  type: string/);
+  assert.match(content, /\/v1\/reports\/export:[\s\S]*outputFormat:\n                  type: string\n                  enum: \[json, excel, pdf\]/);
+});
+
 test("current OpenAPI document includes common error responses and download content types", () => {
   const content = readFileSync(openApiPath, "utf8");
 

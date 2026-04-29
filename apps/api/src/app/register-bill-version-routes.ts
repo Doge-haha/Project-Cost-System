@@ -49,6 +49,24 @@ export function registerBillVersionRoutes(
     return created;
   });
 
+  app.get(
+    "/v1/projects/:projectId/bill-versions/:billVersionId",
+    async (request) => {
+      const { projectId, billVersionId } = request.params as {
+        projectId: string;
+        billVersionId: string;
+      };
+
+      return transactionRunner.runInTransaction(async () =>
+        billVersionService.getBillVersion({
+          projectId,
+          billVersionId,
+          userId: request.currentUser!.id,
+        }),
+      );
+    },
+  );
+
   app.post(
     "/v1/projects/:projectId/bill-versions/:billVersionId/copy-from",
     async (request, reply) => {

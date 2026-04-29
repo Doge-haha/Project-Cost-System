@@ -1,4 +1,5 @@
 import {
+  boolean,
   doublePrecision,
   index,
   integer,
@@ -6,7 +7,10 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 const auditColumns = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -27,7 +31,7 @@ export const projects = pgTable(
     ...auditColumns,
   },
   (table) => ({
-    projectCodeIndex: index("project_code_idx").on(table.code),
+    projectCodeIndex: uniqueIndex("project_code_uidx").on(table.code),
   }),
 );
 
@@ -46,9 +50,13 @@ export const projectStages = pgTable(
   },
   (table) => ({
     projectStageProjectIndex: index("project_stage_project_idx").on(table.projectId),
-    projectStageSequenceIndex: index("project_stage_sequence_idx").on(
+    projectStageSequenceIndex: uniqueIndex("project_stage_sequence_uidx").on(
       table.projectId,
       table.sequenceNo,
+    ),
+    projectStageCodeIndex: uniqueIndex("project_stage_code_uidx").on(
+      table.projectId,
+      table.stageCode,
     ),
   }),
 );
@@ -64,15 +72,71 @@ export const projectDisciplines = pgTable(
     disciplineName: text("discipline_name").notNull(),
     defaultStandardSetCode: text("default_standard_set_code"),
     status: text("status").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
     ...auditColumns,
   },
   (table) => ({
     projectDisciplineProjectIndex: index("project_discipline_project_idx").on(
       table.projectId,
     ),
-    projectDisciplineCodeIndex: index("project_discipline_code_idx").on(
+    projectDisciplineCodeIndex: uniqueIndex("project_discipline_code_uidx").on(
       table.projectId,
       table.disciplineCode,
+    ),
+  }),
+);
+
+export const disciplineTypes = pgTable(
+  "discipline_type",
+  {
+    id: text("id").primaryKey(),
+    disciplineCode: text("discipline_code").notNull(),
+    disciplineName: text("discipline_name").notNull(),
+    disciplineGroup: text("discipline_group"),
+    businessViewType: text("business_view_type"),
+    regionCode: text("region_code"),
+    sourceMarkup: text("source_markup"),
+    gb08Code: text("gb08_code"),
+    gb13Code: text("gb13_code"),
+    sourceSystem: text("source_system"),
+    status: text("status").notNull(),
+    ...auditColumns,
+  },
+  (table) => ({
+    disciplineTypeCodeIndex: uniqueIndex("discipline_type_code_uidx").on(
+      table.disciplineCode,
+    ),
+    disciplineTypeFilterIndex: index("discipline_type_filter_idx").on(
+      table.regionCode,
+      table.status,
+    ),
+  }),
+);
+
+export const standardSets = pgTable(
+  "standard_set",
+  {
+    id: text("id").primaryKey(),
+    standardSetCode: text("standard_set_code").notNull(),
+    standardSetName: text("standard_set_name").notNull(),
+    disciplineCode: text("discipline_code").notNull(),
+    regionCode: text("region_code"),
+    versionYear: integer("version_year"),
+    standardType: text("standard_type"),
+    sourceFieldCode: text("source_field_code"),
+    sourceMarkup: text("source_markup"),
+    sourceSystem: text("source_system"),
+    status: text("status").notNull(),
+    ...auditColumns,
+  },
+  (table) => ({
+    standardSetCodeIndex: uniqueIndex("standard_set_code_uidx").on(
+      table.standardSetCode,
+    ),
+    standardSetDisciplineIndex: index("standard_set_discipline_idx").on(
+      table.disciplineCode,
+      table.regionCode,
+      table.status,
     ),
   }),
 );
@@ -91,7 +155,7 @@ export const projectMembers = pgTable(
   },
   (table) => ({
     projectMemberProjectIndex: index("project_member_project_idx").on(table.projectId),
-    projectMemberUserIndex: index("project_member_user_idx").on(
+    projectMemberUserIndex: uniqueIndex("project_member_user_uidx").on(
       table.projectId,
       table.userId,
     ),
@@ -129,11 +193,16 @@ export const billVersions = pgTable(
     versionName: text("version_name").notNull(),
     versionStatus: text("version_status").notNull(),
     sourceVersionId: text("source_version_id"),
+    sourceStageId: text("source_stage_id"),
+    sourceSpecCode: text("source_spec_code"),
+    sourceSpecName: text("source_spec_name"),
+    sourceVisibleFlag: boolean("source_visible_flag"),
+    sourceDefaultFlag: boolean("source_default_flag"),
     ...auditColumns,
   },
   (table) => ({
     billVersionProjectIndex: index("bill_version_project_idx").on(table.projectId),
-    billVersionContextIndex: index("bill_version_context_idx").on(
+    billVersionContextIndex: uniqueIndex("bill_version_context_uidx").on(
       table.projectId,
       table.stageCode,
       table.disciplineCode,
@@ -149,12 +218,22 @@ export const billItems = pgTable(
     billVersionId: text("bill_version_id")
       .notNull()
       .references(() => billVersions.id),
-    parentId: text("parent_id"),
+    parentId: text("parent_id").references((): AnyPgColumn => billItems.id),
     itemCode: text("item_code").notNull(),
     itemName: text("item_name").notNull(),
     quantity: doublePrecision("quantity").notNull(),
     unit: text("unit").notNull(),
     sortNo: integer("sort_no").notNull(),
+    sourceBillId: text("source_bill_id"),
+    sourceSequence: integer("source_sequence"),
+    sourceLevelCode: text("source_level_code"),
+    isMeasureItem: boolean("is_measure_item"),
+    sourceReferencePrice: doublePrecision("source_reference_price"),
+    sourceFeeId: text("source_fee_id"),
+    measureCategory: text("measure_category"),
+    measureFeeFlag: boolean("measure_fee_flag"),
+    measureCategorySubtype: text("measure_category_subtype"),
+    featureRuleText: text("feature_rule_text"),
     systemUnitPrice: doublePrecision("system_unit_price"),
     manualUnitPrice: doublePrecision("manual_unit_price"),
     finalUnitPrice: doublePrecision("final_unit_price"),
@@ -167,6 +246,11 @@ export const billItems = pgTable(
     billItemVersionIndex: index("bill_item_version_idx").on(table.billVersionId),
     billItemSortIndex: index("bill_item_sort_idx").on(table.billVersionId, table.sortNo),
     billItemParentIndex: index("bill_item_parent_idx").on(table.parentId),
+    billItemBusinessIndex: uniqueIndex("bill_item_business_uidx").on(
+      table.billVersionId,
+      table.itemCode,
+      table.parentId,
+    ),
   }),
 );
 
@@ -179,13 +263,15 @@ export const billWorkItems = pgTable(
       .references(() => billItems.id),
     workContent: text("work_content").notNull(),
     sortNo: integer("sort_no").notNull(),
+    sourceSpecCode: text("source_spec_code"),
+    sourceBillId: text("source_bill_id"),
     ...auditColumns,
   },
   (table) => ({
     billWorkItemBillItemIndex: index("bill_work_item_bill_item_idx").on(
       table.billItemId,
     ),
-    billWorkItemSortIndex: index("bill_work_item_sort_idx").on(
+    billWorkItemSortIndex: uniqueIndex("bill_work_item_sort_uidx").on(
       table.billItemId,
       table.sortNo,
     ),
@@ -274,7 +360,9 @@ export const priceVersions = pgTable(
     ...auditColumns,
   },
   (table) => ({
-    priceVersionCodeIndex: index("price_version_code_idx").on(table.versionCode),
+    priceVersionCodeIndex: uniqueIndex("price_version_code_uidx").on(
+      table.versionCode,
+    ),
     priceVersionFilterIndex: index("price_version_filter_idx").on(
       table.regionCode,
       table.disciplineCode,
@@ -299,7 +387,7 @@ export const priceItems = pgTable(
   },
   (table) => ({
     priceItemVersionIndex: index("price_item_version_idx").on(table.priceVersionId),
-    priceItemQuotaIndex: index("price_item_quota_idx").on(
+    priceItemQuotaIndex: uniqueIndex("price_item_quota_uidx").on(
       table.priceVersionId,
       table.quotaCode,
     ),
@@ -374,6 +462,11 @@ export const reviewSubmissions = pgTable(
       table.billVersionId,
       table.status,
     ),
+    reviewSubmissionPendingUniqueIndex: uniqueIndex(
+      "review_submission_pending_bill_version_uidx",
+    )
+      .on(table.billVersionId)
+      .where(sql`${table.status} = 'pending'`),
   }),
 );
 
@@ -477,6 +570,8 @@ export const reportExportTasks = pgTable(
     requestedBy: text("requested_by").notNull(),
     stageCode: text("stage_code"),
     disciplineCode: text("discipline_code"),
+    reportTemplateId: text("report_template_id"),
+    outputFormat: text("output_format"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     errorMessage: text("error_message"),
@@ -518,6 +613,9 @@ export const knowledgeEntries = pgTable(
       table.sourceType,
       table.sourceAction,
     ),
+    knowledgeEntryTypeStatusCreatedIndex: index(
+      "knowledge_entry_type_status_created_idx",
+    ).on(table.sourceType, table.sourceAction, table.createdAt),
     knowledgeEntryCreatedIndex: index("knowledge_entry_created_idx").on(table.createdAt),
   }),
 );
@@ -544,6 +642,11 @@ export const memoryEntries = pgTable(
     memoryEntrySubjectIndex: index("memory_entry_subject_idx").on(
       table.subjectType,
       table.subjectId,
+    ),
+    memoryEntryScopeKeyIndex: index("memory_entry_scope_key_idx").on(
+      table.subjectType,
+      table.subjectId,
+      table.memoryKey,
     ),
   }),
 );
@@ -656,6 +759,11 @@ export const auditLogs = pgTable(
     auditLogResourceIndex: index("audit_log_resource_idx").on(
       table.resourceType,
       table.resourceId,
+    ),
+    auditLogResourceCreatedIndex: index("audit_log_resource_created_idx").on(
+      table.resourceType,
+      table.resourceId,
+      table.createdAt,
     ),
     auditLogCreatedAtIndex: index("audit_log_created_at_idx").on(
       table.projectId,

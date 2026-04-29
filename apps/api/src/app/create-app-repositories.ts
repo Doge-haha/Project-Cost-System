@@ -86,6 +86,10 @@ import {
   InMemoryAiRecommendationRepository,
   type AiRecommendationRepository,
 } from "../modules/ai/ai-recommendation-repository.js";
+import {
+  InMemoryMasterDataRepository,
+  type MasterDataRepository,
+} from "../modules/master-data/master-data-repository.js";
 
 export type AppRepositories = {
   project: ProjectRepository;
@@ -110,6 +114,7 @@ export type AppRepositories = {
   backgroundJob: BackgroundJobRepository;
   importTask: ImportTaskRepository;
   aiRecommendation: AiRecommendationRepository;
+  masterData: MasterDataRepository;
 };
 
 export type CreateAppRepositoryOptions = {
@@ -135,6 +140,7 @@ export type CreateAppRepositoryOptions = {
   backgroundJobRepository?: BackgroundJobRepository;
   importTaskRepository?: ImportTaskRepository;
   aiRecommendationRepository?: AiRecommendationRepository;
+  masterDataRepository?: MasterDataRepository;
 };
 
 export function createAppRepositories(
@@ -186,5 +192,8 @@ export function createAppRepositories(
     aiRecommendation:
       options.aiRecommendationRepository ??
       new InMemoryAiRecommendationRepository([]),
+    masterData:
+      options.masterDataRepository ??
+      new InMemoryMasterDataRepository({ disciplineTypes: [], standardSets: [] }),
   };
 }

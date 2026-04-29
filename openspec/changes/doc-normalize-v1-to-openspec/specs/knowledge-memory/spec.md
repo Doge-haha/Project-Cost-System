@@ -123,6 +123,7 @@ MUST 知识候选提取、记忆生成、查询命中和关键使用动作应可
 
 - `apps/api` 当前已存在 `knowledge_entry` 和 `memory_entry` 相关仓储与服务骨架。
 - `apps/api` 已提供知识条目、记忆条目和知识搜索相关接口。
+- `apps/api` 当前已为知识条目与记忆条目补齐基础检索索引，并在知识抽取结果落库时写入 `knowledge_entry.create` 与 `memory_entry.create` 审计日志。
 - `apps/ai-runtime` 当前已有 `knowledge_pipeline.py`，能够从审计事件中提取 `knowledgeCandidates` 和 `memoryCandidates`。
 
 这些现状说明知识与记忆主线已经有初步实现，但完整治理和产品化仍属于后续工程工作。

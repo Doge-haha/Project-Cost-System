@@ -154,6 +154,16 @@ const billVersions: BillVersionRecord[] = [
     versionStatus: "locked",
     sourceVersionId: null,
   },
+  {
+    id: "bill-version-014",
+    projectId: "project-001",
+    stageCode: "budget",
+    disciplineCode: "building",
+    versionNo: 1,
+    versionName: "预算版 V1",
+    versionStatus: "editable",
+    sourceVersionId: null,
+  },
 ];
 const billItems: BillItemRecord[] = [
   {
@@ -242,8 +252,60 @@ test("GET /v1/projects/:id/bill-versions returns scoped versions", async () => {
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(response.json(), {
-    items: billVersions,
+    items: billVersions.filter(
+      (version) =>
+        version.stageCode === "estimate" && version.disciplineCode === "building",
+    ),
   });
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/bill-versions/:versionId returns version detail", async () => {
+  const app = createBillVersionApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), billVersions[0]);
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/bill-versions/:versionId rejects requests outside scope", async () => {
+  const app = createBillVersionApp();
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-014",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 403);
 
   await app.close();
 });
@@ -611,7 +673,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
 
   assert.equal(createResponse.statusCode, 201);
   assert.deepEqual(createResponse.json(), {
-    id: "bill-version-006",
+    id: "bill-version-007",
     projectId: "project-001",
     stageCode: "estimate",
     disciplineCode: "building",
@@ -619,11 +681,12 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
     versionName: "估算版 V1 - Copy",
     versionStatus: "editable",
     sourceVersionId: "bill-version-001",
+    sourceStageId: "stage-001",
   });
 
   const itemsResponse = await app.inject({
     method: "GET",
-    url: "/v1/projects/project-001/bill-versions/bill-version-006/items",
+    url: "/v1/projects/project-001/bill-versions/bill-version-007/items",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -634,7 +697,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
     items: [
       {
         id: "bill-item-005",
-        billVersionId: "bill-version-006",
+        billVersionId: "bill-version-007",
         parentId: null,
         itemCode: "A.1",
         itemName: "土石方工程",
@@ -644,7 +707,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
       },
         {
           id: "bill-item-006",
-          billVersionId: "bill-version-006",
+          billVersionId: "bill-version-007",
           parentId: "bill-item-005",
           itemCode: "A.1.1",
           itemName: "机械挖土方",
@@ -663,7 +726,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
 
   const workItemsResponse = await app.inject({
     method: "GET",
-    url: "/v1/projects/project-001/bill-versions/bill-version-006/items/bill-item-005/work-items",
+    url: "/v1/projects/project-001/bill-versions/bill-version-007/items/bill-item-005/work-items",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -775,7 +838,7 @@ test("POST /v1/projects/:id/bill-versions creates a new version for an authorize
 
   assert.equal(response.statusCode, 201);
   assert.deepEqual(response.json(), {
-    id: "bill-version-006",
+    id: "bill-version-007",
     projectId: "project-001",
     stageCode: "estimate",
     disciplineCode: "building",
@@ -968,6 +1031,25 @@ test("bill version mutations write audit logs", async () => {
 
   assert.equal(withdrawAuditResponse.statusCode, 200);
   assert.equal(withdrawAuditResponse.json().items.length, 1);
+
+  const stageAuditResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/audit-logs?resourceType=project_stage&action=update",
+    headers: {
+      authorization: `Bearer ${ownerToken}`,
+    },
+  });
+
+  assert.equal(stageAuditResponse.statusCode, 200);
+  const stageAuditStatuses = stageAuditResponse
+    .json()
+    .items.map((item: { afterPayload: { status: string } }) => item.afterPayload.status);
+  assert.ok(stageAuditStatuses.includes("submitted"));
+  assert.ok(stageAuditStatuses.includes("active"));
+  assert.equal(
+    stageAuditResponse.json().items[0].afterPayload.causeResourceType,
+    "bill_version",
+  );
 
   await app.close();
 });

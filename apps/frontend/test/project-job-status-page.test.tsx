@@ -4518,4 +4518,211 @@ describe("ProjectJobStatusPage", () => {
     });
     expect(screen.queryByText("已复制当前筛选链接，可直接发给协作同事。")).not.toBeInTheDocument();
   });
+
+  test("renders the dedicated source bill import failure report view", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse({
+          project: {
+            id: "project-001",
+            code: "PRJ-001",
+            name: "新点造价项目",
+            status: "draft",
+          },
+          currentStage: null,
+          availableStages: [],
+          disciplines: [],
+          billVersions: [],
+          todoSummary: {
+            totalCount: 0,
+            pendingReviewCount: 0,
+            pendingProcessDocumentCount: 0,
+            draftProcessDocumentCount: 0,
+            items: [],
+          },
+          riskSummary: {
+            totalCount: 1,
+            rejectedReviewCount: 0,
+            rejectedProcessDocumentCount: 0,
+            failedJobCount: 1,
+            items: ["1 个异步任务执行失败"],
+          },
+          importStatus: {
+            mode: "import_task",
+            totalCount: 1,
+            queuedCount: 0,
+            processingCount: 0,
+            completedCount: 0,
+            failedCount: 1,
+            latestTask: {
+              id: "import-task-source-001",
+              sourceType: "source_bill",
+              sourceLabel: "源清单导入",
+              status: "failed",
+              createdAt: "2026-04-19T10:00:00.000Z",
+            },
+            note: "导入状态已切换为正式导入任务模型，工作台摘要与导入任务记录保持一致。",
+          },
+          currentUser: {
+            userId: "user-001",
+            displayName: "Owner User",
+            memberId: "member-001",
+            permissionSummary: {
+              roleCode: "project_owner",
+              roleLabel: "项目负责人",
+              canManageProject: true,
+              canEditProject: true,
+              scopeSummary: ["项目全部范围"],
+              visibleStageCodes: [],
+              visibleDisciplineCodes: [],
+            },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/import-tasks") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "import-task-source-001",
+              projectId: "project-001",
+              sourceType: "source_bill",
+              sourceLabel: "源清单导入",
+              sourceFileName: "source-bill.xlsx",
+              sourceBatchNo: "list-001",
+              status: "failed",
+              requestedBy: "user-001",
+              totalItemCount: 4,
+              importedItemCount: 1,
+              memoryItemCount: 0,
+              failedItemCount: 3,
+              latestJobId: "sync-bill-import-version-001",
+              latestErrorMessage: "父级 missing-parent 无法映射",
+              failureDetails: [
+                "ZaoJia_Qd_Qdxm[1] 重复编码 010101001001，已按源行保留",
+                "ZaoJia_Qd_Qdxm[2] 父级 missing-parent 无法映射",
+                "ZaoJia_Qd_Gznr[0] QdID missing-item 无法挂接清单项",
+              ],
+              retryCount: 0,
+              retryLimit: 3,
+              canRetry: true,
+              metadata: {
+                failureSummary: [
+                  {
+                    reasonCode: "duplicate_code",
+                    reasonLabel: "重复编码",
+                    count: 1,
+                  },
+                  {
+                    reasonCode: "unmapped_parent",
+                    reasonLabel: "父级无法映射",
+                    count: 1,
+                  },
+                  {
+                    reasonCode: "unmapped_work_item",
+                    reasonLabel: "工作内容无法挂接",
+                    count: 1,
+                  },
+                ],
+                failedItems: [
+                  {
+                    lineNo: 2,
+                    tableName: "ZaoJia_Qd_Qdxm",
+                    sourceId: "item-002",
+                    itemCode: "010101001001",
+                    reasonCode: "duplicate_code",
+                    reasonLabel: "重复编码",
+                    errorMessage: "重复编码 010101001001，已按源行保留",
+                    projectId: null,
+                    resourceType: "bill_item",
+                    action: "create",
+                    keys: ["Qdbh"],
+                  },
+                  {
+                    lineNo: 3,
+                    tableName: "ZaoJia_Qd_Qdxm",
+                    sourceId: "item-003",
+                    itemCode: "010101001002",
+                    reasonCode: "unmapped_parent",
+                    reasonLabel: "父级无法映射",
+                    errorMessage: "父级 missing-parent 无法映射",
+                    projectId: null,
+                    resourceType: "bill_item",
+                    action: "link",
+                    keys: ["ParentQdID"],
+                  },
+                  {
+                    lineNo: 1,
+                    tableName: "ZaoJia_Qd_Gznr",
+                    sourceId: "missing-item",
+                    itemCode: null,
+                    reasonCode: "unmapped_work_item",
+                    reasonLabel: "工作内容无法挂接",
+                    errorMessage: "QdID missing-item 无法挂接清单项",
+                    projectId: null,
+                    resourceType: "bill_work_item",
+                    action: "link",
+                    keys: ["QdID"],
+                  },
+                ],
+              },
+              createdAt: "2026-04-19T10:00:00.000Z",
+              completedAt: "2026-04-19T10:01:00.000Z",
+            },
+          ],
+          summary: {
+            totalCount: 1,
+            statusCounts: {
+              queued: 0,
+              processing: 0,
+              completed: 0,
+              failed: 1,
+            },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/jobs") {
+        return createJsonResponse({
+          items: [],
+          summary: {
+            totalCount: 0,
+            statusCounts: {
+              queued: 0,
+              processing: 0,
+              completed: 0,
+              failed: 0,
+            },
+            jobTypeCounts: {},
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter
+        initialEntries={["/projects/project-001/jobs?status=failed&failureReason=unmapped_parent"]}
+      >
+        <Routes>
+          <Route path="/projects/:projectId/jobs" element={<ProjectJobStatusPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "源清单导入失败报告" })).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText("当前范围：父级无法映射 · 共 1 条").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        "父级无法映射 · ZaoJia_Qd_Qdxm 第 3 行 · 010101001002 · 父级 missing-parent 无法映射",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "工作内容无法挂接 · 1 条" })).toBeInTheDocument();
+  });
 });

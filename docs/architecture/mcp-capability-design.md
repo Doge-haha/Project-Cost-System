@@ -566,7 +566,7 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 已落地 tools：
 
 - `recalculate-project`
-- `export-summary-report`
+- `export-summary-report`（支持 `reportTemplateId` 与 `outputFormat`）
 - `extract-knowledge`
 - `preview-knowledge-extraction`
 - `extract-knowledge-from-audit`

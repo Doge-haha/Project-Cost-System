@@ -1,4 +1,5 @@
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
+import type { FeeTemplateStatus } from "../pricing/pricing-constants.js";
 
 export type FeeTemplateRecord = {
   id: string;
@@ -8,7 +9,7 @@ export type FeeTemplateRecord = {
   stageScope: string[];
   taxMode: string;
   allocationMode: string;
-  status: "draft" | "active" | "inactive";
+  status: FeeTemplateStatus;
 };
 
 export interface FeeTemplateRepository {

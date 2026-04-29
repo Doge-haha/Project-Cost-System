@@ -49,7 +49,7 @@ npm --workspace @saas-pricing/mcp-gateway run typecheck
 - `report-export-status`
 - `import-failure-context`
 - `recalculate-project`
-- `export-summary-report`
+- `export-summary-report`（支持 `reportTemplateId` 和 `outputFormat`）
 - `extract-knowledge`
 - `preview-knowledge-extraction`
 - `extract-knowledge-from-audit`

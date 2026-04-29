@@ -52,6 +52,8 @@ export async function runWorkerJob(
           reportType: payload.reportType,
           stageCode: payload.stageCode ?? undefined,
           disciplineCode: payload.disciplineCode ?? undefined,
+          reportTemplateId: payload.reportTemplateId ?? undefined,
+          outputFormat: payload.outputFormat ?? undefined,
           requestedBy: job.requestedBy,
         },
         dependencies,

@@ -4,12 +4,9 @@ import { eq } from "drizzle-orm";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { quotaLines } from "../../infrastructure/database/schema.js";
+import type { QuotaLineSourceMode } from "../pricing/pricing-constants.js";
 
-export type QuotaLineSourceMode =
-  | "manual"
-  | "ai"
-  | "history_reference"
-  | "reference_knowledge";
+export type { QuotaLineSourceMode };
 
 export type QuotaLineRecord = {
   id: string;

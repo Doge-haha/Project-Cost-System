@@ -7,6 +7,7 @@ import type { ProjectDisciplineRepository } from "../project/project-discipline-
 import type { ProjectMemberRepository } from "../project/project-member-repository.js";
 import type { ProjectRepository } from "../project/project-repository.js";
 import type { ProjectStageRepository } from "../project/project-stage-repository.js";
+import { importTaskStatuses } from "./import-task-constants.js";
 import type { ImportTaskRecord, ImportTaskRepository } from "./import-task-repository.js";
 
 export const createImportTaskSchema = z.object({
@@ -48,12 +49,12 @@ export class ImportTaskService {
       items,
       summary: {
         totalCount: items.length,
-        statusCounts: {
-          queued: items.filter((item) => item.status === "queued").length,
-          processing: items.filter((item) => item.status === "processing").length,
-          completed: items.filter((item) => item.status === "completed").length,
-          failed: items.filter((item) => item.status === "failed").length,
-        },
+        statusCounts: Object.fromEntries(
+          importTaskStatuses.map((status) => [
+            status,
+            items.filter((item) => item.status === status).length,
+          ]),
+        ) as Record<ImportTaskRecord["status"], number>,
       },
     };
   }
@@ -212,6 +213,53 @@ export class ImportTaskService {
     });
 
     return failed;
+  }
+
+  async finishImportTaskWithSummary(input: {
+    taskId: string;
+    jobId: string;
+    status: "completed" | "failed";
+    importedItemCount: number;
+    memoryItemCount?: number;
+    failedItemCount: number;
+    failureDetails?: string[];
+    latestErrorMessage?: string | null;
+    metadata?: Record<string, unknown>;
+  }): Promise<ImportTaskRecord> {
+    const task = await this.requireTask(input.taskId);
+    const failureDetails = dedupeFailureDetails(input.failureDetails ?? []);
+    const finished = await this.importTaskRepository.update(task.id, {
+      status: input.status,
+      latestJobId: input.jobId,
+      importedItemCount: Math.max(input.importedItemCount, 0),
+      memoryItemCount: Math.max(input.memoryItemCount ?? 0, 0),
+      failedItemCount: Math.max(input.failedItemCount, 0),
+      latestErrorMessage: input.latestErrorMessage ?? null,
+      failureDetails,
+      metadata: this.buildImportTaskMetadata(task.metadata, {
+        failureDetails,
+        extraMetadata: input.metadata,
+      }),
+      completedAt: new Date().toISOString(),
+    });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: finished.projectId,
+      resourceType: "import_task",
+      resourceId: finished.id,
+      action: input.status,
+      operatorId: finished.requestedBy,
+      beforePayload: {
+        status: task.status,
+      },
+      afterPayload: {
+        status: finished.status,
+        importedItemCount: finished.importedItemCount,
+        failedItemCount: finished.failedItemCount,
+      },
+    });
+
+    return finished;
   }
 
   async retryImportTask(input: {
@@ -567,6 +615,9 @@ function normalizeFailedItems(input: unknown): Array<{
   reasonCode: string;
   reasonLabel: string;
   errorMessage: string;
+  tableName: string | null;
+  sourceId: string | null;
+  itemCode: string | null;
   projectId: string | null;
   resourceType: string | null;
   action: string | null;
@@ -593,6 +644,9 @@ function normalizeFailedItems(input: unknown): Array<{
         typeof item.errorMessage === "string" && item.errorMessage.length > 0
           ? item.errorMessage
           : "系统未记录",
+      tableName: typeof item.tableName === "string" ? item.tableName : null,
+      sourceId: typeof item.sourceId === "string" ? item.sourceId : null,
+      itemCode: typeof item.itemCode === "string" ? item.itemCode : null,
       projectId: typeof item.projectId === "string" ? item.projectId : null,
       resourceType: typeof item.resourceType === "string" ? item.resourceType : null,
       action: typeof item.action === "string" ? item.action : null,
@@ -655,6 +709,9 @@ function buildCsvErrorReport(
     resourceType: string | null;
     action: string | null;
     keys: string[];
+    tableName: string | null;
+    sourceId: string | null;
+    itemCode: string | null;
   }>,
 ): string {
   const header = [
@@ -666,6 +723,9 @@ function buildCsvErrorReport(
     "resourceType",
     "action",
     "keys",
+    "tableName",
+    "sourceId",
+    "itemCode",
   ];
   const rows = items.map((item) => [
     item.lineNo === null ? "" : String(item.lineNo),
@@ -676,6 +736,9 @@ function buildCsvErrorReport(
     item.resourceType ?? "",
     item.action ?? "",
     item.keys.join("|"),
+    item.tableName ?? "",
+    item.sourceId ?? "",
+    item.itemCode ?? "",
   ]);
 
   return [header, ...rows]

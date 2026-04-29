@@ -9,6 +9,7 @@ import {
   submitReviewSchema,
   type ReviewSubmissionService,
 } from "../modules/review/review-submission-service.js";
+import { reviewSubmissionStatuses } from "../modules/review/review-submission-constants.js";
 
 export function registerReviewRoutes(
   app: FastifyInstance,
@@ -51,7 +52,7 @@ export function registerReviewRoutes(
         billVersionId: z.string().min(1).optional(),
         stageCode: z.string().min(1).optional(),
         disciplineCode: z.string().min(1).optional(),
-        status: z.enum(["pending", "approved", "rejected", "cancelled"]).optional(),
+        status: z.enum(reviewSubmissionStatuses).optional(),
       })
       .parse(request.query);
 

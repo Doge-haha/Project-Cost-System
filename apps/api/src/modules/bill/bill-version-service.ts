@@ -5,7 +5,10 @@ import { AppError } from "../../shared/errors/app-error.js";
 import type { AuditLogService } from "../audit/audit-log-service.js";
 import { ProjectAuthorizationService } from "../project/project-authorization-service.js";
 import type { ProjectRepository } from "../project/project-repository.js";
-import type { ProjectStageRepository } from "../project/project-stage-repository.js";
+import type {
+  ProjectStageRecord,
+  ProjectStageRepository,
+} from "../project/project-stage-repository.js";
 import type { ProjectDisciplineRepository } from "../project/project-discipline-repository.js";
 import type { ProjectMemberRepository } from "../project/project-member-repository.js";
 import type {
@@ -100,6 +103,14 @@ export class BillVersionService {
     );
   }
 
+  async getBillVersion(input: {
+    projectId: string;
+    billVersionId: string;
+    userId: string;
+  }): Promise<BillVersionRecord> {
+    return this.getAuthorizedVersion(input, "view");
+  }
+
   async createBillVersion(input: {
     projectId: string;
     stageCode: string;
@@ -143,6 +154,9 @@ export class BillVersionService {
       },
       "edit",
     );
+    const sourceStage = (
+      await this.dependencies.projectStageRepository.listByProjectId(input.projectId)
+    ).find((stage) => stage.stageCode === sourceVersion.stageCode);
 
     const created = await this.billVersionRepository.create({
       projectId: sourceVersion.projectId,
@@ -150,6 +164,7 @@ export class BillVersionService {
       disciplineCode: sourceVersion.disciplineCode,
       versionName: `${sourceVersion.versionName} - Copy`,
       sourceVersionId: sourceVersion.id,
+      sourceStageId: sourceStage?.id ?? null,
     });
 
     const sourceItems = await this.dependencies.billItemRepository.listByBillVersionId(
@@ -247,10 +262,13 @@ export class BillVersionService {
       versionId: version.id,
       versionStatus: "submitted",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
       status: "submitted",
+      userId: input.userId,
+      causeResourceType: "bill_version",
+      causeResourceId: updated.id,
     });
 
     await this.auditLogService.writeAuditLog({
@@ -307,10 +325,13 @@ export class BillVersionService {
       versionId: version.id,
       versionStatus: "editable",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
       status: "active",
+      userId: input.userId,
+      causeResourceType: "bill_version",
+      causeResourceId: updated.id,
     });
 
     await this.auditLogService.writeAuditLog({
@@ -346,10 +367,13 @@ export class BillVersionService {
       versionId: version.id,
       versionStatus: "locked",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
       status: "locked",
+      userId: input.userId,
+      causeResourceType: "bill_version",
+      causeResourceId: updated.id,
     });
 
     await this.auditLogService.writeAuditLog({
@@ -386,10 +410,13 @@ export class BillVersionService {
       versionId: version.id,
       versionStatus: "editable",
     });
-    await this.dependencies.projectStageRepository.updateStatus({
+    await this.updateProjectStageStatusWithAudit({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
       status: "active",
+      userId: input.userId,
+      causeResourceType: "bill_version",
+      causeResourceId: updated.id,
     });
 
     await this.auditLogService.writeAuditLog({
@@ -411,6 +438,49 @@ export class BillVersionService {
     if (!project) {
       throw new AppError(404, "PROJECT_NOT_FOUND", "Project not found");
     }
+  }
+
+  private async updateProjectStageStatusWithAudit(input: {
+    projectId: string;
+    stageCode: string;
+    status: ProjectStageRecord["status"];
+    userId: string;
+    causeResourceType: string;
+    causeResourceId: string;
+  }): Promise<ProjectStageRecord> {
+    const beforeStage = (
+      await this.dependencies.projectStageRepository.listByProjectId(input.projectId)
+    ).find((stage) => stage.stageCode === input.stageCode);
+    const before = beforeStage ? { ...beforeStage } : null;
+
+    const updated = await this.dependencies.projectStageRepository.updateStatus({
+      projectId: input.projectId,
+      stageCode: input.stageCode,
+      status: input.status,
+    });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: input.stageCode,
+      resourceType: "project_stage",
+      resourceId: updated.id,
+      action: "update",
+      operatorId: input.userId,
+      beforePayload: before
+        ? {
+            stageCode: before.stageCode,
+            status: before.status,
+          }
+        : null,
+      afterPayload: {
+        stageCode: updated.stageCode,
+        status: updated.status,
+        causeResourceType: input.causeResourceType,
+        causeResourceId: input.causeResourceId,
+      },
+    });
+
+    return updated;
   }
 
   async getAuthorizedVersion(

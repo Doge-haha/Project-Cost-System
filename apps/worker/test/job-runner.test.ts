@@ -22,6 +22,8 @@ test("runWorkerJob processes report_export summary jobs", async () => {
       payload: {
         projectId: "project-001",
         reportType: "summary",
+        reportTemplateId: "tpl-standard-summary-v1",
+        outputFormat: "pdf",
       },
       createdAt: "2026-04-17T00:00:00.000Z",
     },
@@ -34,7 +36,11 @@ test("runWorkerJob processes report_export summary jobs", async () => {
   );
 
   assert.equal(result.status, "completed");
-  assert.deepEqual(result.result, { totalFinalAmount: 123.45 });
+  assert.deepEqual(result.result, {
+    totalFinalAmount: 123.45,
+    reportTemplateId: "tpl-standard-summary-v1",
+    outputFormat: "pdf",
+  });
 });
 
 test("runWorkerJob processes report_export variance jobs", async () => {
@@ -67,6 +73,50 @@ test("runWorkerJob processes report_export variance jobs", async () => {
   assert.deepEqual(result.result, {
     stageCode: "construction",
     items: [{ itemId: "bill-item-001" }],
+    reportTemplateId: null,
+    outputFormat: "json",
+  });
+});
+
+test("runWorkerJob processes report_export stage bill jobs", async () => {
+  const result = await runWorkerJob(
+    {
+      id: "job-stage-bill-001",
+      jobType: "report_export",
+      status: "queued",
+      requestedBy: "user-001",
+      projectId: "project-001",
+      payload: {
+        projectId: "project-001",
+        reportType: "stage_bill",
+        stageCode: "estimate",
+        disciplineCode: "building",
+        reportTemplateId: "tpl-standard-stage-bill-v1",
+        outputFormat: "excel",
+      },
+      createdAt: "2026-04-17T00:00:00.000Z",
+    },
+    {
+      fetchSummary: async () => ({ totalFinalAmount: 0 }),
+      fetchVariance: async (input) => ({
+        limit: input.limit,
+        items: [{ itemCode: "010101001", finalAmount: 100 }],
+      }),
+      recalculateProject: async () => ({ versions: [] }),
+      aiRuntimeClient: { processEventBatch: async () => ({}) } as never,
+    },
+  );
+
+  assert.equal(result.status, "completed");
+  assert.deepEqual(result.result, {
+    reportType: "stage_bill",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    limit: 100,
+    items: [{ itemCode: "010101001", finalAmount: 100 }],
+    reportTemplateId: "tpl-standard-stage-bill-v1",
+    outputFormat: "excel",
   });
 });
 

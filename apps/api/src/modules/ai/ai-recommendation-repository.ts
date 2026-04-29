@@ -4,12 +4,14 @@ import { desc, eq } from "drizzle-orm";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { aiRecommendations } from "../../infrastructure/database/schema.js";
-
-export type AiRecommendationStatus = "generated" | "accepted" | "ignored" | "expired";
-export type AiRecommendationType =
-  | "bill_recommendation"
-  | "quota_recommendation"
-  | "variance_warning";
+import type {
+  AiRecommendationStatus,
+  AiRecommendationType,
+} from "./ai-recommendation-constants.js";
+export type {
+  AiRecommendationStatus,
+  AiRecommendationType,
+} from "./ai-recommendation-constants.js";
 
 export type AiRecommendationRecord = {
   id: string;

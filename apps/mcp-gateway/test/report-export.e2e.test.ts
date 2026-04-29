@@ -31,6 +31,8 @@ test("export-summary-report tool and report-export-status resource stay aligned 
         reportType: "summary",
         stageCode: "estimate",
         disciplineCode: "building",
+        reportTemplateId: "tpl-standard-summary-v1",
+        outputFormat: "pdf",
       },
     });
 
@@ -41,6 +43,11 @@ test("export-summary-report tool and report-export-status resource stay aligned 
     assert.equal(exportResponse.json().result.job.status, "queued");
     assert.equal(exportResponse.json().result.result.status, "queued");
     assert.equal(exportResponse.json().result.result.reportType, "summary");
+    assert.equal(
+      exportResponse.json().result.job.payload.reportTemplateId,
+      "tpl-standard-summary-v1",
+    );
+    assert.equal(exportResponse.json().result.job.payload.outputFormat, "pdf");
     assert.equal(
       exportResponse.json().execution.jobId,
       exportResponse.json().result.job.id,

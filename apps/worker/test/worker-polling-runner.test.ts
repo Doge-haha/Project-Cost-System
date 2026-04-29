@@ -59,7 +59,11 @@ test("WorkerPollingRunner polls one job from the API source and executes it", as
 
   assert.ok(result);
   assert.equal(result?.status, "completed");
-  assert.deepEqual(result?.result, { totalFinalAmount: 999 });
+  assert.deepEqual(result?.result, {
+    totalFinalAmount: 999,
+    reportTemplateId: null,
+    outputFormat: "json",
+  });
 });
 
 test("WorkerPollingRunner returns null when the API source has no queued job", async () => {
@@ -160,7 +164,11 @@ test("WorkerPollingRunner reports completed jobs back to the platform", async ()
   assert.deepEqual(completions, [
     {
       jobId: "background-job-001",
-      result: { totalFinalAmount: 999 },
+      result: {
+        totalFinalAmount: 999,
+        reportTemplateId: null,
+        outputFormat: "json",
+      },
     },
   ]);
 });

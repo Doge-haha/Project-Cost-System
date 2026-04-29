@@ -4,6 +4,7 @@ import type { TransactionRunner } from "../shared/tx/transaction.js";
 import type { BillVersionService } from "../modules/bill/bill-version-service.js";
 import type { BillItemService } from "../modules/bill/bill-item-service.js";
 import type { BillWorkItemService } from "../modules/bill/bill-work-item-service.js";
+import type { BillSourceImportService } from "../modules/bill/bill-source-import-service.js";
 import type { QuotaLineService } from "../modules/quota/quota-line-service.js";
 import type { PriceVersionService } from "../modules/pricing/price-version-service.js";
 import type { PriceItemService } from "../modules/pricing/price-item-service.js";
@@ -15,6 +16,7 @@ import type { BackgroundJobService } from "../modules/jobs/background-job-servic
 import type { BackgroundJobProcessor } from "../modules/jobs/background-job-processor.js";
 import type { FeeTemplateService } from "../modules/fee/fee-template-service.js";
 import { registerBillRoutes } from "./register-bill-routes.js";
+import { registerBillSourceImportRoutes } from "./register-bill-source-import-routes.js";
 import { registerOpsRoutes } from "./register-ops-routes.js";
 
 export function registerBusinessRoutes(
@@ -24,6 +26,7 @@ export function registerBusinessRoutes(
     billVersionService: BillVersionService;
     billItemService: BillItemService;
     billWorkItemService: BillWorkItemService;
+    billSourceImportService: BillSourceImportService;
     quotaLineService: QuotaLineService;
     priceVersionService: PriceVersionService;
     priceItemService: PriceItemService;
@@ -45,6 +48,11 @@ export function registerBusinessRoutes(
     reviewSubmissionService: input.reviewSubmissionService,
     backgroundJobService: input.backgroundJobService,
     calculateService: input.calculateService,
+  });
+
+  registerBillSourceImportRoutes(app, {
+    transactionRunner: input.transactionRunner,
+    billSourceImportService: input.billSourceImportService,
   });
 
   registerOpsRoutes(app, {

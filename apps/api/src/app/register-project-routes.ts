@@ -7,6 +7,7 @@ import type { AuditLogService } from "../modules/audit/audit-log-service.js";
 import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import type { ImportTaskService } from "../modules/import/import-task-service.js";
 import type { KnowledgeService } from "../modules/knowledge/knowledge-service.js";
+import type { MasterDataService } from "../modules/master-data/master-data-service.js";
 import type { ProcessDocumentService } from "../modules/process/process-document-service.js";
 import type { ProjectService } from "../modules/project/project-service.js";
 import { registerImportRoutes } from "./register-import-routes.js";
@@ -14,6 +15,7 @@ import { registerAiRecommendationRoutes } from "./register-ai-recommendation-rou
 import { registerKnowledgeRoutes } from "./register-knowledge-routes.js";
 import { registerProcessDocumentRoutes } from "./register-process-document-routes.js";
 import { registerProjectCoreRoutes } from "./register-project-core-routes.js";
+import { registerMasterDataRoutes } from "./register-master-data-routes.js";
 
 export function registerProjectRoutes(
   app: FastifyInstance,
@@ -27,8 +29,14 @@ export function registerProjectRoutes(
     knowledgeService: KnowledgeService;
     processDocumentService: ProcessDocumentService;
     importTaskService: ImportTaskService;
+    masterDataService: MasterDataService;
   },
 ) {
+  registerMasterDataRoutes(app, {
+    transactionRunner: input.transactionRunner,
+    masterDataService: input.masterDataService,
+  });
+
   registerImportRoutes(app, {
     transactionRunner: input.transactionRunner,
     aiRuntimePreviewService: input.aiRuntimePreviewService,

@@ -34,7 +34,11 @@ test("QueueBackedWorker drains queued jobs and returns executed result", async (
   assert.ok(executed);
   assert.equal(executed?.status, "completed");
   assert.equal(executed?.completedAt, "2026-04-18T09:00:00.000Z");
-  assert.deepEqual(executed?.result, { totalFinalAmount: 888 });
+  assert.deepEqual(executed?.result, {
+    totalFinalAmount: 888,
+    reportTemplateId: null,
+    outputFormat: "json",
+  });
   assert.equal((await worker.pendingJobs()).length, 0);
 });
 
@@ -84,5 +88,9 @@ test("QueueBackedWorker can claim the next queued job from a source and execute 
   assert.ok(executed);
   assert.equal(executed?.status, "completed");
   assert.equal(executed?.completedAt, "2026-04-18T10:00:00.000Z");
-  assert.deepEqual(executed?.result, { totalFinalAmount: 456 });
+  assert.deepEqual(executed?.result, {
+    totalFinalAmount: 456,
+    reportTemplateId: null,
+    outputFormat: "json",
+  });
 });

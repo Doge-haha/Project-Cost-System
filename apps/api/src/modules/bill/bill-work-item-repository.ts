@@ -10,6 +10,8 @@ export type BillWorkItemRecord = {
   billItemId: string;
   workContent: string;
   sortNo: number;
+  sourceSpecCode?: string | null;
+  sourceBillId?: string | null;
 };
 
 export interface BillWorkItemRepository {
@@ -96,13 +98,18 @@ export class InMemoryBillWorkItemRepository implements BillWorkItemRepository {
 
     const created: BillWorkItemRecord[] = [];
     for (const item of sourceItems) {
-      created.push(
-        await this.create({
-          billItemId: targetBillItemId,
-          workContent: item.workContent,
-          sortNo: item.sortNo,
-        }),
-      );
+      const input: Omit<BillWorkItemRecord, "id"> = {
+        billItemId: targetBillItemId,
+        workContent: item.workContent,
+        sortNo: item.sortNo,
+      };
+      if (item.sourceSpecCode !== undefined) {
+        input.sourceSpecCode = item.sourceSpecCode;
+      }
+      if (item.sourceBillId !== undefined) {
+        input.sourceBillId = item.sourceBillId;
+      }
+      created.push(await this.create(input));
     }
 
     return created;
@@ -131,6 +138,8 @@ export class DbBillWorkItemRepository implements BillWorkItemRepository {
         billItemId: input.billItemId,
         workContent: input.workContent,
         sortNo: input.sortNo,
+        sourceSpecCode: input.sourceSpecCode ?? null,
+        sourceBillId: input.sourceBillId ?? null,
       })
       .returning();
 
@@ -188,13 +197,18 @@ export class DbBillWorkItemRepository implements BillWorkItemRepository {
     const created: BillWorkItemRecord[] = [];
 
     for (const item of sourceItems) {
-      created.push(
-        await this.create({
-          billItemId: targetBillItemId,
-          workContent: item.workContent,
-          sortNo: item.sortNo,
-        }),
-      );
+      const input: Omit<BillWorkItemRecord, "id"> = {
+        billItemId: targetBillItemId,
+        workContent: item.workContent,
+        sortNo: item.sortNo,
+      };
+      if (item.sourceSpecCode !== undefined) {
+        input.sourceSpecCode = item.sourceSpecCode;
+      }
+      if (item.sourceBillId !== undefined) {
+        input.sourceBillId = item.sourceBillId;
+      }
+      created.push(await this.create(input));
     }
 
     return created;
@@ -204,10 +218,18 @@ export class DbBillWorkItemRepository implements BillWorkItemRepository {
 function mapBillWorkItemRecord(
   record: typeof billWorkItems.$inferSelect,
 ): BillWorkItemRecord {
-  return {
+  const mapped: BillWorkItemRecord = {
     id: record.id,
     billItemId: record.billItemId,
     workContent: record.workContent,
     sortNo: record.sortNo,
   };
+  if (record.sourceSpecCode !== null) {
+    mapped.sourceSpecCode = record.sourceSpecCode;
+  }
+  if (record.sourceBillId !== null) {
+    mapped.sourceBillId = record.sourceBillId;
+  }
+
+  return mapped;
 }

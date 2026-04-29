@@ -1,4 +1,5 @@
 import type { CreateAppOptions } from "./create-app-options.js";
+import { createDemoAppRepositories } from "./create-demo-app-repositories.js";
 import { createDatabaseAppOptions } from "../infrastructure/database/create-database-app-options.js";
 
 export function createRuntimeAppOptions(
@@ -23,6 +24,7 @@ export function createRuntimeAppOptions(
       mode: "memory",
       appOptions: {
         appRuntimeMode: "memory",
+        ...createOptionalDemoRepositories(env),
       },
     };
   }
@@ -48,6 +50,14 @@ export function createRuntimeAppOptions(
     mode: "memory",
     appOptions: {
       appRuntimeMode: "memory",
+      ...createOptionalDemoRepositories(env),
     },
   };
+}
+
+function createOptionalDemoRepositories(env: Record<string, string | undefined>) {
+  return env.APP_DEMO_SEED?.trim() === "1" ||
+    env.APP_DEMO_SEED?.trim() === "true"
+    ? createDemoAppRepositories()
+    : {};
 }

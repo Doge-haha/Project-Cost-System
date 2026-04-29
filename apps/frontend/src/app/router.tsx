@@ -8,6 +8,7 @@ import { ProjectDetailPage } from "../features/projects/project-detail-page";
 import { ProjectJobStatusPage } from "../features/projects/project-job-status-page";
 import { ProjectKnowledgePage } from "../features/projects/project-knowledge-page";
 import { ProjectProcessDocumentsPage } from "../features/projects/project-process-documents-page";
+import { ProjectReportsPage } from "../features/projects/project-reports-page";
 import { ProjectWorkspaceInboxPage } from "../features/projects/project-workspace-inbox-page";
 import { ProjectReviewsPage } from "../features/projects/project-reviews-page";
 import { ProjectsPage } from "../features/projects/projects-page";
@@ -65,6 +66,10 @@ export const appRoutes: RouteObject[] = [
       {
         path: "projects/:projectId/summary",
         element: <SummaryPage />,
+      },
+      {
+        path: "projects/:projectId/reports",
+        element: <ProjectReportsPage />,
       },
     ],
   },

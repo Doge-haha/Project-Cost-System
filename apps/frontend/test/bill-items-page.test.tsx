@@ -50,6 +50,116 @@ describe("BillItemsPage", () => {
     fetchMock.mockReset();
   });
 
+  test("filters bill items by code or name", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+              children: [
+                {
+                  id: "bill-item-002",
+                  parentId: "bill-item-001",
+                  code: "A.1",
+                  name: "人工挖土方",
+                  level: 2,
+                  quantity: 12,
+                  unit: "m3",
+                },
+              ],
+            },
+            {
+              id: "bill-item-003",
+              parentId: null,
+              code: "B",
+              name: "安装工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "清单层级表格" })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("筛选清单项"), {
+      target: { value: "挖土" },
+    });
+
+    expect(screen.getByText("已筛选 1/3 项清单。")).toBeInTheDocument();
+    expect(screen.getByText("人工挖土方")).toBeInTheDocument();
+    expect(screen.queryByText("安装工程")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "清空筛选" }));
+
+    expect(screen.getByText("安装工程")).toBeInTheDocument();
+  });
+
   test("renders project name in breadcrumbs and header context", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));

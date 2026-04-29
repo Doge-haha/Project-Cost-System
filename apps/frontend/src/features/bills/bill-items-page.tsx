@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { apiClient, ApiError } from "../../lib/api";
@@ -47,6 +47,7 @@ export function BillItemsPage() {
   const [pricingActionMessage, setPricingActionMessage] = useState<string | null>(null);
   const [manualUnitPrice, setManualUnitPrice] = useState("");
   const [manualPricingReason, setManualPricingReason] = useState("市场询价调整");
+  const [billItemFilter, setBillItemFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -108,6 +109,7 @@ export function BillItemsPage() {
       setQuotaActionMessage(null);
       setQuotaValidation(null);
       setPricingActionMessage(null);
+      setBillItemFilter("");
     } catch (fetchError) {
       setError(
         fetchError instanceof ApiError
@@ -327,24 +329,21 @@ export function BillItemsPage() {
     }
   }
 
-  if (loading) {
-    return <LoadingState title="正在加载清单页" />;
-  }
-
-  if (error) {
-    return (
-      <ErrorState
-        body={error}
-        onRetry={() => {
-          void loadBillItems();
-        }}
-      />
-    );
-  }
-
   const selectedVersion =
     versions.find((version) => version.id === versionId) ?? null;
-  const flatItems = flattenBillItems(items);
+  const flatItems = useMemo(() => flattenBillItems(items), [items]);
+  const normalizedBillItemFilter = billItemFilter.trim().toLowerCase();
+  const filteredFlatItems = useMemo(() => {
+    if (!normalizedBillItemFilter) {
+      return flatItems;
+    }
+
+    return flatItems.filter((item) =>
+      [item.code, item.name, item.unit]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedBillItemFilter)),
+    );
+  }, [flatItems, normalizedBillItemFilter]);
   const selectedBillItem = flatItems.find((item) => item.id === selectedBillItemId) ?? null;
   const visibleQuotaLines = quotaLines.filter((quotaLine) => quotaLine.billVersionId === versionId);
   const selectedItemQuotaLines = selectedBillItem
@@ -359,6 +358,21 @@ export function BillItemsPage() {
           versionLabel: selectedVersion.versionName,
         })
       : null;
+
+  if (loading) {
+    return <LoadingState title="正在加载清单页" />;
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        body={error}
+        onRetry={() => {
+          void loadBillItems();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="page-stack">
@@ -388,11 +402,11 @@ export function BillItemsPage() {
       <section className="stat-grid">
         <article className="stat-card">
           <p className="stat-label">清单项数量</p>
-          <p className="stat-value">{items.length}</p>
+          <p className="stat-value">{flatItems.length}</p>
         </article>
         <article className="stat-card">
           <p className="stat-label">叶子节点</p>
-          <p className="stat-value">{countLeafBillItems(items)}</p>
+          <p className="stat-value">{countLeafBillItems(flatItems)}</p>
         </article>
         <article className="stat-card">
           <p className="stat-label">当前版本</p>
@@ -596,8 +610,43 @@ export function BillItemsPage() {
         />
       ) : (
         <section className="panel">
-          <h3>清单层级表格</h3>
-          <BillItemsTable items={items} />
+          <div className="page-header">
+            <div>
+              <h3>清单层级表格</h3>
+              {normalizedBillItemFilter ? (
+                <p className="page-description">
+                  已筛选 {filteredFlatItems.length}/{flatItems.length} 项清单。
+                </p>
+              ) : null}
+            </div>
+            <div className="button-row">
+              <label className="form-field">
+                筛选清单项
+                <input
+                  placeholder="编码、名称或单位"
+                  value={billItemFilter}
+                  onChange={(event) => {
+                    setBillItemFilter(event.target.value);
+                  }}
+                />
+              </label>
+              <button
+                className="primary-button secondary"
+                disabled={!billItemFilter}
+                onClick={() => {
+                  setBillItemFilter("");
+                }}
+                type="button"
+              >
+                清空筛选
+              </button>
+            </div>
+          </div>
+          {filteredFlatItems.length === 0 ? (
+            <EmptyState title="没有匹配清单项" body="请调整编码、名称或单位筛选条件。" />
+          ) : (
+            <BillItemsTable items={filteredFlatItems} />
+          )}
         </section>
       )}
 

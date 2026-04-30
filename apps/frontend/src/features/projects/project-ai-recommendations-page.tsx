@@ -8,6 +8,7 @@ import type {
   AiRecommendationStatus,
   AiRecommendationType,
   ProjectWorkspace,
+  VarianceWarningThreshold,
 } from "../../lib/types";
 import { AppBreadcrumbs } from "../shared/breadcrumbs";
 import { EmptyState } from "../shared/empty-state";
@@ -30,6 +31,19 @@ type RecommendationFilters = {
   limit: string;
 };
 
+type ThresholdForm = {
+  stageCode: string;
+  thresholdAmount: string;
+  thresholdRate: string;
+};
+
+type ContextPreviewState = {
+  recommendation: AiRecommendation;
+  payload: Record<string, unknown> | null;
+  loading: boolean;
+  error: string | null;
+};
+
 const defaultFilters: RecommendationFilters = {
   recommendationType: "",
   status: "",
@@ -38,6 +52,12 @@ const defaultFilters: RecommendationFilters = {
   stageCode: "",
   disciplineCode: "",
   limit: "50",
+};
+
+const defaultThresholdForm: ThresholdForm = {
+  stageCode: "",
+  thresholdAmount: "",
+  thresholdRate: "",
 };
 
 const recommendationTypeOptions: Array<{
@@ -69,6 +89,14 @@ export function ProjectAiRecommendationsPage() {
   const [actionTargetId, setActionTargetId] = useState<string | null>(null);
   const [acceptTarget, setAcceptTarget] = useState<AiRecommendation | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [thresholds, setThresholds] = useState<VarianceWarningThreshold[]>([]);
+  const [thresholdForm, setThresholdForm] =
+    useState<ThresholdForm>(defaultThresholdForm);
+  const [thresholdSaving, setThresholdSaving] = useState(false);
+  const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
+  const [contextPreview, setContextPreview] = useState<ContextPreviewState | null>(
+    null,
+  );
   const activeQuery = useMemo(() => readFilters(searchParams), [searchParams]);
   const recommendationGroups = useMemo(
     () => groupRecommendationsByResourceType(state?.recommendations.items ?? []),
@@ -122,6 +150,19 @@ export function ProjectAiRecommendationsPage() {
     }
   }
 
+  async function loadThresholds() {
+    if (!projectId) {
+      return;
+    }
+
+    try {
+      const response = await apiClient.listVarianceWarningThresholds(projectId);
+      setThresholds(response.items);
+    } catch {
+      setThresholdMessage("阈值配置暂时无法加载。");
+    }
+  }
+
   useEffect(() => {
     setFilters(readFilters(searchParams));
   }, [searchParams]);
@@ -129,6 +170,10 @@ export function ProjectAiRecommendationsPage() {
   useEffect(() => {
     void loadRecommendations();
   }, [projectId, activeQuery]);
+
+  useEffect(() => {
+    void loadThresholds();
+  }, [projectId]);
 
   function updateFilter(key: keyof RecommendationFilters, value: string) {
     setFilters((current) => ({
@@ -185,6 +230,86 @@ export function ProjectAiRecommendationsPage() {
       );
     } finally {
       setActionTargetId(null);
+    }
+  }
+
+  async function handleThresholdSubmit() {
+    if (!projectId) {
+      return;
+    }
+
+    const thresholdAmount = Number(thresholdForm.thresholdAmount);
+    const thresholdRate = Number(thresholdForm.thresholdRate) / 100;
+
+    if (!Number.isFinite(thresholdAmount) || thresholdAmount < 0) {
+      setThresholdMessage("金额阈值必须为非负数字。");
+      return;
+    }
+
+    if (!Number.isFinite(thresholdRate) || thresholdRate < 0) {
+      setThresholdMessage("比率阈值必须为非负数字。");
+      return;
+    }
+
+    setThresholdSaving(true);
+    setThresholdMessage(null);
+
+    try {
+      const saved = await apiClient.upsertVarianceWarningThreshold(projectId, {
+        stageCode: thresholdForm.stageCode.trim() || null,
+        thresholdAmount,
+        thresholdRate,
+      });
+      setThresholds((current) => upsertThreshold(current, saved));
+      setThresholdForm(defaultThresholdForm);
+      setThresholdMessage("阈值配置已保存。");
+    } catch (submitError) {
+      setThresholdMessage(
+        submitError instanceof ApiError
+          ? submitError.message
+          : "阈值配置保存失败，请稍后重试。",
+      );
+    } finally {
+      setThresholdSaving(false);
+    }
+  }
+
+  async function handleOpenContextPreview(recommendation: AiRecommendation) {
+    if (!projectId) {
+      return;
+    }
+
+    setContextPreview({
+      recommendation,
+      payload: null,
+      loading: true,
+      error: null,
+    });
+
+    try {
+      const payload = await apiClient.getAiRecommendationContext(projectId, {
+        recommendationType: recommendation.recommendationType,
+        resourceType: recommendation.resourceType,
+        resourceId: recommendation.resourceId,
+        stageCode: recommendation.stageCode ?? undefined,
+        disciplineCode: recommendation.disciplineCode ?? undefined,
+      });
+      setContextPreview({
+        recommendation,
+        payload,
+        loading: false,
+        error: null,
+      });
+    } catch (previewError) {
+      setContextPreview({
+        recommendation,
+        payload: null,
+        loading: false,
+        error:
+          previewError instanceof ApiError
+            ? previewError.message
+            : "AI 输入上下文加载失败。",
+      });
     }
   }
 
@@ -326,6 +451,84 @@ export function ProjectAiRecommendationsPage() {
       </section>
 
       <section className="panel">
+        <h2>偏差预警阈值</h2>
+        {thresholdMessage ? (
+          <p className="page-description">{thresholdMessage}</p>
+        ) : null}
+        <div className="form-grid">
+          <label className="form-field">
+            阈值阶段
+            <input
+              aria-label="阈值阶段"
+              onChange={(event) =>
+                setThresholdForm((current) => ({
+                  ...current,
+                  stageCode: event.target.value,
+                }))
+              }
+              placeholder="留空为项目默认"
+              value={thresholdForm.stageCode}
+            />
+          </label>
+          <label className="form-field">
+            金额阈值
+            <input
+              aria-label="金额阈值"
+              min="0"
+              onChange={(event) =>
+                setThresholdForm((current) => ({
+                  ...current,
+                  thresholdAmount: event.target.value,
+                }))
+              }
+              placeholder="5000"
+              type="number"
+              value={thresholdForm.thresholdAmount}
+            />
+          </label>
+          <label className="form-field">
+            比率阈值
+            <input
+              aria-label="比率阈值"
+              min="0"
+              onChange={(event) =>
+                setThresholdForm((current) => ({
+                  ...current,
+                  thresholdRate: event.target.value,
+                }))
+              }
+              placeholder="8"
+              type="number"
+              value={thresholdForm.thresholdRate}
+            />
+          </label>
+        </div>
+        <div className="button-row">
+          <button
+            className="primary-button"
+            disabled={!canHandleRecommendations || thresholdSaving}
+            onClick={() => {
+              void handleThresholdSubmit();
+            }}
+            type="button"
+          >
+            保存阈值
+          </button>
+        </div>
+        {thresholds.length > 0 ? (
+          <div className="recommendation-meta-list">
+            {thresholds.map((threshold) => (
+              <p className="page-description" key={threshold.id}>
+                {formatThreshold(threshold)}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="page-description">当前未配置阈值。</p>
+        )}
+      </section>
+
+      <section className="panel">
         <h2>推荐列表</h2>
         {actionMessage ? <p className="page-description">{actionMessage}</p> : null}
         {state.recommendations.items.length > 0 ? (
@@ -374,6 +577,20 @@ export function ProjectAiRecommendationsPage() {
                       <p className="page-description">
                         生成人 {recommendation.createdBy}
                       </p>
+                      <div className="version-card-actions">
+                        <button
+                          className="connection-button secondary"
+                          onClick={() => {
+                            void handleOpenContextPreview(recommendation);
+                          }}
+                          type="button"
+                        >
+                          预览上下文
+                        </button>
+                      </div>
+                      {recommendation.status === "expired" ? (
+                        <ExpiredRecommendationReason recommendation={recommendation} />
+                      ) : null}
                       {recommendation.status === "generated" && canHandleRecommendations ? (
                         <>
                           <div className="version-card-actions">
@@ -463,6 +680,38 @@ export function ProjectAiRecommendationsPage() {
           <EmptyState title="没有匹配推荐" body="当前筛选条件下没有 AI 推荐。" />
         )}
       </section>
+      {contextPreview ? (
+        <div
+          aria-label="AI 输入上下文预览"
+          className="action-confirmation"
+          role="dialog"
+        >
+          <h2>AI 输入上下文预览</h2>
+          <p className="page-description">
+            {formatRecommendationType(contextPreview.recommendation.recommendationType)} ·{" "}
+            {contextPreview.recommendation.resourceType} ·{" "}
+            {contextPreview.recommendation.resourceId}
+          </p>
+          {contextPreview.loading ? (
+            <p className="page-description">正在加载上下文...</p>
+          ) : contextPreview.error ? (
+            <p className="page-description">{contextPreview.error}</p>
+          ) : (
+            <pre className="context-preview-code">
+              {JSON.stringify(contextPreview.payload, null, 2)}
+            </pre>
+          )}
+          <div className="version-card-actions">
+            <button
+              className="connection-button secondary"
+              onClick={() => setContextPreview(null)}
+              type="button"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -583,6 +832,34 @@ function summarizeVisibleRecommendations(items: AiRecommendation[]) {
   };
 }
 
+function upsertThreshold(
+  current: VarianceWarningThreshold[],
+  saved: VarianceWarningThreshold,
+) {
+  const next = current.filter(
+    (item) => (item.stageCode ?? null) !== (saved.stageCode ?? null),
+  );
+  return [...next, saved].sort((left, right) =>
+    (left.stageCode ?? "").localeCompare(right.stageCode ?? ""),
+  );
+}
+
+function formatThreshold(threshold: VarianceWarningThreshold) {
+  const scope = threshold.stageCode ? threshold.stageCode : "默认范围";
+  return `${scope} · 金额 ${formatPlainNumber(threshold.thresholdAmount)} · 比率 ${formatPercent(
+    threshold.thresholdRate,
+  )}`;
+}
+
+function formatPlainNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+}
+
+function formatPercent(value: number) {
+  const percent = value * 100;
+  return `${Number.isInteger(percent) ? percent : Number(percent.toFixed(2))}%`;
+}
+
 function formatRecommendationType(type: AiRecommendationType) {
   const option = recommendationTypeOptions.find((item) => item.value === type);
   return option?.label ?? type;
@@ -634,4 +911,56 @@ function formatRecommendationProvider(payload: Record<string, unknown>) {
   const model = typeof providerPayload?.model === "string" ? providerPayload.model : null;
 
   return provider && model ? `来源 ${provider} / ${model}` : null;
+}
+
+function ExpiredRecommendationReason(props: { recommendation: AiRecommendation }) {
+  const details = formatStaleReason(props.recommendation.inputPayload);
+
+  return (
+    <div className="recommendation-expired-detail">
+      <p className="page-description">
+        失效原因 {props.recommendation.statusReason ?? "系统判定推荐上下文已变化"}
+      </p>
+      {details ? <p className="page-description">{details}</p> : null}
+    </div>
+  );
+}
+
+function formatStaleReason(payload: Record<string, unknown>) {
+  const staleReason =
+    payload.staleReason &&
+    typeof payload.staleReason === "object" &&
+    !Array.isArray(payload.staleReason)
+      ? (payload.staleReason as Record<string, unknown>)
+      : null;
+
+  if (!staleReason) {
+    return null;
+  }
+
+  const previousVersionId =
+    typeof staleReason.previousVersionId === "string"
+      ? staleReason.previousVersionId
+      : null;
+  const currentVersionId =
+    typeof staleReason.currentVersionId === "string"
+      ? staleReason.currentVersionId
+      : null;
+
+  if (previousVersionId && currentVersionId) {
+    return `版本 ${previousVersionId} → ${currentVersionId}`;
+  }
+
+  const previousStageCode =
+    typeof staleReason.previousStageCode === "string"
+      ? staleReason.previousStageCode
+      : null;
+  const currentStageCode =
+    typeof staleReason.currentStageCode === "string"
+      ? staleReason.currentStageCode
+      : null;
+
+  return previousStageCode && currentStageCode
+    ? `阶段 ${previousStageCode} → ${currentStageCode}`
+    : null;
 }

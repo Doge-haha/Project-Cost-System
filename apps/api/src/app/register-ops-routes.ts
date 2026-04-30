@@ -9,6 +9,7 @@ import type { PriceItemService } from "../modules/pricing/price-item-service.js"
 import type { PriceVersionService } from "../modules/pricing/price-version-service.js";
 import type { ReportExportTaskService } from "../modules/reports/report-export-task-service.js";
 import type { SummaryService } from "../modules/reports/summary-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import { registerJobRoutes } from "./register-job-routes.js";
 import { registerPricingRoutes } from "./register-pricing-routes.js";
 import { registerReportRoutes } from "./register-report-routes.js";
@@ -25,6 +26,7 @@ export function registerOpsRoutes(
     backgroundJobService: BackgroundJobService;
     backgroundJobProcessor: BackgroundJobProcessor;
     feeTemplateService: FeeTemplateService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
   registerPricingRoutes(app, {
@@ -33,6 +35,7 @@ export function registerOpsRoutes(
     priceItemService: input.priceItemService,
     calculateService: input.calculateService,
     feeTemplateService: input.feeTemplateService,
+    aiRecommendationService: input.aiRecommendationService,
   });
 
   registerReportRoutes(app, {

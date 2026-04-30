@@ -86,6 +86,10 @@ import {
   InMemoryAiRecommendationRepository,
   type AiRecommendationRepository,
 } from "../modules/ai/ai-recommendation-repository.js";
+import {
+  InMemoryVarianceWarningThresholdRepository,
+  type VarianceWarningThresholdRepository,
+} from "../modules/ai/variance-warning-threshold-repository.js";
 
 export type AppRepositories = {
   project: ProjectRepository;
@@ -110,6 +114,7 @@ export type AppRepositories = {
   backgroundJob: BackgroundJobRepository;
   importTask: ImportTaskRepository;
   aiRecommendation: AiRecommendationRepository;
+  varianceWarningThreshold: VarianceWarningThresholdRepository;
 };
 
 export type CreateAppRepositoryOptions = {
@@ -135,6 +140,7 @@ export type CreateAppRepositoryOptions = {
   backgroundJobRepository?: BackgroundJobRepository;
   importTaskRepository?: ImportTaskRepository;
   aiRecommendationRepository?: AiRecommendationRepository;
+  varianceWarningThresholdRepository?: VarianceWarningThresholdRepository;
 };
 
 export function createAppRepositories(
@@ -186,5 +192,8 @@ export function createAppRepositories(
     aiRecommendation:
       options.aiRecommendationRepository ??
       new InMemoryAiRecommendationRepository([]),
+    varianceWarningThreshold:
+      options.varianceWarningThresholdRepository ??
+      new InMemoryVarianceWarningThresholdRepository([]),
   };
 }

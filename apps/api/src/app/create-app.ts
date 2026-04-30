@@ -41,6 +41,7 @@ export function createApp(options: CreateAppOptions): FastifyInstance {
     backgroundJobService: services.backgroundJobService,
     backgroundJobProcessor: services.backgroundJobProcessor,
     feeTemplateService: services.feeTemplateService,
+    aiRecommendationService: services.aiRecommendationService,
   });
 
   return app;

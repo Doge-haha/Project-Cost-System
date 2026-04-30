@@ -11,9 +11,9 @@
 
 摘要：
 
-- 路由总数：92
+- 路由总数：96
 - 分组总数：15
-- 方法分布：GET 40 / POST 37 / PUT 11 / DELETE 4
+- 方法分布：GET 42 / POST 38 / PUT 12 / DELETE 4
 - 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
@@ -27,7 +27,10 @@
 - `GET /v1/projects/:projectId`
 - `GET /v1/projects/:projectId/ai/bill-recommendations`
 - `GET /v1/projects/:projectId/ai/quota-recommendations`
+- `GET /v1/projects/:projectId/ai/recommendation-context`
 - `GET /v1/projects/:projectId/ai/recommendations`
+- `GET /v1/projects/:projectId/ai/variance-warning-thresholds`
+- `PUT /v1/projects/:projectId/ai/variance-warning-thresholds`
 - `GET /v1/projects/:projectId/ai/variance-warnings`
 - `PUT /v1/projects/:projectId/default-fee-template`
 - `PUT /v1/projects/:projectId/default-price-version`
@@ -135,6 +138,7 @@
 - `POST /v1/ai/recommendations/:recommendationId/accept`
 - `POST /v1/ai/recommendations/:recommendationId/expire`
 - `POST /v1/ai/recommendations/:recommendationId/ignore`
+- `POST /v1/ai/recommendations/expire-stale`
 - `POST /v1/ai/variance-warnings`
 
 ## AI Runtime / Knowledge

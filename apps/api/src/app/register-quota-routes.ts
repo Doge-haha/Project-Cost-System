@@ -8,15 +8,17 @@ import {
   updateQuotaLineSchema,
   type QuotaLineService,
 } from "../modules/quota/quota-line-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 
 export function registerQuotaRoutes(
   app: FastifyInstance,
   input: {
     transactionRunner: TransactionRunner;
     quotaLineService: QuotaLineService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
-  const { transactionRunner, quotaLineService } = input;
+  const { transactionRunner, quotaLineService, aiRecommendationService } = input;
 
   app.get("/v1/projects/:projectId/quota-lines", async (request) => {
     const { projectId } = request.params as { projectId: string };
@@ -59,6 +61,19 @@ export function registerQuotaRoutes(
           }),
         );
       }
+
+      await Promise.all(
+        [...new Set(payload.items.map((item) => item.billItemId))].map((billItemId) =>
+          aiRecommendationService.expireStaleRecommendations({
+            projectId,
+            resourceType: "bill_item",
+            resourceId: billItemId,
+            recommendationType: "quota_recommendation",
+            reason: "quota_context_changed",
+            userId: request.currentUser!.id,
+          }),
+        ),
+      );
 
       return items;
     });
@@ -135,8 +150,8 @@ export function registerQuotaRoutes(
       };
       const payload = createQuotaLineSchema.parse(request.body);
 
-      const created = await transactionRunner.runInTransaction(async () =>
-        quotaLineService.createQuotaLine({
+      const created = await transactionRunner.runInTransaction(async () => {
+        const item = await quotaLineService.createQuotaLine({
           projectId,
           billVersionId,
           billItemId: itemId,
@@ -154,8 +169,17 @@ export function registerQuotaRoutes(
           contentFactor: payload.contentFactor,
           sourceMode: payload.sourceMode,
           userId: request.currentUser!.id,
-        }),
-      );
+        });
+        await aiRecommendationService.expireStaleRecommendations({
+          projectId,
+          resourceType: "bill_item",
+          resourceId: itemId,
+          recommendationType: "quota_recommendation",
+          reason: "quota_context_changed",
+          userId: request.currentUser!.id,
+        });
+        return item;
+      });
 
       reply.status(201);
       return created;
@@ -169,8 +193,8 @@ export function registerQuotaRoutes(
     };
     const payload = updateQuotaLineSchema.parse(request.body);
 
-    return transactionRunner.runInTransaction(async () =>
-      quotaLineService.updateQuotaLine({
+    return transactionRunner.runInTransaction(async () => {
+      const updated = await quotaLineService.updateQuotaLine({
         projectId,
         quotaLineId,
         sourceStandardSetCode: payload.sourceStandardSetCode,
@@ -187,8 +211,17 @@ export function registerQuotaRoutes(
         contentFactor: payload.contentFactor,
         sourceMode: payload.sourceMode,
         userId: request.currentUser!.id,
-      }),
-    );
+      });
+      await aiRecommendationService.expireStaleRecommendations({
+        projectId,
+        resourceType: "bill_item",
+        resourceId: updated.billItemId,
+        recommendationType: "quota_recommendation",
+        reason: "quota_context_changed",
+        userId: request.currentUser!.id,
+      });
+      return updated;
+    });
   });
 
   app.delete(
@@ -199,13 +232,21 @@ export function registerQuotaRoutes(
         quotaLineId: string;
       };
 
-      await transactionRunner.runInTransaction(async () =>
-        quotaLineService.deleteQuotaLine({
+      await transactionRunner.runInTransaction(async () => {
+        const deleted = await quotaLineService.deleteQuotaLine({
           projectId,
           quotaLineId,
           userId: request.currentUser!.id,
-        }),
-      );
+        });
+        await aiRecommendationService.expireStaleRecommendations({
+          projectId,
+          resourceType: "bill_item",
+          resourceId: deleted.billItemId,
+          recommendationType: "quota_recommendation",
+          reason: "quota_context_changed",
+          userId: request.currentUser!.id,
+        });
+      });
 
       reply.status(204);
       return null;

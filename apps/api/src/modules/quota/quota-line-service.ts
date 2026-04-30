@@ -530,7 +530,7 @@ export class QuotaLineService {
     projectId: string;
     quotaLineId: string;
     userId: string;
-  }): Promise<void> {
+  }): Promise<QuotaLineRecord> {
     const existingQuotaLine = await this.quotaLineRepository.findById(input.quotaLineId);
     if (!existingQuotaLine) {
       throw new AppError(404, "QUOTA_LINE_NOT_FOUND", "Quota line not found");
@@ -564,6 +564,8 @@ export class QuotaLineService {
       operatorId: input.userId,
       beforePayload: existingQuotaLine,
     });
+
+    return existingQuotaLine;
   }
 
   private async assertBillItemInEditableContext(

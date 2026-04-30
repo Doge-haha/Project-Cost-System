@@ -2,13 +2,16 @@ import { randomUUID } from "node:crypto";
 
 import { AppError } from "../../shared/errors/app-error.js";
 import type { AuditLogService } from "../audit/audit-log-service.js";
+import type { BillItemRepository } from "../bill/bill-item-repository.js";
 import type { BillItemService } from "../bill/bill-item-service.js";
+import type { BillVersionRepository } from "../bill/bill-version-repository.js";
 import type { KnowledgeService } from "../knowledge/knowledge-service.js";
 import { ProjectAuthorizationService } from "../project/project-authorization-service.js";
 import type { ProjectDisciplineRepository } from "../project/project-discipline-repository.js";
 import type { ProjectMemberRepository } from "../project/project-member-repository.js";
 import type { ProjectRepository } from "../project/project-repository.js";
 import type { ProjectStageRepository } from "../project/project-stage-repository.js";
+import type { QuotaLineRepository } from "../quota/quota-line-repository.js";
 import type { QuotaLineService } from "../quota/quota-line-service.js";
 import type { SummaryService } from "../reports/summary-service.js";
 import type {
@@ -17,6 +20,10 @@ import type {
   AiRecommendationStatus,
   AiRecommendationType,
 } from "./ai-recommendation-repository.js";
+import type {
+  VarianceWarningThresholdRecord,
+  VarianceWarningThresholdRepository,
+} from "./variance-warning-threshold-repository.js";
 
 type RecommendationContext = {
   projectId: string;
@@ -33,10 +40,14 @@ export class AiRecommendationService {
       projectStageRepository: ProjectStageRepository;
       projectDisciplineRepository: ProjectDisciplineRepository;
       projectMemberRepository: ProjectMemberRepository;
+      billVersionRepository?: BillVersionRepository;
+      billItemRepository?: BillItemRepository;
+      quotaLineRepository?: QuotaLineRepository;
       billItemService?: BillItemService;
       quotaLineService?: QuotaLineService;
       summaryService?: SummaryService;
       knowledgeService?: KnowledgeService;
+      varianceWarningThresholdRepository?: VarianceWarningThresholdRepository;
     },
     private readonly auditLogService: AuditLogService,
   ) {}
@@ -50,9 +61,21 @@ export class AiRecommendationService {
   }): Promise<AiRecommendationRecord> {
     await this.assertProjectAccess(input, "edit");
     await this.expireSupersededRecommendations(input);
+    const inputPayload = {
+      ...(await this.buildRecommendationInputContext({
+        projectId: input.projectId,
+        stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        recommendationType: input.recommendationType,
+        userId: input.userId,
+      })),
+      ...(input.inputPayload ?? {}),
+    };
     const createdAt = new Date().toISOString();
     const trace = buildAiAssistTrace({
-      inputPayload: input.inputPayload ?? {},
+      inputPayload,
       outputPayload: input.outputPayload,
     });
     const created = await this.recommendationRepository.create({
@@ -63,7 +86,7 @@ export class AiRecommendationService {
       resourceId: input.resourceId,
       recommendationType: input.recommendationType,
       inputPayload: {
-        ...(input.inputPayload ?? {}),
+        ...inputPayload,
         aiAssistTraceId: trace.aiAssistTraceId,
         aiProvider: trace.aiProvider,
         aiRequestSummary: trace.aiRequestSummary,
@@ -113,8 +136,14 @@ export class AiRecommendationService {
     }
 
     await this.assertProjectAccess(input, "edit");
-    const thresholdAmount = input.thresholdAmount ?? 0;
-    const thresholdRate = input.thresholdRate ?? 0.1;
+    const thresholds = await this.resolveVarianceThresholds({
+      projectId: input.projectId,
+      stageCode: input.stageCode,
+      thresholdAmount: input.thresholdAmount,
+      thresholdRate: input.thresholdRate,
+    });
+    const thresholdAmount = thresholds.thresholdAmount;
+    const thresholdRate = thresholds.thresholdRate;
     const details = await this.dependencies.summaryService.getSummaryDetails({
       projectId: input.projectId,
       billVersionId: input.billVersionId,
@@ -146,9 +175,12 @@ export class AiRecommendationService {
             billVersionId: item.billVersionId,
             thresholdAmount,
             thresholdRate,
+            thresholdScope: thresholds.scope,
+            contextType: "variance_warning",
           },
           outputPayload: {
             warning: "清单最终金额与系统金额偏差超过阈值",
+            warningScope: "bill_item",
             itemCode: item.itemCode,
             itemName: item.itemName,
             billVersionId: item.billVersionId,
@@ -168,7 +200,382 @@ export class AiRecommendationService {
       );
     }
 
+    const [disciplineBreakdown, unitBreakdown] = await Promise.all([
+      this.dependencies.summaryService.getVarianceBreakdown({
+        projectId: input.projectId,
+        groupBy: "discipline",
+        billVersionId: input.billVersionId,
+        stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
+        userId: input.userId,
+      }),
+      this.dependencies.summaryService.getVarianceBreakdown({
+        projectId: input.projectId,
+        groupBy: "unit",
+        billVersionId: input.billVersionId,
+        stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
+        userId: input.userId,
+      }),
+    ]);
+    for (const item of [...disciplineBreakdown.items, ...unitBreakdown.items]) {
+      if (!isVarianceExceeded(item, thresholdAmount, thresholdRate)) {
+        continue;
+      }
+      const isDiscipline = disciplineBreakdown.items.includes(item);
+      created.push(
+        await this.createRecommendation({
+          projectId: input.projectId,
+          stageCode: input.stageCode,
+          disciplineCode: isDiscipline ? item.groupKey : input.disciplineCode,
+          resourceType: isDiscipline ? "discipline" : "unit",
+          resourceId: item.groupKey,
+          recommendationType: "variance_warning",
+          inputPayload: {
+            billVersionId: input.billVersionId,
+            thresholdAmount,
+            thresholdRate,
+            thresholdScope: thresholds.scope,
+            contextType: isDiscipline ? "variance_by_discipline" : "variance_by_unit",
+          },
+          outputPayload: {
+            warning: isDiscipline ? "专业级偏差超过阈值" : "单体级偏差超过阈值",
+            warningScope: isDiscipline ? "discipline" : "unit",
+            groupKey: item.groupKey,
+            groupLabel: item.groupLabel,
+            totalSystemAmount: item.totalSystemAmount,
+            totalFinalAmount: item.totalFinalAmount,
+            varianceAmount: item.varianceAmount,
+            varianceRate: item.varianceRate,
+            varianceShare: item.varianceShare,
+            thresholdAmount,
+            thresholdRate,
+            severity:
+              Math.abs(item.varianceRate) >= thresholdRate * 2 ? "high" : "warning",
+          },
+          userId: input.userId,
+        }),
+      );
+    }
+
+    const version = input.billVersionId
+      ? await this.dependencies.billVersionRepository?.findById(input.billVersionId)
+      : null;
+    if (version?.sourceVersionId) {
+      const comparison = await this.dependencies.summaryService.compareVersions({
+        projectId: input.projectId,
+        baseBillVersionId: version.sourceVersionId,
+        targetBillVersionId: version.id,
+        userId: input.userId,
+      });
+      for (const item of comparison.items) {
+        const varianceAmount = Math.abs(item.finalVarianceAmount);
+        const baseAmount = Math.abs(item.baseFinalAmount);
+        const varianceRate = baseAmount > 0 ? varianceAmount / baseAmount : 0;
+        if (
+          !(
+            (thresholdAmount > 0 && varianceAmount >= thresholdAmount) ||
+            (thresholdRate > 0 && varianceRate >= thresholdRate)
+          )
+        ) {
+          continue;
+        }
+        created.push(
+          await this.createRecommendation({
+            projectId: input.projectId,
+            stageCode: version.stageCode,
+            disciplineCode: version.disciplineCode,
+            resourceType: "bill_version",
+            resourceId: version.id,
+            recommendationType: "variance_warning",
+            inputPayload: {
+              baseBillVersionId: comparison.baseBillVersionId,
+              targetBillVersionId: comparison.targetBillVersionId,
+              thresholdAmount,
+              thresholdRate,
+              thresholdScope: thresholds.scope,
+              contextType: "upstream_version_compare",
+            },
+            outputPayload: {
+              warning: "当前版本与上游版本偏差超过阈值",
+              warningScope: "upstream_version",
+              itemCode: item.itemCode,
+              itemNameBase: item.itemNameBase,
+              itemNameTarget: item.itemNameTarget,
+              baseVersionName: comparison.baseVersionName,
+              targetVersionName: comparison.targetVersionName,
+              baseFinalAmount: item.baseFinalAmount,
+              targetFinalAmount: item.targetFinalAmount,
+              varianceAmount,
+              varianceRate,
+              thresholdAmount,
+              thresholdRate,
+              severity: varianceRate >= thresholdRate * 2 ? "high" : "warning",
+            },
+            userId: input.userId,
+          }),
+        );
+      }
+    }
+
     return created;
+  }
+
+  async buildRecommendationInputContext(input: RecommendationContext & {
+    recommendationType: AiRecommendationType;
+    resourceType?: string;
+    resourceId?: string;
+    billVersionId?: string;
+  }): Promise<Record<string, unknown>> {
+    await this.assertProjectAccess(input, "view");
+    const [project, stages, disciplines, memories] = await Promise.all([
+      this.dependencies.projectRepository.findById(input.projectId),
+      this.dependencies.projectStageRepository.listByProjectId(input.projectId),
+      this.dependencies.projectDisciplineRepository.listByProjectId(input.projectId),
+      this.dependencies.knowledgeService
+        ? this.dependencies.knowledgeService.listMemoryEntries({
+            projectId: input.projectId,
+            stageCode: input.stageCode,
+            subjectType: "ai_runtime",
+            limit: 5,
+            userId: input.userId,
+          })
+        : Promise.resolve([]),
+    ]);
+    const base = {
+      contextType: input.recommendationType,
+      project: project
+        ? {
+            id: project.id,
+            code: project.code,
+            name: project.name,
+            defaultPriceVersionId: project.defaultPriceVersionId ?? null,
+            defaultFeeTemplateId: project.defaultFeeTemplateId ?? null,
+          }
+        : null,
+      stageCode: input.stageCode ?? null,
+      disciplineCode: input.disciplineCode ?? null,
+      stages: stages.map(({ stageCode, stageName, status, sequenceNo }) => ({
+        stageCode,
+        stageName,
+        status,
+        sequenceNo,
+      })),
+      disciplines: disciplines.map(
+        ({ disciplineCode, disciplineName, defaultStandardSetCode, status }) => ({
+          disciplineCode,
+          disciplineName,
+          defaultStandardSetCode,
+          status,
+        }),
+      ),
+      memoryHints: memories.map((memory) => ({
+        memoryKey: memory.memoryKey,
+        content: memory.content,
+      })),
+    };
+
+    if (
+      input.recommendationType === "bill_recommendation" &&
+      input.resourceType === "bill_version" &&
+      input.resourceId
+    ) {
+      const sourceChain = await this.buildBillVersionSourceChain(input.resourceId);
+      const currentVersion = sourceChain[0] ?? null;
+      const currentItems = currentVersion
+        ? await this.dependencies.billItemRepository?.listByBillVersionId(
+            currentVersion.id,
+          )
+        : [];
+      const sourceItems = await Promise.all(
+        sourceChain.slice(1).map(async (version) => ({
+          billVersionId: version.id,
+          versionName: version.versionName,
+          items:
+            await this.dependencies.billItemRepository?.listByBillVersionId(
+              version.id,
+            ) ?? [],
+        })),
+      );
+      return {
+        ...base,
+        currentVersion,
+        currentItemCount: currentItems?.length ?? 0,
+        currentItems:
+          currentItems?.map(({ id, itemCode, itemName, quantity, unit, sortNo }) => ({
+            id,
+            itemCode,
+            itemName,
+            quantity,
+            unit,
+            sortNo,
+          })) ?? [],
+        sourceChain,
+        sourceItems,
+      };
+    }
+
+    if (
+      input.recommendationType === "quota_recommendation" &&
+      input.resourceType === "bill_item" &&
+      input.resourceId
+    ) {
+      const billItem = await this.dependencies.billItemRepository?.findById(
+        input.resourceId,
+      );
+      const billVersion = billItem
+        ? await this.dependencies.billVersionRepository?.findById(
+            billItem.billVersionId,
+          )
+        : null;
+      const existingQuotaLines = billItem
+        ? await this.dependencies.quotaLineRepository?.listByBillItemId(billItem.id)
+        : [];
+      const candidates =
+        billItem && this.dependencies.quotaLineService
+          ? await this.dependencies.quotaLineService.listQuotaSourceCandidates({
+              projectId: input.projectId,
+              userId: input.userId,
+              disciplineCode: billVersion?.disciplineCode,
+              keyword: billItem.itemName,
+            })
+          : [];
+      return {
+        ...base,
+        billVersion,
+        billItem,
+        existingQuotaLines: existingQuotaLines ?? [],
+        quotaCandidates: candidates.slice(0, 10),
+      };
+    }
+
+    if (input.recommendationType === "variance_warning") {
+      const thresholds = await this.resolveVarianceThresholds({
+        projectId: input.projectId,
+        stageCode: input.stageCode,
+      });
+      const billVersionId = input.billVersionId ?? input.resourceId;
+      const details = this.dependencies.summaryService
+        ? await this.dependencies.summaryService.getSummaryDetails({
+            projectId: input.projectId,
+            billVersionId,
+            stageCode: input.stageCode,
+            disciplineCode: input.disciplineCode,
+            limit: 10,
+            userId: input.userId,
+          })
+        : null;
+      return {
+        ...base,
+        thresholdAmount: thresholds.thresholdAmount,
+        thresholdRate: thresholds.thresholdRate,
+        thresholdScope: thresholds.scope,
+        summaryDetails: details,
+      };
+    }
+
+    return base;
+  }
+
+  async listVarianceWarningThresholds(input: RecommendationContext): Promise<
+    VarianceWarningThresholdRecord[]
+  > {
+    await this.assertProjectAccess(input, "view");
+    return (
+      await this.dependencies.varianceWarningThresholdRepository?.listByProjectId(
+        input.projectId,
+      )
+    ) ?? [];
+  }
+
+  async configureVarianceWarningThreshold(input: RecommendationContext & {
+    thresholdAmount: number;
+    thresholdRate: number;
+  }): Promise<VarianceWarningThresholdRecord> {
+    await this.assertProjectAccess(input, "edit");
+    if (!this.dependencies.varianceWarningThresholdRepository) {
+      throw new AppError(
+        500,
+        "VARIANCE_WARNING_THRESHOLD_REPOSITORY_MISSING",
+        "Variance warning threshold repository is not configured",
+      );
+    }
+
+    const configured =
+      await this.dependencies.varianceWarningThresholdRepository.upsert({
+        projectId: input.projectId,
+        stageCode: input.stageCode ?? null,
+        thresholdAmount: input.thresholdAmount,
+        thresholdRate: input.thresholdRate,
+      });
+
+    await this.expireStaleRecommendations({
+      projectId: input.projectId,
+      recommendationType: "variance_warning",
+      reason: "variance_threshold_changed",
+      userId: input.userId,
+    });
+
+    return configured;
+  }
+
+  async expireStaleRecommendations(input: RecommendationContext & {
+    recommendationType?: AiRecommendationType;
+    resourceType?: string;
+    resourceId?: string;
+    reason: string;
+  }): Promise<AiRecommendationRecord[]> {
+    await this.assertProjectAccess(input, "edit");
+    const existing = await this.recommendationRepository.listByProjectId(
+      input.projectId,
+    );
+    const stale = existing.filter((recommendation) => {
+      if (recommendation.status !== "generated") {
+        return false;
+      }
+      if (
+        input.recommendationType &&
+        recommendation.recommendationType !== input.recommendationType
+      ) {
+        return false;
+      }
+      if (input.resourceType && recommendation.resourceType !== input.resourceType) {
+        return false;
+      }
+      if (input.resourceId && recommendation.resourceId !== input.resourceId) {
+        return false;
+      }
+      if (input.stageCode && recommendation.stageCode !== input.stageCode) {
+        return false;
+      }
+      if (
+        input.disciplineCode &&
+        recommendation.disciplineCode !== input.disciplineCode
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    return this.expireRecommendations(stale, input.userId, input.reason);
+  }
+
+  async expireRecommendationsOutsideStage(input: RecommendationContext & {
+    activeStageCode: string;
+    reason: string;
+  }): Promise<AiRecommendationRecord[]> {
+    await this.assertProjectAccess(input, "edit");
+    const existing = await this.recommendationRepository.listByProjectId(
+      input.projectId,
+    );
+    const stale = existing.filter(
+      (recommendation) =>
+        recommendation.status === "generated" &&
+        recommendation.stageCode !== null &&
+        recommendation.stageCode !== input.activeStageCode,
+    );
+
+    return this.expireRecommendations(stale, input.userId, input.reason);
   }
 
   async listRecommendations(input: RecommendationContext & {
@@ -356,13 +763,28 @@ export class AiRecommendationService {
         recommendation.recommendationType === input.recommendationType,
     );
 
-    for (const recommendation of superseded) {
+    await this.expireRecommendations(
+      superseded,
+      input.userId,
+      "superseded_by_new_recommendation",
+      now,
+    );
+  }
+
+  private async expireRecommendations(
+    recommendations: AiRecommendationRecord[],
+    userId: string,
+    reason: string,
+    now = new Date().toISOString(),
+  ): Promise<AiRecommendationRecord[]> {
+    const expired: AiRecommendationRecord[] = [];
+    for (const recommendation of recommendations) {
       const updated = await this.recommendationRepository.update({
         ...recommendation,
         status: "expired",
-        handledBy: input.userId,
+        handledBy: userId,
         handledAt: now,
-        statusReason: "superseded_by_new_recommendation",
+        statusReason: reason,
         updatedAt: now,
       });
 
@@ -372,7 +794,7 @@ export class AiRecommendationService {
         resourceType: "ai_recommendation",
         resourceId: updated.id,
         action: "expired",
-        operatorId: input.userId,
+        operatorId: userId,
         beforePayload: {
           status: recommendation.status,
         },
@@ -382,8 +804,11 @@ export class AiRecommendationService {
         },
       });
 
-      await this.persistRecommendationFeedback(updated, input.userId);
+      await this.persistRecommendationFeedback(updated, userId);
+      expired.push(updated);
     }
+
+    return expired;
   }
 
   private async persistRecommendationFeedback(
@@ -425,6 +850,76 @@ export class AiRecommendationService {
         memoryEntryIds: persisted.memoryEntries.map((entry) => entry.id),
       },
     });
+  }
+
+  private async resolveVarianceThresholds(input: {
+    projectId: string;
+    stageCode?: string;
+    thresholdAmount?: number;
+    thresholdRate?: number;
+  }): Promise<{
+    thresholdAmount: number;
+    thresholdRate: number;
+    scope: "request" | "stage" | "project" | "default";
+  }> {
+    if (
+      input.thresholdAmount !== undefined ||
+      input.thresholdRate !== undefined
+    ) {
+      return {
+        thresholdAmount: input.thresholdAmount ?? 0,
+        thresholdRate: input.thresholdRate ?? 0.1,
+        scope: "request",
+      };
+    }
+
+    const thresholds =
+      await this.dependencies.varianceWarningThresholdRepository?.listByProjectId(
+        input.projectId,
+      );
+    const stageThreshold = thresholds?.find(
+      (threshold) => threshold.stageCode === input.stageCode,
+    );
+    if (stageThreshold) {
+      return {
+        thresholdAmount: stageThreshold.thresholdAmount,
+        thresholdRate: stageThreshold.thresholdRate,
+        scope: "stage",
+      };
+    }
+
+    const projectThreshold = thresholds?.find(
+      (threshold) => threshold.stageCode === null,
+    );
+    if (projectThreshold) {
+      return {
+        thresholdAmount: projectThreshold.thresholdAmount,
+        thresholdRate: projectThreshold.thresholdRate,
+        scope: "project",
+      };
+    }
+
+    return {
+      thresholdAmount: 0,
+      thresholdRate: 0.1,
+      scope: "default",
+    };
+  }
+
+  private async buildBillVersionSourceChain(billVersionId: string) {
+    const chain = [];
+    let current =
+      await this.dependencies.billVersionRepository?.findById(billVersionId);
+    while (current) {
+      chain.push(current);
+      if (!current.sourceVersionId) {
+        break;
+      }
+      current = await this.dependencies.billVersionRepository?.findById(
+        current.sourceVersionId,
+      );
+    }
+    return chain;
   }
 
   private async applyAcceptedRecommendation(
@@ -535,6 +1030,18 @@ function readString(payload: Record<string, unknown>, key: string): string | nul
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function isVarianceExceeded(
+  item: { varianceAmount: number; varianceRate: number },
+  thresholdAmount: number,
+  thresholdRate: number,
+) {
+  const amountExceeded =
+    thresholdAmount > 0 && Math.abs(item.varianceAmount) >= thresholdAmount;
+  const rateExceeded =
+    thresholdRate > 0 && Math.abs(item.varianceRate) >= thresholdRate;
+  return amountExceeded || rateExceeded;
+}
+
 function buildAiAssistTrace(input: {
   inputPayload: Record<string, unknown>;
   outputPayload: Record<string, unknown>;
@@ -577,8 +1084,38 @@ function summarizePayload(payload: Record<string, unknown>): {
   payloadKeys: string[];
   valueCount: number;
 } {
+  const generatedContextKeys = new Set([
+    "billItem",
+    "billVersion",
+    "contextType",
+    "currentItemCount",
+    "currentItems",
+    "currentVersion",
+    "disciplineCode",
+    "disciplines",
+    "existingQuotaLines",
+    "memoryHints",
+    "project",
+    "quotaCandidates",
+    "sourceChain",
+    "sourceItems",
+    "stageCode",
+    "stages",
+    "summaryDetails",
+    "thresholdAmount",
+    "thresholdRate",
+    "thresholdScope",
+  ]);
   const payloadKeys = Object.keys(payload)
-    .filter((key) => !["aiAssistTraceId", "aiProvider", "aiRequestSummary", "aiResponseSummary"].includes(key))
+    .filter(
+      (key) =>
+        ![
+          "aiAssistTraceId",
+          "aiProvider",
+          "aiRequestSummary",
+          "aiResponseSummary",
+        ].includes(key) && !generatedContextKeys.has(key),
+    )
     .sort();
   return {
     payloadKeys,

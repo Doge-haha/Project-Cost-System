@@ -643,6 +643,25 @@ export const aiRecommendations = pgTable(
   }),
 );
 
+export const varianceWarningThresholds = pgTable(
+  "variance_warning_threshold",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    stageCode: text("stage_code"),
+    thresholdAmount: doublePrecision("threshold_amount").notNull(),
+    thresholdRate: doublePrecision("threshold_rate").notNull(),
+    ...auditColumns,
+  },
+  (table) => ({
+    varianceWarningThresholdProjectIndex: index(
+      "variance_warning_threshold_project_idx",
+    ).on(table.projectId, table.stageCode),
+  }),
+);
+
 export const auditLogs = pgTable(
   "audit_log",
   {
@@ -697,5 +716,6 @@ export const schema = {
   skillDefinitions,
   knowledgeRelations,
   aiRecommendations,
+  varianceWarningThresholds,
   auditLogs,
 };

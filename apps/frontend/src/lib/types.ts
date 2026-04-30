@@ -332,6 +332,22 @@ export type AiRecommendationListResponse = {
   };
 };
 
+export type AiRecommendationInputContext = Record<string, unknown>;
+
+export type VarianceWarningThreshold = {
+  id: string;
+  projectId: string;
+  stageCode?: string | null;
+  thresholdAmount: number;
+  thresholdRate: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type VarianceWarningThresholdListResponse = {
+  items: VarianceWarningThreshold[];
+};
+
 export type BillItem = {
   id: string;
   parentId?: string | null;

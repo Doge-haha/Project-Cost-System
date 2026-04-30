@@ -2,6 +2,7 @@ import { getRuntimeConfig } from "./config";
 import type {
   AuditLogListResponse,
   AiRecommendation,
+  AiRecommendationInputContext,
   AiRecommendationListResponse,
   AiRecommendationStatus,
   AiRecommendationType,
@@ -32,6 +33,8 @@ import type {
   SummaryResponse,
   VarianceBreakdownGroupBy,
   VarianceBreakdownResponse,
+  VarianceWarningThreshold,
+  VarianceWarningThresholdListResponse,
   VersionCompareResponse,
 } from "./types";
 
@@ -455,6 +458,54 @@ export const apiClient = {
         stageCode: query?.stageCode,
         disciplineCode: query?.disciplineCode,
         limit: query?.limit,
+      },
+    );
+  },
+  getAiRecommendationContext(
+    projectId: string,
+    query: {
+      recommendationType: AiRecommendationType;
+      resourceType?: string;
+      resourceId?: string;
+      billVersionId?: string;
+      stageCode?: string;
+      disciplineCode?: string;
+    },
+  ) {
+    return request<AiRecommendationInputContext>(
+      `/v1/projects/${projectId}/ai/recommendation-context`,
+      query,
+    );
+  },
+  listVarianceWarningThresholds(
+    projectId: string,
+    query?: {
+      stageCode?: string;
+      disciplineCode?: string;
+    },
+  ) {
+    return request<VarianceWarningThresholdListResponse>(
+      `/v1/projects/${projectId}/ai/variance-warning-thresholds`,
+      {
+        stageCode: query?.stageCode,
+        disciplineCode: query?.disciplineCode,
+      },
+    );
+  },
+  upsertVarianceWarningThreshold(
+    projectId: string,
+    input: {
+      stageCode?: string | null;
+      thresholdAmount: number;
+      thresholdRate: number;
+    },
+  ) {
+    return request<VarianceWarningThreshold>(
+      `/v1/projects/${projectId}/ai/variance-warning-thresholds`,
+      undefined,
+      {
+        method: "PUT",
+        body: input,
       },
     );
   },

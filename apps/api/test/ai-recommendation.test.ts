@@ -378,12 +378,23 @@ test("POST /v1/ai/variance-warnings generates threshold-based warnings from summ
   });
 
   assert.equal(response.statusCode, 201);
-  assert.equal(response.json().items.length, 1);
-  assert.equal(response.json().summary.typeCounts.variance_warning, 1);
-  assert.equal(response.json().items[0].resourceType, "bill_item");
-  assert.equal(response.json().items[0].resourceId, "bill-item-001");
-  assert.equal(response.json().items[0].outputPayload.varianceAmount, 40);
-  assert.equal(response.json().items[0].outputPayload.thresholdRate, 0.2);
+  assert.equal(response.json().items.length, 3);
+  assert.equal(response.json().summary.typeCounts.variance_warning, 3);
+  const itemWarning = response
+    .json()
+    .items.find((item: any) => item.outputPayload.warningScope === "bill_item");
+  const disciplineWarning = response
+    .json()
+    .items.find((item: any) => item.outputPayload.warningScope === "discipline");
+  const unitWarning = response
+    .json()
+    .items.find((item: any) => item.outputPayload.warningScope === "unit");
+  assert.equal(itemWarning.resourceType, "bill_item");
+  assert.equal(itemWarning.resourceId, "bill-item-001");
+  assert.equal(itemWarning.outputPayload.varianceAmount, 40);
+  assert.equal(itemWarning.outputPayload.thresholdRate, 0.2);
+  assert.equal(disciplineWarning.resourceType, "discipline");
+  assert.equal(unitWarning.resourceType, "unit");
 
   const listResponse = await app.inject({
     method: "GET",
@@ -393,7 +404,154 @@ test("POST /v1/ai/variance-warnings generates threshold-based warnings from summ
     },
   });
   assert.equal(listResponse.statusCode, 200);
+  assert.equal(listResponse.json().items.length, 3);
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/ai/recommendation-context builds bill, quota, and variance inputs", async () => {
+  const app = createRecommendationApp({
+    billItems: [
+      {
+        ...billItems[0],
+        systemAmount: 100,
+        finalAmount: 140,
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const billContextResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/recommendation-context?recommendationType=bill_recommendation&resourceType=bill_version&resourceId=bill-version-001&stageCode=estimate&disciplineCode=building",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(billContextResponse.statusCode, 200);
+  assert.equal(billContextResponse.json().currentVersion.id, "bill-version-001");
+  assert.equal(billContextResponse.json().currentItems.length, 1);
+
+  const quotaContextResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/recommendation-context?recommendationType=quota_recommendation&resourceType=bill_item&resourceId=bill-item-001&stageCode=estimate&disciplineCode=building",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(quotaContextResponse.statusCode, 200);
+  assert.equal(quotaContextResponse.json().billItem.id, "bill-item-001");
+  assert.ok(Array.isArray(quotaContextResponse.json().quotaCandidates));
+
+  const varianceContextResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/recommendation-context?recommendationType=variance_warning&billVersionId=bill-version-001&stageCode=estimate&disciplineCode=building",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(varianceContextResponse.statusCode, 200);
+  assert.equal(varianceContextResponse.json().thresholdScope, "default");
+  assert.equal(varianceContextResponse.json().summaryDetails.items.length, 1);
+
+  await app.close();
+});
+
+test("variance warning thresholds can be configured per stage", async () => {
+  const app = createRecommendationApp({
+    billItems: [
+      {
+        ...billItems[0],
+        systemAmount: 100,
+        finalAmount: 112,
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const thresholdResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/ai/variance-warning-thresholds",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      stageCode: "estimate",
+      thresholdAmount: 10,
+      thresholdRate: 0.1,
+    },
+  });
+  assert.equal(thresholdResponse.statusCode, 200);
+  assert.equal(thresholdResponse.json().stageCode, "estimate");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/variance-warnings",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      billVersionId: "bill-version-001",
+    },
+  });
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items[0].inputPayload.thresholdScope, "stage");
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/variance-warning-thresholds",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(listResponse.statusCode, 200);
   assert.equal(listResponse.json().items.length, 1);
+
+  await app.close();
+});
+
+test("quota context changes automatically expire stale quota recommendations", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const recommendationResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      outputPayload: {
+        quotaName: "挖土方",
+      },
+    },
+  });
+  assert.equal(recommendationResponse.statusCode, 201);
+
+  const createQuotaLineResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/quota-lines",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      sourceStandardSetCode: "JS-2014",
+      sourceQuotaId: "quota-001",
+      sourceSequence: 1,
+      chapterCode: "01",
+      quotaCode: "010101",
+      quotaName: "挖土方",
+      unit: "m3",
+      quantity: 10,
+      laborFee: 1,
+      materialFee: 2,
+      machineFee: 3,
+      contentFactor: 1,
+      sourceMode: "manual",
+    },
+  });
+  assert.equal(createQuotaLineResponse.statusCode, 201);
+
+  const expiredResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/quota-recommendations?status=expired",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  assert.equal(expiredResponse.statusCode, 200);
+  assert.equal(expiredResponse.json().items.length, 1);
+  assert.equal(expiredResponse.json().items[0].statusReason, "quota_context_changed");
 
   await app.close();
 });

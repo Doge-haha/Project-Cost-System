@@ -46,6 +46,7 @@ export function registerProjectRoutes(
     transactionRunner: input.transactionRunner,
     projectService: input.projectService,
     auditLogService: input.auditLogService,
+    aiRecommendationService: input.aiRecommendationService,
   });
 
   registerKnowledgeRoutes(app, {

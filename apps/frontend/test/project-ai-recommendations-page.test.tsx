@@ -371,6 +371,233 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("处理人 system · 原因 上游清单版本已变化")).toBeInTheDocument();
   });
 
+  test("loads and saves variance warning thresholds", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(createRecommendationListResponse([]));
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        if (init?.method === "PUT") {
+          expect(JSON.parse(String(init.body))).toEqual({
+            stageCode: "estimate",
+            thresholdAmount: 8000,
+            thresholdRate: 0.12,
+          });
+          return createJsonResponse({
+            id: "threshold-002",
+            projectId: "project-001",
+            stageCode: "estimate",
+            thresholdAmount: 8000,
+            thresholdRate: 0.12,
+            createdAt: "2026-04-18T12:00:00.000Z",
+            updatedAt: "2026-04-18T12:00:00.000Z",
+          });
+        }
+
+        return createJsonResponse({
+          items: [
+            {
+              id: "threshold-001",
+              projectId: "project-001",
+              stageCode: null,
+              thresholdAmount: 5000,
+              thresholdRate: 0.08,
+              createdAt: "2026-04-18T11:00:00.000Z",
+              updatedAt: "2026-04-18T11:00:00.000Z",
+            },
+          ],
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("默认范围 · 金额 5000 · 比率 8%")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "阈值阶段" }), {
+      target: { value: "estimate" },
+    });
+    fireEvent.change(screen.getByLabelText("金额阈值"), {
+      target: { value: "8000" },
+    });
+    fireEvent.change(screen.getByLabelText("比率阈值"), {
+      target: { value: "12" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存阈值" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("阈值配置已保存。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("estimate · 金额 8000 · 比率 12%")).toBeInTheDocument();
+  });
+
+  test("opens recommendation input context preview", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "ai-recommendation-001",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "bill_item",
+              resourceId: "bill-item-001",
+              recommendationType: "bill_recommendation",
+              inputPayload: {},
+              outputPayload: {
+                itemName: "土方工程",
+                reason: "历史清单匹配",
+              },
+              status: "generated",
+              createdBy: "engineer-001",
+              handledBy: null,
+              handledAt: null,
+              statusReason: null,
+              createdAt: "2026-04-18T11:00:00.000Z",
+              updatedAt: "2026-04-18T11:00:00.000Z",
+            },
+          ],
+          summary: {
+            totalCount: 1,
+            statusCounts: {
+              generated: 1,
+              accepted: 0,
+              ignored: 0,
+              expired: 0,
+            },
+            typeCounts: {
+              bill_recommendation: 1,
+              quota_recommendation: 0,
+              variance_warning: 0,
+            },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendation-context") {
+        expect(url.searchParams.get("recommendationType")).toBe("bill_recommendation");
+        expect(url.searchParams.get("resourceType")).toBe("bill_item");
+        expect(url.searchParams.get("resourceId")).toBe("bill-item-001");
+        expect(url.searchParams.get("stageCode")).toBe("estimate");
+        expect(url.searchParams.get("disciplineCode")).toBe("building");
+        return createJsonResponse({
+          project: { id: "project-001", name: "新点造价项目" },
+          currentStage: "estimate",
+          targetResource: { id: "bill-item-001", name: "土方工程" },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("清单推荐 · 待处理")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "预览上下文" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: "AI 输入上下文预览" })).toBeInTheDocument();
+    });
+    expect(screen.getByText(/"currentStage": "estimate"/)).toBeInTheDocument();
+    expect(screen.getByText(/"name": "土方工程"/)).toBeInTheDocument();
+  });
+
+  test("shows enriched expired recommendation reason", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "ai-recommendation-002",
+              projectId: "project-001",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              resourceType: "bill_item",
+              resourceId: "bill-item-002",
+              recommendationType: "variance_warning",
+              inputPayload: {
+                staleReason: {
+                  kind: "price_version_changed",
+                  previousVersionId: "price-v1",
+                  currentVersionId: "price-v2",
+                },
+              },
+              outputPayload: {
+                warning: "最终金额偏差超过阈值",
+              },
+              status: "expired",
+              createdBy: "engineer-001",
+              handledBy: "system",
+              handledAt: "2026-04-18T11:30:00.000Z",
+              statusReason: "价目版本变化，偏差预警已失效",
+              createdAt: "2026-04-18T11:10:00.000Z",
+              updatedAt: "2026-04-18T11:30:00.000Z",
+            },
+          ],
+          summary: {
+            totalCount: 1,
+            statusCounts: {
+              generated: 0,
+              accepted: 0,
+              ignored: 0,
+              expired: 1,
+            },
+            typeCounts: {
+              bill_recommendation: 0,
+              quota_recommendation: 0,
+              variance_warning: 1,
+            },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("偏差预警 · 已失效")).toBeInTheDocument();
+    });
+    expect(screen.getByText("失效原因 价目版本变化，偏差预警已失效")).toBeInTheDocument();
+    expect(screen.getByText("版本 price-v1 → price-v2")).toBeInTheDocument();
+  });
+
   test("hides generated recommendation actions for read-only users", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -560,6 +787,26 @@ function createWorkspace(
         scopeSummary: ["项目全部范围"],
         visibleStageCodes: [],
         visibleDisciplineCodes: [],
+      },
+    },
+  };
+}
+
+function createRecommendationListResponse(items: unknown[]) {
+  return {
+    items,
+    summary: {
+      totalCount: items.length,
+      statusCounts: {
+        generated: 0,
+        accepted: 0,
+        ignored: 0,
+        expired: 0,
+      },
+      typeCounts: {
+        bill_recommendation: 0,
+        quota_recommendation: 0,
+        variance_warning: 0,
       },
     },
   };

@@ -128,6 +128,9 @@ test("database migrations create pricing, fee, and audit tables", async () => {
     await runtime.pool.query(
       "insert into ai_recommendation (id, project_id, stage_code, discipline_code, resource_type, resource_id, recommendation_type, input_payload, output_payload, status, created_by, handled_by, handled_at, status_reason, created_at, updated_at) values ('ai-recommendation-001', 'project-001', 'estimate', 'building', 'bill_item', 'bill-item-001', 'quota_recommendation', '{\"itemName\":\"土方工程\"}', '{\"quotaCode\":\"010101\"}', 'generated', 'user-001', null, null, null, '2026-04-19T10:00:00.000Z', '2026-04-19T10:00:00.000Z')",
     );
+    await runtime.pool.query(
+      "insert into variance_warning_threshold (id, project_id, stage_code, threshold_amount, threshold_rate) values ('variance-threshold-001', 'project-001', 'estimate', 1000, 0.12)",
+    );
 
     const priceItems = await runtime.pool.query(
       "select id, price_version_id, total_unit_price from price_item",
@@ -161,6 +164,9 @@ test("database migrations create pricing, fee, and audit tables", async () => {
     );
     const aiRecommendations = await runtime.pool.query(
       "select id, recommendation_type, status from ai_recommendation",
+    );
+    const varianceThresholds = await runtime.pool.query(
+      "select id, stage_code, threshold_amount, threshold_rate from variance_warning_threshold",
     );
 
     assert.deepEqual(priceItems.rows, [
@@ -240,6 +246,14 @@ test("database migrations create pricing, fee, and audit tables", async () => {
         id: "ai-recommendation-001",
         recommendationType: "quota_recommendation",
         status: "generated",
+      },
+    ]);
+    assert.deepEqual(varianceThresholds.rows, [
+      {
+        id: "variance-threshold-001",
+        stageCode: "estimate",
+        thresholdAmount: 1000,
+        thresholdRate: 0.12,
       },
     ]);
   } finally {

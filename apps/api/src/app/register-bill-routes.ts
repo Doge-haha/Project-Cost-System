@@ -8,6 +8,7 @@ import type { CalculateService } from "../modules/engine/calculate-service.js";
 import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import type { QuotaLineService } from "../modules/quota/quota-line-service.js";
 import type { ReviewSubmissionService } from "../modules/review/review-submission-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import { registerBillItemRoutes } from "./register-bill-item-routes.js";
 import { registerBillVersionRoutes } from "./register-bill-version-routes.js";
 import { registerBillWorkItemRoutes } from "./register-bill-work-item-routes.js";
@@ -26,6 +27,7 @@ export function registerBillRoutes(
     reviewSubmissionService: ReviewSubmissionService;
     backgroundJobService: BackgroundJobService;
     calculateService: CalculateService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
   registerReviewRoutes(app, {
@@ -57,5 +59,6 @@ export function registerBillRoutes(
   registerQuotaRoutes(app, {
     transactionRunner: input.transactionRunner,
     quotaLineService: input.quotaLineService,
+    aiRecommendationService: input.aiRecommendationService,
   });
 }

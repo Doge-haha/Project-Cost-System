@@ -14,6 +14,7 @@ import type { ReportExportTaskService } from "../modules/reports/report-export-t
 import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import type { BackgroundJobProcessor } from "../modules/jobs/background-job-processor.js";
 import type { FeeTemplateService } from "../modules/fee/fee-template-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import { registerBillRoutes } from "./register-bill-routes.js";
 import { registerOpsRoutes } from "./register-ops-routes.js";
 
@@ -34,6 +35,7 @@ export function registerBusinessRoutes(
     backgroundJobService: BackgroundJobService;
     backgroundJobProcessor: BackgroundJobProcessor;
     feeTemplateService: FeeTemplateService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
   registerBillRoutes(app, {
@@ -45,6 +47,7 @@ export function registerBusinessRoutes(
     reviewSubmissionService: input.reviewSubmissionService,
     backgroundJobService: input.backgroundJobService,
     calculateService: input.calculateService,
+    aiRecommendationService: input.aiRecommendationService,
   });
 
   registerOpsRoutes(app, {
@@ -57,5 +60,6 @@ export function registerBusinessRoutes(
     backgroundJobService: input.backgroundJobService,
     backgroundJobProcessor: input.backgroundJobProcessor,
     feeTemplateService: input.feeTemplateService,
+    aiRecommendationService: input.aiRecommendationService,
   });
 }

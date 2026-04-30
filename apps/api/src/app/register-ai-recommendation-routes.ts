@@ -43,6 +43,31 @@ const transitionSchema = z.object({
   reason: z.string().min(1).optional(),
 });
 
+const recommendationContextQuerySchema = z.object({
+  recommendationType: recommendationTypeSchema,
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  billVersionId: z.string().min(1).optional(),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+});
+
+const expireStaleSchema = z.object({
+  projectId: z.string().min(1),
+  recommendationType: recommendationTypeSchema.optional(),
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+  reason: z.string().min(1),
+});
+
+const varianceWarningThresholdSchema = z.object({
+  stageCode: z.string().min(1).nullable().optional(),
+  thresholdAmount: z.number().nonnegative(),
+  thresholdRate: z.number().nonnegative(),
+});
+
 export function registerAiRecommendationRoutes(
   app: FastifyInstance,
   input: {
@@ -138,6 +163,58 @@ export function registerAiRecommendationRoutes(
     });
   });
 
+  app.get("/v1/projects/:projectId/ai/recommendation-context", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const query = recommendationContextQuerySchema.parse(request.query);
+
+    return transactionRunner.runInTransaction(() =>
+      aiRecommendationService.buildRecommendationInputContext({
+        projectId,
+        recommendationType: query.recommendationType,
+        resourceType: query.resourceType,
+        resourceId: query.resourceId,
+        billVersionId: query.billVersionId,
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode,
+        userId: request.currentUser!.id,
+      }),
+    );
+  });
+
+  app.get("/v1/projects/:projectId/ai/variance-warning-thresholds", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const query = z
+      .object({
+        stageCode: z.string().min(1).optional(),
+        disciplineCode: z.string().min(1).optional(),
+      })
+      .parse(request.query);
+
+    return transactionRunner.runInTransaction(async () => ({
+      items: await aiRecommendationService.listVarianceWarningThresholds({
+        projectId,
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode,
+        userId: request.currentUser!.id,
+      }),
+    }));
+  });
+
+  app.put("/v1/projects/:projectId/ai/variance-warning-thresholds", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const payload = varianceWarningThresholdSchema.parse(request.body);
+
+    return transactionRunner.runInTransaction(() =>
+      aiRecommendationService.configureVarianceWarningThreshold({
+        projectId,
+        stageCode: payload.stageCode ?? undefined,
+        thresholdAmount: payload.thresholdAmount,
+        thresholdRate: payload.thresholdRate,
+        userId: request.currentUser!.id,
+      }),
+    );
+  });
+
   app.get("/v1/projects/:projectId/ai/bill-recommendations", async (request) =>
     listByType(request, transactionRunner, aiRecommendationService, "bill_recommendation"),
   );
@@ -195,6 +272,27 @@ export function registerAiRecommendationRoutes(
         userId: request.currentUser!.id,
       }),
     );
+  });
+
+  app.post("/v1/ai/recommendations/expire-stale", async (request) => {
+    const payload = expireStaleSchema.parse(request.body);
+
+    return transactionRunner.runInTransaction(async () => {
+      const items = await aiRecommendationService.expireStaleRecommendations({
+        projectId: payload.projectId,
+        recommendationType: payload.recommendationType,
+        resourceType: payload.resourceType,
+        resourceId: payload.resourceId,
+        stageCode: payload.stageCode,
+        disciplineCode: payload.disciplineCode,
+        reason: payload.reason,
+        userId: request.currentUser!.id,
+      });
+      return {
+        items,
+        summary: aiRecommendationService.summarizeRecommendations(items),
+      };
+    });
   });
 }
 

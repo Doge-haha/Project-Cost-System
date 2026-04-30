@@ -6,6 +6,7 @@ import { AppError } from "../shared/errors/app-error.js";
 import { normalizePagination, type PaginationEnvelope } from "../shared/http/pagination.js";
 import type { TransactionRunner } from "../shared/tx/transaction.js";
 import type { AuditLogService } from "../modules/audit/audit-log-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import type { ProjectService } from "../modules/project/project-service.js";
 
 const updateProjectPricingDefaultsSchema = z.object({
@@ -71,9 +72,15 @@ export function registerProjectCoreRoutes(
     transactionRunner: TransactionRunner;
     projectService: ProjectService;
     auditLogService: AuditLogService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
-  const { transactionRunner, projectService, auditLogService } = input;
+  const {
+    transactionRunner,
+    projectService,
+    auditLogService,
+    aiRecommendationService,
+  } = input;
 
   app.get("/v1/projects", async (request) => {
     const pagination = normalizePagination(request.query);
@@ -157,14 +164,24 @@ export function registerProjectCoreRoutes(
     const { projectId } = request.params as { projectId: string };
     const payload = updateProjectStagesSchema.parse(request.body);
 
-    return transactionRunner.runInTransaction(async () => ({
-      items: await projectService.updateProjectStages({
+    return transactionRunner.runInTransaction(async () => {
+      const items = await projectService.updateProjectStages({
         projectId,
         userId: request.currentUser!.id,
         roleCodes: request.currentUser!.roleCodes,
         stages: payload.stages,
-      }),
-    }));
+      });
+      const activeStage = payload.stages.find((stage) => stage.status === "active");
+      if (activeStage) {
+        await aiRecommendationService.expireRecommendationsOutsideStage({
+          projectId,
+          activeStageCode: activeStage.stageCode,
+          reason: "stage_context_changed",
+          userId: request.currentUser!.id,
+        });
+      }
+      return { items };
+    });
   });
 
   app.get("/v1/projects/:projectId/disciplines", async (request) => {
@@ -240,29 +257,45 @@ export function registerProjectCoreRoutes(
     const { projectId } = request.params as { projectId: string };
     const payload = updateProjectPricingDefaultsSchema.parse(request.body);
 
-    return transactionRunner.runInTransaction(async () =>
-      projectService.updateProjectPricingDefaults({
+    return transactionRunner.runInTransaction(async () => {
+      const updated = await projectService.updateProjectPricingDefaults({
         projectId,
         userId: request.currentUser!.id,
         roleCodes: request.currentUser!.roleCodes,
         defaultPriceVersionId: payload.defaultPriceVersionId,
         defaultFeeTemplateId: payload.defaultFeeTemplateId,
-      }),
-    );
+      });
+      if ("defaultPriceVersionId" in payload) {
+        await aiRecommendationService.expireStaleRecommendations({
+          projectId,
+          recommendationType: "variance_warning",
+          reason: "price_version_changed",
+          userId: request.currentUser!.id,
+        });
+      }
+      return updated;
+    });
   });
 
   app.put("/v1/projects/:projectId/default-price-version", async (request) => {
     const { projectId } = request.params as { projectId: string };
     const payload = updateProjectDefaultPriceVersionSchema.parse(request.body);
 
-    return transactionRunner.runInTransaction(async () =>
-      projectService.updateProjectPricingDefaults({
+    return transactionRunner.runInTransaction(async () => {
+      const updated = await projectService.updateProjectPricingDefaults({
         projectId,
         userId: request.currentUser!.id,
         roleCodes: request.currentUser!.roleCodes,
         defaultPriceVersionId: payload.defaultPriceVersionId,
-      }),
-    );
+      });
+      await aiRecommendationService.expireStaleRecommendations({
+        projectId,
+        recommendationType: "variance_warning",
+        reason: "price_version_changed",
+        userId: request.currentUser!.id,
+      });
+      return updated;
+    });
   });
 
   app.put("/v1/projects/:projectId/default-fee-template", async (request) => {

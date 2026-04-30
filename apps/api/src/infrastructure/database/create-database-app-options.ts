@@ -23,6 +23,7 @@ import { DbKnowledgeEntryRepository } from "../../modules/knowledge/knowledge-en
 import { DbMemoryEntryRepository } from "../../modules/knowledge/memory-entry-repository.js";
 import { DbImportTaskRepository } from "../../modules/import/import-task-repository.js";
 import { DbAiRecommendationRepository } from "../../modules/ai/ai-recommendation-repository.js";
+import { DbVarianceWarningThresholdRepository } from "../../modules/ai/variance-warning-threshold-repository.js";
 import { createTransactionRunner } from "../../shared/tx/transaction.js";
 import { createDatabaseClient } from "./database-client.js";
 import { parseDatabaseConfig } from "./database-config.js";
@@ -80,6 +81,8 @@ export function createDatabaseAppOptions(
       knowledgeEntryRepository: new DbKnowledgeEntryRepository(client.db),
       memoryEntryRepository: new DbMemoryEntryRepository(client.db),
       aiRecommendationRepository: new DbAiRecommendationRepository(client.db),
+      varianceWarningThresholdRepository:
+        new DbVarianceWarningThresholdRepository(client.db),
       auditLogRepository: new DbAuditLogRepository(client.db),
     },
     close: async () => {

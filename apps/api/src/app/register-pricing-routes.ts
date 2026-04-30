@@ -17,6 +17,7 @@ import {
   listPriceVersionSchema,
   type PriceVersionService,
 } from "../modules/pricing/price-version-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 
 export function registerPricingRoutes(
   app: FastifyInstance,
@@ -26,6 +27,7 @@ export function registerPricingRoutes(
     priceItemService: PriceItemService;
     calculateService: CalculateService;
     feeTemplateService: FeeTemplateService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
   const {

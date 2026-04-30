@@ -8,6 +8,7 @@ test("worker exposes executable background job types", () => {
     "report_export",
     "project_recalculate",
     "knowledge_extraction",
+    "ai_recommendation",
   ]);
 });
 

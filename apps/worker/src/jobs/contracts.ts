@@ -3,6 +3,7 @@ export type {
   BackgroundJobRecord as WorkerJob,
   BackgroundJobStatus as WorkerJobStatus,
   BackgroundJobType as WorkerJobType,
+  AiRecommendationJobPayload,
   KnowledgeExtractionJobPayload,
   ProjectRecalculateJobPayload,
   ReportExportJobPayload,

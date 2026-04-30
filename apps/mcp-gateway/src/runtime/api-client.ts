@@ -19,7 +19,11 @@ export type SummaryDetailsQuery = ProjectSummaryQuery & {
 export type JobsSummaryQuery = {
   projectId?: string;
   requestedBy?: string;
-  jobType?: "report_export" | "project_recalculate" | "knowledge_extraction";
+  jobType?:
+    | "report_export"
+    | "project_recalculate"
+    | "knowledge_extraction"
+    | "ai_recommendation";
   status?: "queued" | "processing" | "completed" | "failed";
   limit?: number;
 };
@@ -1041,6 +1045,10 @@ export class GatewayApiClient {
     input: GenerateAiRecommendationsInput,
     bearerToken: string,
   ): Promise<Record<string, unknown>> {
+    if (!input.outputPayload || Object.keys(input.outputPayload).length === 0) {
+      return this.enqueueAiRecommendationJob(input, bearerToken);
+    }
+
     const endpoint =
       input.recommendationType === "variance_warning"
         ? "/v1/ai/variance-warnings"
@@ -1087,6 +1095,44 @@ export class GatewayApiClient {
           "UPSTREAM_REQUEST_FAILED",
         (payload as { error?: { message?: string } }).error?.message ??
           "Failed to generate AI recommendations",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  private async enqueueAiRecommendationJob(
+    input: GenerateAiRecommendationsInput,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/ai/recommendation-jobs`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(input),
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to enqueue AI recommendation job",
       );
     }
 

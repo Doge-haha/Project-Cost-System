@@ -164,6 +164,13 @@ export function registerJobRoutes(
             knowledge_extraction: items.filter(
               (item) => item.jobType === "knowledge_extraction",
             ).length,
+            ...(items.some((item) => item.jobType === "ai_recommendation")
+              ? {
+                  ai_recommendation: items.filter(
+                    (item) => item.jobType === "ai_recommendation",
+                  ).length,
+                }
+              : {}),
           },
         },
       };

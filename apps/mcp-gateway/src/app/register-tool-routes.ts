@@ -352,10 +352,17 @@ export function registerToolRoutes(
       payload,
       request.bearerToken!,
     );
+    const asyncJobId =
+      typeof result.job === "object" &&
+      result.job !== null &&
+      "id" in result.job &&
+      typeof result.job.id === "string"
+        ? result.job.id
+        : null;
 
     return toolEnvelope({
       tool: "generate_ai_recommendations",
-      mode: "synchronous",
+      mode: asyncJobId ? "accepted" : "synchronous",
       target: {
         projectId: payload.projectId,
         recommendationType: payload.recommendationType,
@@ -365,6 +372,19 @@ export function registerToolRoutes(
         disciplineCode: payload.disciplineCode ?? null,
       },
       result,
+      execution:
+        asyncJobId != null
+          ? {
+              kind: "async_job",
+              jobId: asyncJobId,
+              statusResource: {
+                resourceType: "job_status",
+                query: {
+                  jobId: asyncJobId,
+                },
+              },
+            }
+          : undefined,
       related: {
         recommendationsResource: {
           resourceType: "ai_recommendations",

@@ -62,6 +62,28 @@ export class AiRuntimePreviewService {
     source: string;
     events: Array<Record<string, unknown>>;
   }): Promise<Record<string, unknown>> {
+    return this.processPayload(input);
+  }
+
+  async processLlmChat(input: {
+    source?: string;
+    provider?: string;
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+    messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+    temperature?: number;
+    maxTokens?: number;
+    timeoutSeconds?: number;
+  }): Promise<Record<string, unknown>> {
+    return this.processPayload({
+      task: "llm_chat",
+      source: input.source ?? "llm_provider",
+      ...input,
+    });
+  }
+
+  private async processPayload(input: Record<string, unknown>): Promise<Record<string, unknown>> {
     const { stdout, stderr } = await this.commandRunner(
       this.options.pythonExecutable,
       [this.options.cliPath],

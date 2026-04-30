@@ -24,6 +24,7 @@ import type {
   VarianceWarningThresholdRecord,
   VarianceWarningThresholdRepository,
 } from "./variance-warning-threshold-repository.js";
+import type { AiRuntimePreviewService } from "./ai-runtime-preview-service.js";
 
 type RecommendationContext = {
   projectId: string;
@@ -48,6 +49,7 @@ export class AiRecommendationService {
       summaryService?: SummaryService;
       knowledgeService?: KnowledgeService;
       varianceWarningThresholdRepository?: VarianceWarningThresholdRepository;
+      aiRuntimePreviewService?: AiRuntimePreviewService;
     },
     private readonly auditLogService: AuditLogService,
   ) {}
@@ -123,6 +125,144 @@ export class AiRecommendationService {
     });
 
     return created;
+  }
+
+  async generateProviderRecommendations(input: RecommendationContext & {
+    recommendationType: AiRecommendationType;
+    resourceType?: string;
+    resourceId?: string;
+    billVersionId?: string;
+    thresholdAmount?: number;
+    thresholdRate?: number;
+    limit?: number;
+    provider?: string;
+    model?: string;
+    inputPayload?: Record<string, unknown>;
+    outputPayload?: Record<string, unknown>;
+  }): Promise<{
+    recommendations: AiRecommendationRecord[];
+    provider: Record<string, unknown> | null;
+    createdCount: number;
+  }> {
+    if (input.recommendationType === "variance_warning") {
+      const recommendations = await this.generateVarianceWarnings({
+        projectId: input.projectId,
+        stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
+        billVersionId: input.billVersionId,
+        thresholdAmount: input.thresholdAmount,
+        thresholdRate: input.thresholdRate,
+        limit: input.limit,
+        userId: input.userId,
+      });
+      return {
+        recommendations,
+        provider: { provider: "rules_engine", model: "variance_thresholds" },
+        createdCount: recommendations.length,
+      };
+    }
+
+    if (input.outputPayload && Object.keys(input.outputPayload).length > 0) {
+      const created = await this.createRecommendation({
+        projectId: input.projectId,
+        stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
+        resourceType: readRequiredJobString(input.resourceType, "resourceType"),
+        resourceId: readRequiredJobString(input.resourceId, "resourceId"),
+        recommendationType: input.recommendationType,
+        inputPayload: input.inputPayload,
+        outputPayload: input.outputPayload,
+        userId: input.userId,
+      });
+      return {
+        recommendations: [created],
+        provider: readAiProvider(created.inputPayload),
+        createdCount: 1,
+      };
+    }
+
+    if (!this.dependencies.aiRuntimePreviewService) {
+      throw new AppError(
+        500,
+        "AI_PROVIDER_NOT_CONFIGURED",
+        "AI provider runtime is not configured",
+      );
+    }
+
+    const context = await this.buildRecommendationInputContext({
+      projectId: input.projectId,
+      stageCode: input.stageCode,
+      disciplineCode: input.disciplineCode,
+      recommendationType: input.recommendationType,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+      billVersionId: input.billVersionId,
+      userId: input.userId,
+    });
+    const llmResult = await this.dependencies.aiRuntimePreviewService.processLlmChat({
+      provider: input.provider,
+      model: input.model,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You generate SaaS pricing AI recommendations. Return strict JSON with a recommendations array; each item must contain outputPayload.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            recommendationType: input.recommendationType,
+            resourceType: input.resourceType,
+            resourceId: input.resourceId,
+            context,
+            inputPayload: input.inputPayload ?? {},
+          }),
+        },
+      ],
+      temperature: 0.2,
+      maxTokens: 1200,
+    });
+    const providerResult = readObject(llmResult, "result");
+    const provider = readObject(providerResult, "provider");
+    const content = readRequiredStringFromObject(providerResult, "content");
+    const recommendations = parseProviderRecommendations(content);
+    const created: AiRecommendationRecord[] = [];
+    for (const recommendation of recommendations.slice(0, input.limit ?? 10)) {
+      created.push(
+        await this.createRecommendation({
+          projectId: input.projectId,
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          resourceType:
+            recommendation.resourceType ??
+            readRequiredJobString(input.resourceType, "resourceType"),
+          resourceId:
+            recommendation.resourceId ??
+            readRequiredJobString(input.resourceId, "resourceId"),
+          recommendationType: input.recommendationType,
+          inputPayload: {
+            ...(input.inputPayload ?? {}),
+            aiProvider: {
+              provider:
+                readString(provider ?? {}, "provider") ??
+                input.provider ??
+                "openai_compatible",
+              model:
+                readString(provider ?? {}, "model") ?? input.model ?? "unknown",
+            },
+            providerGenerated: true,
+          },
+          outputPayload: recommendation.outputPayload,
+          userId: input.userId,
+        }),
+      );
+    }
+
+    return {
+      recommendations: created,
+      provider: provider ?? null,
+      createdCount: created.length,
+    };
   }
 
   async generateVarianceWarnings(input: RecommendationContext & {
@@ -1079,6 +1219,91 @@ export class AiRecommendationService {
 function readString(payload: Record<string, unknown>, key: string): string | null {
   const value = payload[key];
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function readRequiredJobString(value: string | undefined, key: string): string {
+  if (value && value.length > 0) {
+    return value;
+  }
+  throw new AppError(
+    422,
+    "AI_RECOMMENDATION_JOB_PAYLOAD_INCOMPLETE",
+    `AI recommendation job requires ${key}`,
+  );
+}
+
+function readObject(
+  payload: Record<string, unknown> | null,
+  key: string,
+): Record<string, unknown> | null {
+  const value = payload?.[key];
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readRequiredStringFromObject(
+  payload: Record<string, unknown> | null,
+  key: string,
+): string {
+  const value = payload?.[key];
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value;
+  }
+  throw new AppError(
+    502,
+    "AI_PROVIDER_RESPONSE_INVALID",
+    `AI provider response requires ${key}`,
+  );
+}
+
+function parseProviderRecommendations(content: string): Array<{
+  resourceType?: string;
+  resourceId?: string;
+  outputPayload: Record<string, unknown>;
+}> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new AppError(
+      502,
+      "AI_PROVIDER_RESPONSE_INVALID",
+      "AI provider response must be valid JSON",
+    );
+  }
+
+  const root =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  const items = Array.isArray(root.recommendations)
+    ? root.recommendations
+    : Array.isArray(parsed)
+      ? parsed
+      : [];
+  const recommendations = items
+    .filter((item): item is Record<string, unknown> =>
+      item !== null && typeof item === "object" && !Array.isArray(item),
+    )
+    .map((item) => {
+      const outputPayload = readObject(item, "outputPayload");
+      return {
+        resourceType: readString(item, "resourceType") ?? undefined,
+        resourceId: readString(item, "resourceId") ?? undefined,
+        outputPayload: outputPayload ?? item,
+      };
+    });
+
+  if (recommendations.length === 0) {
+    throw new AppError(
+      502,
+      "AI_PROVIDER_RESPONSE_INVALID",
+      "AI provider response must contain at least one recommendation",
+    );
+  }
+
+  return recommendations;
 }
 
 function isVarianceExceeded(

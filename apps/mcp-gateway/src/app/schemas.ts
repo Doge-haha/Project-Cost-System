@@ -15,7 +15,12 @@ export const jobsSummaryQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
   requestedBy: z.string().min(1).optional(),
   jobType: z
-    .enum(["report_export", "project_recalculate", "knowledge_extraction"])
+    .enum([
+      "report_export",
+      "project_recalculate",
+      "knowledge_extraction",
+      "ai_recommendation",
+    ])
     .optional(),
   status: z.enum(["queued", "processing", "completed", "failed"]).optional(),
   limit: z.coerce.number().int().positive().max(100).optional(),

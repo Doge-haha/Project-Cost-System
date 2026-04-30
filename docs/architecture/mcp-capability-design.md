@@ -579,6 +579,11 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - `decide-review`
 - `update-process-document-status`
 
+`generate-ai-recommendations` 在传入 `outputPayload` 时保持同步生成；未传
+`outputPayload` 时转为 `ai_recommendation` 异步 job，MCP 返回 job status
+resource，后端 job processor 调用 AI Runtime 的 OpenAI-compatible LLM provider
+生成结构化推荐，再复用推荐服务写入审计和推荐记录。
+
 当前验证：
 
 - `npm --workspace @saas-pricing/mcp-gateway test`

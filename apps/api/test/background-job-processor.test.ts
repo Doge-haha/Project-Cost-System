@@ -75,6 +75,9 @@ test("BackgroundJobProcessor completes queued project recalculate jobs", async (
     processKnowledgeExtraction: async () => {
       throw new Error("unexpected knowledge extraction execution");
     },
+    processAiRecommendation: async () => {
+      throw new Error("unexpected ai recommendation execution");
+    },
   });
 
   const completed = await processor.processJob("job-001");
@@ -120,6 +123,9 @@ test("BackgroundJobProcessor marks failed jobs when processing throws", async ()
     processKnowledgeExtraction: async () => ({
       knowledgeCount: 0,
     }),
+    processAiRecommendation: async () => ({
+      createdCount: 0,
+    }),
   });
 
   const failed = await processor.processJob("job-002");
@@ -163,6 +169,9 @@ test("BackgroundJobProcessor completes queued knowledge extraction jobs", async 
       source: payload.source,
       requestedBy,
       knowledgeCount: payload.events.length,
+    }),
+    processAiRecommendation: async () => ({
+      createdCount: 0,
     }),
   });
 
@@ -212,6 +221,9 @@ test("BackgroundJobProcessor prefers retryEvents over original events for knowle
     processKnowledgeExtraction: async ({ payload }) => ({
       knowledgeCount: payload.events.length,
       firstResourceType: payload.events[0]?.resourceType ?? null,
+    }),
+    processAiRecommendation: async () => ({
+      createdCount: 0,
     }),
   });
 

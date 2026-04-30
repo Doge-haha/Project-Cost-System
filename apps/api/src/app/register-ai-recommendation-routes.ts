@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
+import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import type { AiRecommendationType } from "../modules/ai/ai-recommendation-repository.js";
 import type { TransactionRunner } from "../shared/tx/transaction.js";
 
@@ -39,6 +40,14 @@ const generateVarianceWarningsSchema = z.object({
   outputPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
+const generateRecommendationJobSchema = generateVarianceWarningsSchema.extend({
+  recommendationType: recommendationTypeSchema,
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  provider: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+});
+
 const transitionSchema = z.object({
   reason: z.string().min(1).optional(),
 });
@@ -74,9 +83,10 @@ export function registerAiRecommendationRoutes(
   input: {
     transactionRunner: TransactionRunner;
     aiRecommendationService: AiRecommendationService;
+    backgroundJobService: BackgroundJobService;
   },
 ) {
-  const { transactionRunner, aiRecommendationService } = input;
+  const { transactionRunner, aiRecommendationService, backgroundJobService } = input;
 
   app.post("/v1/ai/bill-recommendations", async (request, reply) =>
     createRecommendation({
@@ -128,6 +138,37 @@ export function registerAiRecommendationRoutes(
       items,
       summary: aiRecommendationService.summarizeRecommendations(items),
     };
+  });
+
+  app.post("/v1/ai/recommendation-jobs", async (request, reply) => {
+    const payload = generateRecommendationJobSchema.parse(request.body);
+    const job = await transactionRunner.runInTransaction(() =>
+      backgroundJobService.enqueueJob({
+        jobType: "ai_recommendation",
+        requestedBy: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
+        projectId: payload.projectId,
+        payload: {
+          projectId: payload.projectId,
+          recommendationType: payload.recommendationType,
+          resourceType: payload.resourceType ?? null,
+          resourceId: payload.resourceId ?? null,
+          billVersionId: payload.billVersionId ?? null,
+          stageCode: payload.stageCode ?? null,
+          disciplineCode: payload.disciplineCode ?? null,
+          thresholdAmount: payload.thresholdAmount ?? null,
+          thresholdRate: payload.thresholdRate ?? null,
+          limit: payload.limit ?? null,
+          provider: payload.provider ?? null,
+          model: payload.model ?? null,
+          inputPayload: payload.inputPayload ?? null,
+          outputPayload: payload.outputPayload ?? null,
+        },
+      }),
+    );
+
+    reply.code(202);
+    return { job };
   });
 
   app.get("/v1/projects/:projectId/ai/recommendations", async (request) => {

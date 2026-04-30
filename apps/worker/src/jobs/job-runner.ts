@@ -3,6 +3,7 @@ import type {
   KnowledgeExtractionJobPayload,
   ProjectRecalculateJobPayload,
   ReportExportJobPayload,
+  AiRecommendationJobPayload,
   WorkerJob,
   WorkerProcessorResult,
   WorkerJobType,
@@ -33,6 +34,10 @@ type Dependencies = {
     priceVersionId?: string;
     feeTemplateId?: string;
     userId: string;
+  }) => Promise<Record<string, unknown>>;
+  generateAiRecommendations?: (input: {
+    payload: AiRecommendationJobPayload;
+    requestedBy: string;
   }) => Promise<Record<string, unknown>>;
   aiRuntimeClient: AiRuntimeCliClient;
 };
@@ -82,6 +87,22 @@ export async function runWorkerJob(
           aiRuntimeClient: dependencies.aiRuntimeClient,
         },
       );
+    }
+    case "ai_recommendation": {
+      if (!dependencies.generateAiRecommendations) {
+        return {
+          status: "failed",
+          errorMessage: "AI recommendation jobs require platform-side processing",
+        };
+      }
+      const payload = job.payload as AiRecommendationJobPayload;
+      return {
+        status: "completed",
+        result: await dependencies.generateAiRecommendations({
+          payload,
+          requestedBy: job.requestedBy,
+        }),
+      };
     }
     default:
       return assertUnsupportedJobType(job.jobType);

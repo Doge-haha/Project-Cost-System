@@ -30,6 +30,8 @@ import {
   type BillItemRecord,
 } from "../src/modules/bill/bill-item-repository.js";
 import { InMemoryQuotaLineRepository } from "../src/modules/quota/quota-line-repository.js";
+import { InMemoryBackgroundJobRepository } from "../src/modules/jobs/background-job-repository.js";
+import { AiRuntimePreviewService } from "../src/modules/ai/ai-runtime-preview-service.js";
 
 const jwtSecret = "ai-recommendation-test-secret";
 
@@ -129,6 +131,7 @@ function createRecommendationApp(input?: { billItems?: BillItemRecord[] }) {
     quotaLineRepository: new InMemoryQuotaLineRepository([]),
     auditLogRepository: new InMemoryAuditLogRepository([]),
     aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
+    backgroundJobRepository: new InMemoryBackgroundJobRepository([]),
 });
 }
 
@@ -405,6 +408,97 @@ test("POST /v1/ai/variance-warnings generates threshold-based warnings from summ
   });
   assert.equal(listResponse.statusCode, 200);
   assert.equal(listResponse.json().items.length, 3);
+
+  await app.close();
+});
+
+test("POST /v1/ai/recommendation-jobs queues and processes provider-backed recommendations", async () => {
+  const backgroundJobRepository = new InMemoryBackgroundJobRepository([]);
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(projects),
+    projectStageRepository: new InMemoryProjectStageRepository(stages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      disciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(members),
+    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billItemRepository: new InMemoryBillItemRepository(billItems),
+    quotaLineRepository: new InMemoryQuotaLineRepository([]),
+    auditLogRepository: new InMemoryAuditLogRepository([]),
+    aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
+    backgroundJobRepository,
+    aiRuntimePreviewService: new AiRuntimePreviewService({
+      pythonExecutable: "python3",
+      cliPath: "/tmp/ai-runtime-cli.py",
+      commandRunner: async (_command, _args, input) => {
+        assert.match(input, /"task":"llm_chat"/);
+        assert.match(input, /bill-version-001/);
+        return {
+          stdout: JSON.stringify({
+            source: "llm_provider",
+            result: {
+              provider: {
+                provider: "openai_compatible",
+                model: "cost-model-v1",
+              },
+              content: JSON.stringify({
+                recommendations: [
+                  {
+                    outputPayload: {
+                      parentId: null,
+                      itemCode: "A-002",
+                      itemName: "回填土",
+                      quantity: 6,
+                      unit: "m3",
+                      sortNo: 2,
+                      reason: "历史清单匹配",
+                    },
+                  },
+                ],
+              }),
+            },
+          }),
+          stderr: "",
+        };
+      },
+    }),
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const queuedResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/recommendation-jobs",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_version",
+      resourceId: "bill-version-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      provider: "openai_compatible",
+      model: "cost-model-v1",
+    },
+  });
+  assert.equal(queuedResponse.statusCode, 202);
+  assert.equal(queuedResponse.json().job.jobType, "ai_recommendation");
+  assert.equal(queuedResponse.json().job.status, "queued");
+
+  const processResponse = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${queuedResponse.json().job.id}/process`,
+    headers: {
+      authorization: `Bearer ${await createToken("admin-001", "system_admin")}`,
+    },
+  });
+  assert.equal(processResponse.statusCode, 200);
+  assert.equal(processResponse.json().status, "completed");
+  assert.equal(processResponse.json().result.createdCount, 1);
+  assert.equal(
+    processResponse.json().result.recommendations[0].inputPayload.aiProvider.model,
+    "cost-model-v1",
+  );
 
   await app.close();
 });

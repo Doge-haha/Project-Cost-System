@@ -197,6 +197,7 @@ export function createAppServices(
       summaryService,
       knowledgeService,
       varianceWarningThresholdRepository: repositories.varianceWarningThreshold,
+      aiRuntimePreviewService,
     },
     auditLogService,
   );
@@ -278,6 +279,32 @@ export function createAppServices(
           knowledgeEntryIds: persisted.knowledgeEntries.map((entry) => entry.id),
           memoryEntryIds: persisted.memoryEntries.map((entry) => entry.id),
         },
+      };
+    },
+    processAiRecommendation: async ({ payload, requestedBy }) => {
+      const result = await aiRecommendationService.generateProviderRecommendations({
+        projectId: payload.projectId,
+        recommendationType: payload.recommendationType,
+        resourceType: payload.resourceType ?? undefined,
+        resourceId: payload.resourceId ?? undefined,
+        billVersionId: payload.billVersionId ?? undefined,
+        stageCode: payload.stageCode ?? undefined,
+        disciplineCode: payload.disciplineCode ?? undefined,
+        thresholdAmount: payload.thresholdAmount ?? undefined,
+        thresholdRate: payload.thresholdRate ?? undefined,
+        limit: payload.limit ?? undefined,
+        provider: payload.provider ?? undefined,
+        model: payload.model ?? undefined,
+        inputPayload: payload.inputPayload ?? undefined,
+        outputPayload: payload.outputPayload ?? undefined,
+        userId: requestedBy,
+      });
+
+      return {
+        createdCount: result.createdCount,
+        provider: result.provider,
+        recommendationIds: result.recommendations.map((item) => item.id),
+        recommendations: result.recommendations,
       };
     },
   });

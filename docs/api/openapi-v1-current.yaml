@@ -248,6 +248,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/recommendation-jobs:
+    post:
+      operationId: postAiRecommendationJobs
+      summary: POST /v1/ai/recommendation-jobs
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/ai/recommendations/{recommendationId}/accept:
     post:
       operationId: postAiRecommendationsByRecommendationIdAccept
@@ -676,7 +722,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [report_export, project_recalculate, knowledge_extraction]
+          enum: [report_export, project_recalculate, knowledge_extraction, ai_recommendation]
       - name: status
         in: query
         description: Status filter.

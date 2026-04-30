@@ -43,7 +43,7 @@ const booleanQueryParameters = new Set(["activeOnly"]);
 const enumQueryParameters = new Map([
   ["documentType", ["change_order", "site_visa", "progress_payment"]],
   ["format", ["json", "csv"]],
-  ["jobType", ["report_export", "project_recalculate", "knowledge_extraction"]],
+  ["jobType", ["report_export", "project_recalculate", "knowledge_extraction", "ai_recommendation"]],
   ["recommendationType", ["bill_recommendation", "quota_recommendation", "variance_warning"]],
   ["status", ["queued", "processing", "completed", "failed", "pending", "approved", "rejected", "cancelled", "draft", "submitted", "generated", "accepted", "ignored", "expired"]],
 ]);
@@ -79,7 +79,7 @@ const tagRules = [
   ["Reports", (route) => route.path.startsWith("/v1/reports")],
   ["Background Jobs", (route) => route.path.startsWith("/v1/jobs") || route.path.endsWith("/recalculate")],
   ["AI Runtime", (route) => route.path.includes("/ai-runtime")],
-  ["AI Recommendations", (route) => route.path.includes("/ai/recommendations") || route.path.includes("/ai/bill-recommendations") || route.path.includes("/ai/quota-recommendations") || route.path.includes("/ai/variance-warnings")],
+  ["AI Recommendations", (route) => route.path.includes("/ai/recommendations") || route.path.includes("/ai/recommendation-jobs") || route.path.includes("/ai/bill-recommendations") || route.path.includes("/ai/quota-recommendations") || route.path.includes("/ai/variance-warnings")],
   ["Import Tasks", (route) => route.path.includes("/import-tasks")],
   ["Knowledge", (route) => route.path.includes("/knowledge") || route.path.includes("/memory")],
   ["Reviews", (route) => route.path.includes("/reviews")],

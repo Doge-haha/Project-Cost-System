@@ -40,6 +40,7 @@ export function registerProjectRoutes(
   registerAiRecommendationRoutes(app, {
     transactionRunner: input.transactionRunner,
     aiRecommendationService: input.aiRecommendationService,
+    backgroundJobService: input.backgroundJobService,
   });
 
   registerProjectCoreRoutes(app, {

@@ -229,7 +229,7 @@ test("current OpenAPI document includes query parameter types and enums", () => 
   assert.match(content, /- name: activeOnly[\s\S]*in: query[\s\S]*schema:\n          type: boolean/);
   assert.match(content, /- name: format[\s\S]*in: query[\s\S]*enum: \[json, csv\]/);
   assert.match(content, /- name: documentType[\s\S]*in: query[\s\S]*enum: \[change_order, site_visa, progress_payment\]/);
-  assert.match(content, /- name: jobType[\s\S]*in: query[\s\S]*enum: \[report_export, project_recalculate, knowledge_extraction\]/);
+  assert.match(content, /- name: jobType[\s\S]*in: query[\s\S]*enum: \[report_export, project_recalculate, knowledge_extraction, ai_recommendation\]/);
 });
 
 test("current OpenAPI document marks request bodies as required where needed", () => {

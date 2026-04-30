@@ -553,7 +553,11 @@ export const apiClient = {
     projectId: string,
     query?: {
       status?: "queued" | "processing" | "completed" | "failed";
-      jobType?: "report_export" | "project_recalculate" | "knowledge_extraction";
+      jobType?:
+        | "report_export"
+        | "project_recalculate"
+        | "knowledge_extraction"
+        | "ai_recommendation";
     },
   ) {
     return request<BackgroundJobListResponse>("/v1/jobs", {

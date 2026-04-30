@@ -2,6 +2,7 @@ import type {
   KnowledgeExtractionJobPayload,
   ProjectRecalculateJobPayload,
   ReportExportJobPayload,
+  AiRecommendationJobPayload,
 } from "@saas-pricing/job-contracts";
 
 import { BackgroundJobService } from "./background-job-service.js";
@@ -18,6 +19,10 @@ type Dependencies = {
   processKnowledgeExtraction: (input: {
     jobId: string;
     payload: KnowledgeExtractionJobPayload;
+    requestedBy: string;
+  }) => Promise<Record<string, unknown>>;
+  processAiRecommendation: (input: {
+    payload: AiRecommendationJobPayload;
     requestedBy: string;
   }) => Promise<Record<string, unknown>>;
 };
@@ -56,11 +61,16 @@ export class BackgroundJobProcessor {
                 payload: job.payload as ReportExportJobPayload,
                 requestedBy: job.requestedBy,
               })
-            : await this.dependencies.processKnowledgeExtraction({
-                jobId: job.id,
-                payload: knowledgeExtractionPayload as KnowledgeExtractionJobPayload,
-                requestedBy: job.requestedBy,
-              });
+            : job.jobType === "ai_recommendation"
+              ? await this.dependencies.processAiRecommendation({
+                  payload: job.payload as AiRecommendationJobPayload,
+                  requestedBy: job.requestedBy,
+                })
+              : await this.dependencies.processKnowledgeExtraction({
+                  jobId: job.id,
+                  payload: knowledgeExtractionPayload as KnowledgeExtractionJobPayload,
+                  requestedBy: job.requestedBy,
+                });
 
       return this.backgroundJobService.completeJob({
         jobId: job.id,

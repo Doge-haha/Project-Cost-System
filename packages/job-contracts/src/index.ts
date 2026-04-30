@@ -2,6 +2,7 @@ export const executableBackgroundJobTypes = [
   "report_export",
   "project_recalculate",
   "knowledge_extraction",
+  "ai_recommendation",
 ] as const;
 
 export type BackgroundJobType = (typeof executableBackgroundJobTypes)[number];
@@ -43,10 +44,31 @@ export type KnowledgeExtractionJobPayload = {
   } | null;
 };
 
+export type AiRecommendationJobPayload = {
+  projectId: string;
+  recommendationType:
+    | "bill_recommendation"
+    | "quota_recommendation"
+    | "variance_warning";
+  resourceType?: string | null;
+  resourceId?: string | null;
+  billVersionId?: string | null;
+  stageCode?: string | null;
+  disciplineCode?: string | null;
+  thresholdAmount?: number | null;
+  thresholdRate?: number | null;
+  limit?: number | null;
+  provider?: string | null;
+  model?: string | null;
+  inputPayload?: Record<string, unknown> | null;
+  outputPayload?: Record<string, unknown> | null;
+};
+
 export type BackgroundJobPayloadMap = {
   report_export: ReportExportJobPayload;
   project_recalculate: ProjectRecalculateJobPayload;
   knowledge_extraction: KnowledgeExtractionJobPayload;
+  ai_recommendation: AiRecommendationJobPayload;
 };
 
 export type BackgroundJobPayload = BackgroundJobPayloadMap[BackgroundJobType];

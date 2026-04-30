@@ -478,6 +478,146 @@ describe("BillItemsPage", () => {
     expect(screen.getAllByText("manual").length).toBeGreaterThan(0);
   });
 
+  test("filters quota candidates before batch add", async () => {
+    let batchCreateBody: { items: Array<Record<string, unknown>> } | null = null;
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/quota-lines/batch-create" &&
+        init?.method === "POST"
+      ) {
+        batchCreateBody = JSON.parse(String(init.body));
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({
+          items: [
+            {
+              sourceStandardSetCode: "js-2013-building",
+              sourceQuotaId: "quota-source-001",
+              sourceSequence: 1,
+              chapterCode: "01",
+              quotaCode: "010101001",
+              quotaName: "人工挖土方",
+              unit: "m3",
+              laborFee: 120,
+              materialFee: 50,
+              machineFee: 30,
+              sourceMode: "manual",
+              matchReason: "土方关键字命中",
+            },
+            {
+              sourceStandardSetCode: "js-2013-building",
+              sourceQuotaId: "quota-source-002",
+              sourceSequence: 2,
+              chapterCode: "02",
+              quotaCode: "020101001",
+              quotaName: "混凝土垫层",
+              unit: "m2",
+              laborFee: 80,
+              materialFee: 160,
+              machineFee: 20,
+              sourceMode: "manual",
+              matchReason: "垫层关键字命中",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "定额选择器" })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("筛选候选定额"), {
+      target: { value: "垫层" },
+    });
+
+    expect(screen.getByText("已筛选 1/2 条候选定额。")).toBeInTheDocument();
+    expect(screen.getByText("混凝土垫层")).toBeInTheDocument();
+    expect(screen.queryByText("人工挖土方")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("选择 020101001"));
+    fireEvent.click(screen.getByRole("button", { name: "批量添加" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("已添加 1 条定额。")).toBeInTheDocument();
+    });
+    expect(batchCreateBody).not.toBeNull();
+    expect(batchCreateBody!.items).toMatchObject([
+      {
+        sourceQuotaId: "quota-source-002",
+        quotaName: "混凝土垫层",
+      },
+    ]);
+  });
+
   test("updates pricing defaults and recalculates the current bill version", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));

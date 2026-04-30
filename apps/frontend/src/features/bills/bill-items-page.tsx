@@ -26,6 +26,32 @@ function flattenBillItems(items: BillItem[]): BillItem[] {
   ]);
 }
 
+function filterQuotaCandidates(
+  candidates: QuotaSourceCandidate[],
+  filter: string,
+) {
+  const normalizedFilter = filter.trim().toLowerCase();
+  if (!normalizedFilter) {
+    return candidates;
+  }
+
+  return candidates.filter((candidate) =>
+    [
+      candidate.quotaCode,
+      candidate.quotaName,
+      candidate.chapterCode,
+      candidate.unit,
+      candidate.sourceMode,
+      candidate.sourceDataset,
+      candidate.sourceRegion,
+      candidate.matchReason,
+      candidate.workContentSummary,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(normalizedFilter)),
+  );
+}
+
 export function BillItemsPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -48,6 +74,7 @@ export function BillItemsPage() {
   const [manualUnitPrice, setManualUnitPrice] = useState("");
   const [manualPricingReason, setManualPricingReason] = useState("市场询价调整");
   const [billItemFilter, setBillItemFilter] = useState("");
+  const [quotaCandidateFilter, setQuotaCandidateFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -110,6 +137,7 @@ export function BillItemsPage() {
       setQuotaValidation(null);
       setPricingActionMessage(null);
       setBillItemFilter("");
+      setQuotaCandidateFilter("");
     } catch (fetchError) {
       setError(
         fetchError instanceof ApiError
@@ -130,7 +158,10 @@ export function BillItemsPage() {
       return;
     }
 
-    const selectedCandidates = quotaCandidates.filter((candidate) =>
+    const selectedCandidates = filterQuotaCandidates(
+      quotaCandidates,
+      quotaCandidateFilter,
+    ).filter((candidate) =>
       selectedCandidateIds.includes(candidate.sourceQuotaId),
     );
     if (selectedCandidates.length === 0) {
@@ -163,6 +194,7 @@ export function BillItemsPage() {
       const refreshed = await apiClient.listProjectQuotaLines(projectId);
       setQuotaLines(refreshed.items);
       setSelectedCandidateIds([]);
+      setQuotaCandidateFilter("");
       setQuotaValidation(null);
       setQuotaActionMessage(`已添加 ${selectedCandidates.length} 条定额。`);
     } catch (mutationError) {
@@ -345,6 +377,11 @@ export function BillItemsPage() {
     );
   }, [flatItems, normalizedBillItemFilter]);
   const selectedBillItem = flatItems.find((item) => item.id === selectedBillItemId) ?? null;
+  const filteredQuotaCandidates = useMemo(
+    () => filterQuotaCandidates(quotaCandidates, quotaCandidateFilter),
+    [quotaCandidateFilter, quotaCandidates],
+  );
+  const normalizedQuotaCandidateFilter = quotaCandidateFilter.trim().toLowerCase();
   const visibleQuotaLines = quotaLines.filter((quotaLine) => quotaLine.billVersionId === versionId);
   const selectedItemQuotaLines = selectedBillItem
     ? visibleQuotaLines.filter((quotaLine) => quotaLine.billItemId === selectedBillItem.id)
@@ -658,26 +695,54 @@ export function BillItemsPage() {
               <p className="page-description">
                 按当前版本专业默认定额集展示候选定额，可批量添加到选中清单项。
               </p>
+              {normalizedQuotaCandidateFilter ? (
+                <p className="page-description">
+                  已筛选 {filteredQuotaCandidates.length}/{quotaCandidates.length} 条候选定额。
+                </p>
+              ) : null}
             </div>
-            <button
-              className="primary-button"
-              disabled={!selectedBillItemId || selectedCandidateIds.length === 0}
-              onClick={() => {
-                void handleBatchAddQuotaLines();
-              }}
-              type="button"
-            >
-              批量添加
-            </button>
-            <button
-              className="primary-button secondary"
-              onClick={() => {
-                void handleValidateQuotaLines();
-              }}
-              type="button"
-            >
-              校验定额
-            </button>
+            <div className="button-row">
+              <label className="form-field">
+                筛选候选定额
+                <input
+                  placeholder="编号、名称、章节或来源"
+                  value={quotaCandidateFilter}
+                  onChange={(event) => {
+                    setQuotaCandidateFilter(event.target.value);
+                    setQuotaActionMessage(null);
+                  }}
+                />
+              </label>
+              <button
+                className="primary-button secondary"
+                disabled={!quotaCandidateFilter}
+                onClick={() => {
+                  setQuotaCandidateFilter("");
+                }}
+                type="button"
+              >
+                清空候选筛选
+              </button>
+              <button
+                className="primary-button"
+                disabled={!selectedBillItemId || selectedCandidateIds.length === 0}
+                onClick={() => {
+                  void handleBatchAddQuotaLines();
+                }}
+                type="button"
+              >
+                批量添加
+              </button>
+              <button
+                className="primary-button secondary"
+                onClick={() => {
+                  void handleValidateQuotaLines();
+                }}
+                type="button"
+              >
+                校验定额
+              </button>
+            </div>
           </div>
 
           <label className="form-field">
@@ -713,7 +778,7 @@ export function BillItemsPage() {
                 </tr>
               </thead>
               <tbody>
-                {quotaCandidates.map((candidate) => (
+                {filteredQuotaCandidates.map((candidate) => (
                   <tr key={candidate.sourceQuotaId}>
                     <td>
                       <input
@@ -753,6 +818,9 @@ export function BillItemsPage() {
               title="暂无候选定额"
               body="当前项目专业默认定额集还没有可套用的候选定额。"
             />
+          ) : null}
+          {quotaCandidates.length > 0 && filteredQuotaCandidates.length === 0 ? (
+            <EmptyState title="没有匹配候选定额" body="请调整编号、名称、章节或来源筛选条件。" />
           ) : null}
           {quotaActionMessage ? (
             <p className="page-description">{quotaActionMessage}</p>

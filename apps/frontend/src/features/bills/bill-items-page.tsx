@@ -90,6 +90,26 @@ function filterFeeTemplates(feeTemplates: FeeTemplate[], filter: string) {
   );
 }
 
+function getPricingActionDisabledReason(
+  selectedPriceVersionId: string,
+  selectedFeeTemplateId: string,
+) {
+  const missingRequirements = [];
+
+  if (!selectedPriceVersionId) {
+    missingRequirements.push("默认价目版本");
+  }
+  if (!selectedFeeTemplateId) {
+    missingRequirements.push("默认取费模板");
+  }
+
+  if (missingRequirements.length === 0) {
+    return null;
+  }
+
+  return `计价类动作不可用：请先绑定${missingRequirements.join("和")}。`;
+}
+
 export function BillItemsPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -438,6 +458,13 @@ export function BillItemsPage() {
   const selectedItemQuotaLines = selectedBillItem
     ? visibleQuotaLines.filter((quotaLine) => quotaLine.billItemId === selectedBillItem.id)
     : [];
+  const pricingActionDisabledReason = getPricingActionDisabledReason(
+    selectedPriceVersionId,
+    selectedFeeTemplateId,
+  );
+  const calculateItemDisabledReason =
+    pricingActionDisabledReason ??
+    (selectedBillItemId ? null : "单项计价不可用：请先选择当前清单项。");
   const breadcrumbs =
     projectId && selectedVersion
       ? buildProjectVersionBreadcrumbs({
@@ -554,36 +581,43 @@ export function BillItemsPage() {
             </button>
             <button
               className="primary-button"
-              disabled={!selectedPriceVersionId || !selectedFeeTemplateId}
+              disabled={calculateItemDisabledReason !== null}
               onClick={() => {
                 void handleCalculateSelectedItem();
               }}
+              title={calculateItemDisabledReason ?? undefined}
               type="button"
             >
               单项计价
             </button>
             <button
               className="primary-button"
-              disabled={!selectedPriceVersionId || !selectedFeeTemplateId}
+              disabled={pricingActionDisabledReason !== null}
               onClick={() => {
                 void handleRecalculateVersion();
               }}
+              title={pricingActionDisabledReason ?? undefined}
               type="button"
             >
               重算当前版本
             </button>
             <button
               className="primary-button"
-              disabled={!selectedPriceVersionId || !selectedFeeTemplateId}
+              disabled={pricingActionDisabledReason !== null}
               onClick={() => {
                 void handleRecalculateProject();
               }}
+              title={pricingActionDisabledReason ?? undefined}
               type="button"
             >
               创建项目重算
             </button>
           </div>
         </div>
+
+        {pricingActionDisabledReason ? (
+          <p className="page-description">{pricingActionDisabledReason}</p>
+        ) : null}
 
         <div className="button-row">
           <label className="form-field">

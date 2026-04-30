@@ -730,6 +730,145 @@ describe("BillItemsPage", () => {
     expect(screen.getByText("江苏土建 2026（JS / building）")).toBeInTheDocument();
   });
 
+  test("explains disabled pricing actions while allowing cleared defaults to be saved", async () => {
+    const defaultUpdates: unknown[] = [];
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: "price-version-001",
+          defaultFeeTemplateId: "fee-template-001",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/default-price-version" &&
+        init?.method === "PUT"
+      ) {
+        defaultUpdates.push(JSON.parse(String(init.body)));
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: null,
+          defaultFeeTemplateId: "fee-template-001",
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/default-fee-template" &&
+        init?.method === "PUT"
+      ) {
+        defaultUpdates.push(JSON.parse(String(init.body)));
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: null,
+          defaultFeeTemplateId: null,
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "计价配置" })).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByLabelText("默认价目版本"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("默认取费模板"), {
+      target: { value: "" },
+    });
+
+    const disabledReason = "计价类动作不可用：请先绑定默认价目版本和默认取费模板。";
+    expect(screen.getByText(disabledReason)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "单项计价" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "单项计价" })).toHaveAttribute(
+      "title",
+      disabledReason,
+    );
+    expect(screen.getByRole("button", { name: "重算当前版本" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "创建项目重算" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("计价配置已保存。")).toBeInTheDocument();
+    });
+    expect(defaultUpdates).toEqual([
+      { defaultPriceVersionId: null },
+      { defaultFeeTemplateId: null },
+    ]);
+  });
+
   test("updates pricing defaults and recalculates the current bill version", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));

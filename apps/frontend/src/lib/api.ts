@@ -631,7 +631,9 @@ export const apiClient = {
       recalculatedCount: number;
       skippedItems: Array<{
         billItemId: string;
-        reason: string;
+        reason: "missing_quota_lines" | "invalid_quantity" | "unmatched_price_items";
+        label?: string;
+        details?: Record<string, unknown>;
       }>;
     }>(
       `/v1/projects/${input.projectId}/bill-versions/${input.billVersionId}/recalculate`,

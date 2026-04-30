@@ -1072,7 +1072,7 @@ describe("BillItemsPage", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("项目重算任务已创建：job-recalculate-001（queued）。"),
+        screen.getByText("项目重算任务已创建：job-recalculate-001（queued）。可前往任务页查看状态。"),
       ).toBeInTheDocument();
     });
 
@@ -1253,5 +1253,166 @@ describe("BillItemsPage", () => {
         ),
       ).toBeInTheDocument();
     });
+  });
+
+  test("shows recalculate skipped item details and links project jobs", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: "price-version-001",
+          defaultFeeTemplateId: "fee-template-001",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      if (
+        url.pathname ===
+          "/v1/projects/project-001/bill-versions/version-001/recalculate" &&
+        init?.method === "POST"
+      ) {
+        return createJsonResponse({
+          recalculatedCount: 1,
+          skippedItems: [
+            {
+              billItemId: "bill-item-missing",
+              reason: "missing_quota_lines",
+              label: "缺少定额明细",
+              details: {
+                quotaLineCount: 0,
+              },
+            },
+            {
+              billItemId: "bill-item-invalid",
+              reason: "invalid_quantity",
+              label: "工程量不合法",
+              details: {
+                quantity: 0,
+              },
+            },
+            {
+              billItemId: "bill-item-unmatched",
+              reason: "unmatched_price_items",
+              label: "价目匹配失败",
+              details: {
+                unmatchedQuotaCodes: ["010101002", "010101003"],
+              },
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/recalculate" &&
+        init?.method === "POST"
+      ) {
+        return createJsonResponse({
+          id: "job-recalculate-001",
+          jobType: "project_recalculate",
+          status: "queued",
+          requestedBy: "engineer-001",
+          projectId: "project-001",
+          payload: {},
+          createdAt: "2026-04-27T00:00:00.000Z",
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "计价配置" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "重算当前版本" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("重算完成：已更新 1 条清单项，跳过 3 条。"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("heading", { name: "重算跳过明细" })).toBeInTheDocument();
+    expect(screen.getByText("bill-item-missing")).toBeInTheDocument();
+    expect(screen.getByText("缺少定额明细")).toBeInTheDocument();
+    expect(screen.getByText("定额明细 0 条")).toBeInTheDocument();
+    expect(screen.getByText("bill-item-invalid")).toBeInTheDocument();
+    expect(screen.getByText("工程量不合法")).toBeInTheDocument();
+    expect(screen.getByText("工程量 0")).toBeInTheDocument();
+    expect(screen.getByText("bill-item-unmatched")).toBeInTheDocument();
+    expect(screen.getByText("价目匹配失败")).toBeInTheDocument();
+    expect(screen.getByText("未命中定额 010101002、010101003")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "创建项目重算" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("项目重算任务已创建：job-recalculate-001（queued）。可前往任务页查看状态。"),
+      ).toBeInTheDocument();
+    });
+    expect(screen.getByRole("link", { name: "查看项目重算任务" })).toHaveAttribute(
+      "href",
+      "/projects/project-001/jobs?jobType=project_recalculate",
+    );
   });
 });

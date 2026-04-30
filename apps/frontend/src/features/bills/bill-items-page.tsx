@@ -112,6 +112,13 @@ function getPricingActionDisabledReason(
 
 type PricingApiAction = "calculate-item" | "recalculate-version" | "recalculate-project";
 
+type RecalculateSkippedItem = {
+  billItemId: string;
+  reason: "missing_quota_lines" | "invalid_quantity" | "unmatched_price_items";
+  label?: string;
+  details?: Record<string, unknown>;
+};
+
 const pricingApiActionLabels: Record<PricingApiAction, string> = {
   "calculate-item": "单项计价",
   "recalculate-version": "当前版本重算",
@@ -191,6 +198,40 @@ function formatPricingApiError(action: PricingApiAction, error: unknown) {
   return `${actionLabel}失败：${guidance}原始错误：${error.message}`;
 }
 
+function formatSkippedReason(reason: RecalculateSkippedItem["reason"]) {
+  if (reason === "missing_quota_lines") {
+    return "缺少定额明细";
+  }
+  if (reason === "invalid_quantity") {
+    return "工程量不合法";
+  }
+  return "价目匹配失败";
+}
+
+function formatSkippedItemDetails(item: RecalculateSkippedItem) {
+  if (item.reason === "missing_quota_lines") {
+    const quotaLineCount = item.details?.quotaLineCount;
+    return typeof quotaLineCount === "number"
+      ? `定额明细 ${quotaLineCount} 条`
+      : "未套用定额明细";
+  }
+
+  if (item.reason === "invalid_quantity") {
+    const quantity = item.details?.quantity;
+    return typeof quantity === "number" ? `工程量 ${quantity}` : "工程量不合法";
+  }
+
+  const unmatchedQuotaCodes = item.details?.unmatchedQuotaCodes;
+  if (
+    Array.isArray(unmatchedQuotaCodes) &&
+    unmatchedQuotaCodes.every((value) => typeof value === "string")
+  ) {
+    return `未命中定额 ${unmatchedQuotaCodes.join("、")}`;
+  }
+
+  return "所选价目版本中没有匹配的价目明细";
+}
+
 export function BillItemsPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -210,6 +251,8 @@ export function BillItemsPage() {
   const [quotaActionMessage, setQuotaActionMessage] = useState<string | null>(null);
   const [quotaValidation, setQuotaValidation] = useState<QuotaLineValidationResult | null>(null);
   const [pricingActionMessage, setPricingActionMessage] = useState<string | null>(null);
+  const [recalculateSkippedItems, setRecalculateSkippedItems] = useState<RecalculateSkippedItem[]>([]);
+  const [projectRecalculateJobPath, setProjectRecalculateJobPath] = useState<string | null>(null);
   const [manualUnitPrice, setManualUnitPrice] = useState("");
   const [manualPricingReason, setManualPricingReason] = useState("市场询价调整");
   const [billItemFilter, setBillItemFilter] = useState("");
@@ -277,6 +320,8 @@ export function BillItemsPage() {
       setQuotaActionMessage(null);
       setQuotaValidation(null);
       setPricingActionMessage(null);
+      setRecalculateSkippedItems([]);
+      setProjectRecalculateJobPath(null);
       setBillItemFilter("");
       setQuotaCandidateFilter("");
       setPriceVersionFilter("");
@@ -376,6 +421,7 @@ export function BillItemsPage() {
     }
 
     setPricingActionMessage("正在保存计价配置...");
+    setProjectRecalculateJobPath(null);
     try {
       const [priceProject, feeProject] = await Promise.all([
         apiClient.updateProjectDefaultPriceVersion(
@@ -404,6 +450,8 @@ export function BillItemsPage() {
     }
 
     setPricingActionMessage("正在重算当前版本...");
+    setRecalculateSkippedItems([]);
+    setProjectRecalculateJobPath(null);
     try {
       const result = await apiClient.recalculateBillVersion({
         projectId,
@@ -412,6 +460,7 @@ export function BillItemsPage() {
         feeTemplateId: selectedFeeTemplateId || undefined,
       });
       await loadBillItems();
+      setRecalculateSkippedItems(result.skippedItems);
       setPricingActionMessage(
         `重算完成：已更新 ${result.recalculatedCount} 条清单项，跳过 ${result.skippedItems.length} 条。`,
       );
@@ -426,6 +475,8 @@ export function BillItemsPage() {
     }
 
     setPricingActionMessage("正在创建项目重算任务...");
+    setRecalculateSkippedItems([]);
+    setProjectRecalculateJobPath(null);
     try {
       const job = await apiClient.recalculateProject({
         projectId,
@@ -434,7 +485,12 @@ export function BillItemsPage() {
         priceVersionId: selectedPriceVersionId || undefined,
         feeTemplateId: selectedFeeTemplateId || undefined,
       });
-      setPricingActionMessage(`项目重算任务已创建：${job.id}（${job.status}）。`);
+      setProjectRecalculateJobPath(
+        `/projects/${projectId}/jobs?jobType=project_recalculate`,
+      );
+      setPricingActionMessage(
+        `项目重算任务已创建：${job.id}（${job.status}）。可前往任务页查看状态。`,
+      );
     } catch (mutationError) {
       setPricingActionMessage(formatPricingApiError("recalculate-project", mutationError));
     }
@@ -446,6 +502,7 @@ export function BillItemsPage() {
     }
 
     setPricingActionMessage("正在计价当前清单项...");
+    setProjectRecalculateJobPath(null);
     try {
       await apiClient.calculateBillItem({
         billItemId: selectedBillItemId,
@@ -867,6 +924,34 @@ export function BillItemsPage() {
 
         {pricingActionMessage ? (
           <p className="page-description">{pricingActionMessage}</p>
+        ) : null}
+        {projectRecalculateJobPath ? (
+          <Link className="app-nav-link active" to={projectRecalculateJobPath}>
+            查看项目重算任务
+          </Link>
+        ) : null}
+        {recalculateSkippedItems.length > 0 ? (
+          <div className="table-wrap">
+            <h3>重算跳过明细</h3>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>清单项 ID</th>
+                  <th>跳过原因</th>
+                  <th>详情</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recalculateSkippedItems.map((item) => (
+                  <tr key={`${item.billItemId}-${item.reason}`}>
+                    <td>{item.billItemId}</td>
+                    <td>{item.label ?? formatSkippedReason(item.reason)}</td>
+                    <td>{formatSkippedItemDetails(item)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </section>
 

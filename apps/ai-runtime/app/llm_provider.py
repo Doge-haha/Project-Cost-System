@@ -46,6 +46,22 @@ def describe_llm_provider(input_payload: dict[str, Any] | None = None) -> LlmPro
     )
 
 
+def validate_llm_provider_config(input_payload: dict[str, Any] | None = None) -> None:
+    payload = input_payload or {}
+    api_key = _optional_string(payload.get("apiKey")) or _optional_string(
+        os.getenv("LLM_API_KEY")
+    )
+    config = describe_llm_provider(payload)
+    if config.provider != "openai_compatible":
+        raise ValueError("LLM_PROVIDER must be openai_compatible")
+    if not config.base_url.startswith(("http://", "https://")):
+        raise ValueError("LLM_BASE_URL must be an http(s) URL")
+    if not api_key:
+        raise ValueError("LLM_API_KEY is required")
+    if not config.model:
+        raise ValueError("LLM_MODEL is required")
+
+
 def generate_llm_completion(input_payload: dict[str, Any]) -> dict[str, Any]:
     messages = input_payload.get("messages")
     if not isinstance(messages, list) or not messages:
@@ -53,12 +69,11 @@ def generate_llm_completion(input_payload: dict[str, Any]) -> dict[str, Any]:
     if not all(_is_message(message) for message in messages):
         raise ValueError("messages must contain role/content objects")
 
+    validate_llm_provider_config(input_payload)
     api_key = _optional_string(input_payload.get("apiKey")) or _optional_string(
         os.getenv("LLM_API_KEY")
     )
     config = describe_llm_provider(input_payload)
-    if not api_key or not config.model:
-        raise ValueError("LLM_API_KEY and LLM_MODEL are required")
 
     request_payload: dict[str, Any] = {
         "model": config.model,
@@ -74,6 +89,7 @@ def generate_llm_completion(input_payload: dict[str, Any]) -> dict[str, Any]:
         request_payload,
         api_key=api_key,
         timeout=float(input_payload.get("timeoutSeconds") or 15),
+        retry_attempts=int(input_payload.get("retryAttempts") or 2),
     )
     content = _extract_content(response_payload)
     return {
@@ -90,6 +106,7 @@ def _post_json(
     *,
     api_key: str,
     timeout: float,
+    retry_attempts: int = 2,
 ) -> dict[str, Any]:
     request = urllib.request.Request(
         url,
@@ -100,14 +117,24 @@ def _post_json(
         },
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
-        raise ValueError(f"LLM provider error: {error.code} {body}") from error
-    except (OSError, urllib.error.URLError, json.JSONDecodeError) as error:
-        raise ValueError(f"LLM provider request failed: {error}") from error
+    last_error: Exception | None = None
+    for attempt in range(max(1, retry_attempts + 1)):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            body = error.read().decode("utf-8", errors="replace")
+            if error.code < 500 or attempt >= retry_attempts:
+                raise ValueError(f"LLM provider error: {error.code} {body}") from error
+            last_error = error
+        except (TimeoutError, urllib.error.URLError, OSError) as error:
+            if attempt >= retry_attempts:
+                raise ValueError(f"LLM provider request failed: {error}") from error
+            last_error = error
+        except json.JSONDecodeError as error:
+            raise ValueError(f"LLM provider returned invalid JSON: {error}") from error
+
+    raise ValueError(f"LLM provider request failed: {last_error}")
 
 
 def _extract_content(response_payload: dict[str, Any]) -> str:

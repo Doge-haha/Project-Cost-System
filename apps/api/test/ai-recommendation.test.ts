@@ -698,6 +698,23 @@ test("POST /v1/ai/recommendations/:id/accept creates a formal bill item for bill
     acceptResponse.json().outputPayload.acceptedBillItemId,
     "bill-item-002",
   );
+  assert.deepEqual(acceptResponse.json().outputPayload.acceptedChanges[0], {
+    action: "create",
+    resourceType: "bill_item",
+    resourceId: "bill-item-002",
+    label: "A-002 回填土",
+    snapshot: {
+      id: "bill-item-002",
+      billVersionId: "bill-version-001",
+      parentId: null,
+      itemCode: "A-002",
+      itemName: "回填土",
+      quantity: 6,
+      unit: "m3",
+      sortNo: 2,
+    },
+    rollbackSupported: true,
+  });
 
   const billItemsResponse = await app.inject({
     method: "GET",
@@ -752,6 +769,33 @@ test("POST /v1/ai/recommendations/:id/accept creates a formal bill item for bill
     feedbackAuditResponse.json().items[0].afterPayload.knowledgeEntryId,
     "knowledge-entry-001",
   );
+
+  const rollbackResponse = await app.inject({
+    method: "POST",
+    url: `/v1/ai/recommendations/${createdResponse.json().id}/rollback`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      reason: "撤销新增清单",
+    },
+  });
+  assert.equal(rollbackResponse.statusCode, 200);
+  assert.equal(rollbackResponse.json().status, "rolled_back");
+  assert.equal(
+    rollbackResponse.json().outputPayload.rollback.changes[0].resourceId,
+    "bill-item-002",
+  );
+
+  const rollbackBillItemsResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+  assert.equal(rollbackBillItemsResponse.statusCode, 200);
+  assert.equal(rollbackBillItemsResponse.json().items.length, 1);
 
   await app.close();
 });

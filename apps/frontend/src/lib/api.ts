@@ -37,6 +37,7 @@ import type {
   VarianceWarningThreshold,
   VarianceWarningThresholdListResponse,
   VersionCompareResponse,
+  CreateAiRecommendationJobResponse,
 } from "./types";
 
 type QueryValue = string | number | undefined | null;
@@ -478,6 +479,28 @@ export const apiClient = {
       query,
     );
   },
+  createAiRecommendationJob(input: {
+    projectId: string;
+    recommendationType: AiRecommendationType;
+    resourceType?: string;
+    resourceId?: string;
+    billVersionId?: string;
+    stageCode?: string;
+    disciplineCode?: string;
+    thresholdAmount?: number;
+    thresholdRate?: number;
+    limit?: number;
+    inputPayload?: Record<string, unknown>;
+  }) {
+    return request<CreateAiRecommendationJobResponse>(
+      "/v1/ai/recommendation-jobs",
+      undefined,
+      {
+        method: "POST",
+        body: input,
+      },
+    );
+  },
   listVarianceWarningThresholds(
     projectId: string,
     query?: {
@@ -542,6 +565,16 @@ export const apiClient = {
   ignoreAiRecommendation(recommendationId: string, reason?: string) {
     return request<AiRecommendation>(
       `/v1/ai/recommendations/${recommendationId}/ignore`,
+      undefined,
+      {
+        method: "POST",
+        body: reason ? { reason } : {},
+      },
+    );
+  },
+  rollbackAiRecommendation(recommendationId: string, reason?: string) {
+    return request<AiRecommendation>(
+      `/v1/ai/recommendations/${recommendationId}/rollback`,
       undefined,
       {
         method: "POST",

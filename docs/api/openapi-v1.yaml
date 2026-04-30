@@ -453,6 +453,59 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/ai/recommendations/{recommendationId}/rollback:
+    post:
+      operationId: postAiRecommendationsByRecommendationIdRollback
+      summary: POST /v1/ai/recommendations/:recommendationId/rollback
+      tags:
+        - AI Recommendations
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: recommendationId
+        in: path
+        description: recommendationId path parameter.
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /v1/ai/recommendations/expire-stale:
     post:
       operationId: postAiRecommendationsExpireStale

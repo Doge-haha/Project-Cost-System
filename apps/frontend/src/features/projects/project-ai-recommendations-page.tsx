@@ -7,6 +7,7 @@ import type {
   AiRecommendationListResponse,
   AiRecommendationStatus,
   AiRecommendationType,
+  BackgroundJob,
   ProjectWorkspace,
   VarianceWarningThreshold,
 } from "../../lib/types";
@@ -76,6 +77,7 @@ const statusOptions: Array<{ value: AiRecommendationStatus; label: string }> = [
   { value: "accepted", label: "已接受" },
   { value: "ignored", label: "已忽略" },
   { value: "expired", label: "已失效" },
+  { value: "rolled_back", label: "已回滚" },
 ];
 
 export function ProjectAiRecommendationsPage() {
@@ -97,6 +99,9 @@ export function ProjectAiRecommendationsPage() {
   const [thresholdSaving, setThresholdSaving] = useState(false);
   const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
   const [batchExpiring, setBatchExpiring] = useState(false);
+  const [recommendationJobs, setRecommendationJobs] = useState<BackgroundJob[]>([]);
+  const [jobSubmitting, setJobSubmitting] = useState(false);
+  const [jobMessage, setJobMessage] = useState<string | null>(null);
   const [contextPreview, setContextPreview] = useState<ContextPreviewState | null>(
     null,
   );
@@ -142,6 +147,14 @@ export function ProjectAiRecommendationsPage() {
         workspace,
         recommendations,
       });
+      try {
+        const jobs = await apiClient.listProjectBackgroundJobs(projectId, {
+          jobType: "ai_recommendation",
+        });
+        setRecommendationJobs(jobs.items);
+      } catch {
+        setRecommendationJobs([]);
+      }
     } catch (fetchError) {
       setError(
         fetchError instanceof ApiError
@@ -173,6 +186,31 @@ export function ProjectAiRecommendationsPage() {
   useEffect(() => {
     void loadRecommendations();
   }, [projectId, activeQuery]);
+
+  useEffect(() => {
+    const hasActiveJob = recommendationJobs.some(
+      (job) => job.status === "queued" || job.status === "processing",
+    );
+    if (!projectId || !hasActiveJob) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(async () => {
+      try {
+        const jobs = await apiClient.listProjectBackgroundJobs(projectId, {
+          jobType: "ai_recommendation",
+        });
+        setRecommendationJobs(jobs.items);
+        if (jobs.items.some((job) => job.status === "completed")) {
+          await loadRecommendations();
+        }
+      } catch {
+        setJobMessage("AI 推荐任务状态刷新失败。");
+      }
+    }, 2000);
+
+    return () => window.clearInterval(timer);
+  }, [projectId, recommendationJobs]);
 
   useEffect(() => {
     void loadThresholds();
@@ -233,6 +271,66 @@ export function ProjectAiRecommendationsPage() {
       );
     } finally {
       setActionTargetId(null);
+    }
+  }
+
+  async function handleRollbackRecommendation(recommendation: AiRecommendation) {
+    setActionTargetId(recommendation.id);
+    setActionMessage(null);
+
+    try {
+      const updated = await apiClient.rollbackAiRecommendation(
+        recommendation.id,
+        "人工撤销已接受推荐",
+      );
+      setState((current) =>
+        updateRecommendationState(current, updated, activeQuery),
+      );
+      setActionMessage("已回滚该推荐接受产生的业务变更。");
+    } catch (submitError) {
+      setActionMessage(
+        submitError instanceof ApiError
+          ? submitError.message
+          : "AI 推荐回滚失败，请检查业务数据是否仍可编辑。",
+      );
+    } finally {
+      setActionTargetId(null);
+    }
+  }
+
+  async function handleCreateAsyncRecommendationJob() {
+    if (!projectId) {
+      return;
+    }
+    setJobSubmitting(true);
+    setJobMessage(null);
+
+    try {
+      const response = await apiClient.createAiRecommendationJob({
+        projectId,
+        recommendationType:
+          activeQuery.recommendationType === ""
+            ? "bill_recommendation"
+            : (activeQuery.recommendationType as AiRecommendationType),
+        resourceType: activeQuery.resourceType || "bill_version",
+        resourceId:
+          activeQuery.resourceId ||
+          state?.workspace.billVersions[0]?.id ||
+          undefined,
+        stageCode: activeQuery.stageCode || undefined,
+        disciplineCode: activeQuery.disciplineCode || undefined,
+        limit: Number(activeQuery.limit),
+      });
+      setRecommendationJobs((current) => [response.job, ...current]);
+      setJobMessage(`已提交异步推荐任务 ${response.job.id}。`);
+    } catch (submitError) {
+      setJobMessage(
+        submitError instanceof ApiError
+          ? submitError.message
+          : "异步推荐任务提交失败，请稍后重试。",
+      );
+    } finally {
+      setJobSubmitting(false);
     }
   }
 
@@ -617,6 +715,36 @@ export function ProjectAiRecommendationsPage() {
       </section>
 
       <section className="panel">
+        <h2>异步生成</h2>
+        {jobMessage ? <p className="page-description">{jobMessage}</p> : null}
+        <div className="button-row">
+          <button
+            className="primary-button"
+            disabled={!canHandleRecommendations || jobSubmitting}
+            onClick={() => {
+              void handleCreateAsyncRecommendationJob();
+            }}
+            type="button"
+          >
+            生成推荐
+          </button>
+        </div>
+        {recommendationJobs.length > 0 ? (
+          <div className="recommendation-meta-list">
+            {recommendationJobs.slice(0, 5).map((job) => (
+              <p className="page-description" key={job.id}>
+                {job.id} · {formatJobStatus(job.status)} ·{" "}
+                {formatProjectDateTime(job.createdAt)}
+                {job.errorMessage ? ` · ${job.errorMessage}` : ""}
+              </p>
+            ))}
+          </div>
+        ) : (
+          <p className="page-description">当前暂无 AI 推荐任务。</p>
+        )}
+      </section>
+
+      <section className="panel">
         <h2>推荐列表</h2>
         {actionMessage ? <p className="page-description">{actionMessage}</p> : null}
         <div className="button-row">
@@ -762,6 +890,7 @@ export function ProjectAiRecommendationsPage() {
                         </p>
                       ) : (
                         <>
+                          <AcceptedChangeSummary recommendation={recommendation} />
                           <p className="page-description">
                             处理人 {recommendation.handledBy ?? "-"} · 原因{" "}
                             {recommendation.statusReason ?? "-"}
@@ -772,6 +901,22 @@ export function ProjectAiRecommendationsPage() {
                               ? formatProjectDateTime(recommendation.handledAt)
                               : "-"}
                           </p>
+                          {recommendation.status === "accepted" &&
+                          canHandleRecommendations &&
+                          canRollbackRecommendation(recommendation) ? (
+                            <div className="version-card-actions">
+                              <button
+                                className="connection-button secondary"
+                                disabled={actionTargetId === recommendation.id}
+                                onClick={() => {
+                                  void handleRollbackRecommendation(recommendation);
+                                }}
+                                type="button"
+                              >
+                                撤销接受
+                              </button>
+                            </div>
+                          ) : null}
                         </>
                       )}
                     </article>
@@ -985,6 +1130,7 @@ function summarizeVisibleRecommendations(items: AiRecommendation[]) {
       accepted: items.filter((item) => item.status === "accepted").length,
       ignored: items.filter((item) => item.status === "ignored").length,
       expired: items.filter((item) => item.status === "expired").length,
+      rolled_back: items.filter((item) => item.status === "rolled_back").length,
     },
     typeCounts: {
       bill_recommendation: items.filter(
@@ -1093,6 +1239,59 @@ function formatRecommendationType(type: AiRecommendationType) {
 function formatRecommendationStatus(status: AiRecommendationStatus) {
   const option = statusOptions.find((item) => item.value === status);
   return option?.label ?? status;
+}
+
+function formatJobStatus(status: BackgroundJob["status"]) {
+  const labels: Record<BackgroundJob["status"], string> = {
+    queued: "排队中",
+    processing: "处理中",
+    completed: "已完成",
+    failed: "失败",
+  };
+  return labels[status] ?? status;
+}
+
+function readAcceptedChanges(recommendation: AiRecommendation) {
+  const value = recommendation.outputPayload.acceptedChanges;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (item): item is Record<string, unknown> =>
+      item !== null && typeof item === "object" && !Array.isArray(item),
+  );
+}
+
+function canRollbackRecommendation(recommendation: AiRecommendation) {
+  const changes = readAcceptedChanges(recommendation);
+  return (
+    changes.length > 0 &&
+    changes.every((change) => change.rollbackSupported === true)
+  );
+}
+
+function AcceptedChangeSummary(props: { recommendation: AiRecommendation }) {
+  const changes = readAcceptedChanges(props.recommendation);
+  if (changes.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="recommendation-meta-list">
+      {changes.map((change, index) => (
+        <p className="page-description" key={`${change.resourceType}-${change.resourceId}-${index}`}>
+          本次接受{formatAcceptedChangeAction(change.action)}{" "}
+          {formatContextPrimitive(change.resourceType)} ·{" "}
+          {formatContextPrimitive(change.resourceId)}
+          {typeof change.label === "string" && change.label ? ` · ${change.label}` : ""}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function formatAcceptedChangeAction(value: unknown) {
+  return value === "delete" ? "删除了" : "创建了";
 }
 
 function formatRecommendationPayload(payload: Record<string, unknown>) {

@@ -120,6 +120,20 @@ export LLM_BASE_URL=https://api.openai.com/v1
 AI 推荐支持同步写入人工/工具给定的 `outputPayload`，也支持通过
 `POST /v1/ai/recommendation-jobs` 进入 `ai_recommendation` 后台任务，由
 AI Runtime 的 OpenAI-compatible LLM provider 生成推荐并落库。
+任务提交后可用返回的 `job.id` 查询 `/v1/jobs/{jobId}`；任务完成后刷新
+`/v1/projects/{projectId}/ai/recommendations?status=generated` 获取推荐结果。
+
+```json
+{
+  "projectId": "project-001",
+  "recommendationType": "bill_recommendation",
+  "resourceType": "bill_version",
+  "resourceId": "bill-version-001",
+  "stageCode": "estimate",
+  "disciplineCode": "building",
+  "limit": 5
+}
+```
 
 只跑某个 workspace 的测试：
 

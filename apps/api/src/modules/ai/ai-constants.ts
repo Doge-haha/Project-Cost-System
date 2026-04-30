@@ -9,6 +9,7 @@ export const AI_RECOMMENDATION_STATUSES = [
   "accepted",
   "ignored",
   "expired",
+  "rolled_back",
 ] as const;
 
 export const AI_TASK_FAILURE_ERROR_CODES = [

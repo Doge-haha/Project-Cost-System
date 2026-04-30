@@ -16,6 +16,7 @@ const recommendationStatusSchema = z.enum([
   "accepted",
   "ignored",
   "expired",
+  "rolled_back",
 ]);
 
 const createRecommendationSchema = z.object({
@@ -297,6 +298,19 @@ export function registerAiRecommendationRoutes(
       aiRecommendationService.transitionRecommendation({
         recommendationId,
         status: "ignored",
+        reason: payload.reason,
+        userId: request.currentUser!.id,
+      }),
+    );
+  });
+
+  app.post("/v1/ai/recommendations/:recommendationId/rollback", async (request) => {
+    const { recommendationId } = request.params as { recommendationId: string };
+    const payload = transitionSchema.parse(request.body ?? {});
+
+    return transactionRunner.runInTransaction(() =>
+      aiRecommendationService.rollbackAcceptedRecommendation({
+        recommendationId,
         reason: payload.reason,
         userId: request.currentUser!.id,
       }),

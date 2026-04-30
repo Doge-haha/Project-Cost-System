@@ -18,12 +18,20 @@ def test_describe_llm_provider_uses_env(monkeypatch) -> None:
 
 
 def test_generate_llm_completion_calls_openai_compatible_chat(monkeypatch) -> None:
-    def fake_post_json(url: str, payload: dict, *, api_key: str, timeout: float) -> dict:
+    def fake_post_json(
+        url: str,
+        payload: dict,
+        *,
+        api_key: str,
+        timeout: float,
+        retry_attempts: int = 2,
+    ) -> dict:
         assert url == "http://llm.local/v1/chat/completions"
         assert payload["model"] == "cost-model"
         assert payload["messages"][0]["role"] == "user"
         assert api_key == "secret"
         assert timeout == 2
+        assert retry_attempts == 2
         return {
             "choices": [{"message": {"content": "建议套用人工挖土方定额。"}}],
             "usage": {"total_tokens": 12},
@@ -81,7 +89,7 @@ def test_generate_llm_completion_requires_configuration(monkeypatch) -> None:
             }
         )
     except ValueError as error:
-        assert str(error) == "LLM_API_KEY and LLM_MODEL are required"
+        assert str(error) == "LLM_API_KEY is required"
     else:
         raise AssertionError("generate_llm_completion should require LLM config")
 

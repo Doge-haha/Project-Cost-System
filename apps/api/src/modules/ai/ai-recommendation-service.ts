@@ -225,7 +225,10 @@ export class AiRecommendationService {
     const providerResult = readObject(llmResult, "result");
     const provider = readObject(providerResult, "provider");
     const content = readRequiredStringFromObject(providerResult, "content");
-    const recommendations = parseProviderRecommendations(content);
+    const recommendations = parseProviderRecommendations(
+      content,
+      input.recommendationType,
+    );
     const created: AiRecommendationRecord[] = [];
     for (const recommendation of recommendations.slice(0, input.limit ?? 10)) {
       created.push(
@@ -844,6 +847,147 @@ export class AiRecommendationService {
       afterPayload: {
         status: updated.status,
         reason: updated.statusReason,
+        acceptedChanges: readAcceptedChanges(updated.outputPayload),
+      },
+    });
+
+    await this.persistRecommendationFeedback(updated, input.userId);
+
+    return updated;
+  }
+
+  async rollbackAcceptedRecommendation(input: {
+    recommendationId: string;
+    reason?: string;
+    userId: string;
+  }): Promise<AiRecommendationRecord> {
+    const current = await this.recommendationRepository.findById(
+      input.recommendationId,
+    );
+    if (!current) {
+      throw new AppError(
+        404,
+        "AI_RECOMMENDATION_NOT_FOUND",
+        "AI recommendation not found",
+      );
+    }
+    if (current.status !== "accepted") {
+      throw new AppError(
+        409,
+        "AI_RECOMMENDATION_NOT_ROLLBACKABLE",
+        "Only accepted recommendations can be rolled back",
+      );
+    }
+
+    await this.assertProjectAccess(
+      {
+        projectId: current.projectId,
+        stageCode: current.stageCode ?? undefined,
+        disciplineCode: current.disciplineCode ?? undefined,
+        userId: input.userId,
+      },
+      "edit",
+    );
+
+    const changes = readAcceptedChanges(current.outputPayload);
+    if (changes.length === 0 || changes.some((change) => !change.rollbackSupported)) {
+      throw new AppError(
+        422,
+        "AI_RECOMMENDATION_ROLLBACK_UNSUPPORTED",
+        "Accepted recommendation does not contain rollback metadata",
+      );
+    }
+
+    const rollbackChanges: AcceptedChange[] = [];
+    for (const change of changes.slice().reverse()) {
+      if (change.action !== "create") {
+        throw new AppError(
+          422,
+          "AI_RECOMMENDATION_ROLLBACK_UNSUPPORTED",
+          "Only created resources can be rolled back automatically",
+        );
+      }
+
+      if (change.resourceType === "quota_line") {
+        if (!this.dependencies.quotaLineService) {
+          throw new AppError(
+            500,
+            "QUOTA_LINE_SERVICE_MISSING",
+            "Quota line service is not configured",
+          );
+        }
+        await this.dependencies.quotaLineService.deleteQuotaLine({
+          projectId: current.projectId,
+          quotaLineId: change.resourceId,
+          userId: input.userId,
+        });
+      } else if (change.resourceType === "bill_item") {
+        if (!this.dependencies.billItemService) {
+          throw new AppError(
+            500,
+            "BILL_ITEM_SERVICE_MISSING",
+            "Bill item service is not configured",
+          );
+        }
+        const billVersionId = readString(change.snapshot, "billVersionId");
+        if (!billVersionId) {
+          throw new AppError(
+            422,
+            "AI_RECOMMENDATION_ROLLBACK_UNSUPPORTED",
+            "Bill item rollback requires billVersionId",
+          );
+        }
+        await this.dependencies.billItemService.deleteBillItem({
+          projectId: current.projectId,
+          billVersionId,
+          itemId: change.resourceId,
+          userId: input.userId,
+        });
+      } else {
+        throw new AppError(
+          422,
+          "AI_RECOMMENDATION_ROLLBACK_UNSUPPORTED",
+          `Rollback is not supported for ${change.resourceType}`,
+        );
+      }
+
+      rollbackChanges.push({ ...change, action: "delete" });
+    }
+
+    const updatedAt = new Date().toISOString();
+    const updated = await this.recommendationRepository.update({
+      ...current,
+      outputPayload: {
+        ...current.outputPayload,
+        rollback: {
+          rolledBackAt: updatedAt,
+          rolledBackBy: input.userId,
+          reason: input.reason ?? null,
+          changes: rollbackChanges,
+        },
+      },
+      status: "rolled_back",
+      handledBy: input.userId,
+      handledAt: updatedAt,
+      statusReason: input.reason ?? "rollback_accepted_recommendation",
+      updatedAt,
+    });
+
+    await this.auditLogService.writeAuditLog({
+      projectId: updated.projectId,
+      stageCode: updated.stageCode ?? null,
+      resourceType: "ai_recommendation",
+      resourceId: updated.id,
+      action: "rolled_back",
+      operatorId: input.userId,
+      beforePayload: {
+        status: current.status,
+        acceptedChanges: changes,
+      },
+      afterPayload: {
+        status: updated.status,
+        reason: updated.statusReason,
+        rollbackChanges,
       },
     });
 
@@ -1116,7 +1260,7 @@ export class AiRecommendationService {
   private async applyAcceptedRecommendation(
     recommendation: AiRecommendationRecord,
     userId: string,
-  ): Promise<Record<string, string> | null> {
+  ): Promise<Record<string, unknown> | null> {
     if (
       recommendation.recommendationType === "bill_recommendation" &&
       recommendation.resourceType === "bill_version"
@@ -1168,13 +1312,25 @@ export class AiRecommendationService {
       userId,
     });
 
-    return { acceptedQuotaLineId: created.id };
+    return {
+      acceptedQuotaLineId: created.id,
+      acceptedChanges: [
+        buildAcceptedChange({
+          action: "create",
+          resourceType: "quota_line",
+          resourceId: created.id,
+          label: `${created.quotaCode} ${created.quotaName}`,
+          snapshot: created,
+          rollbackSupported: true,
+        }),
+      ],
+    };
   }
 
   private async applyAcceptedBillRecommendation(
     recommendation: AiRecommendationRecord,
     userId: string,
-  ): Promise<Record<string, string> | null> {
+  ): Promise<Record<string, unknown> | null> {
     if (!this.dependencies.billItemService) {
       return null;
     }
@@ -1212,8 +1368,55 @@ export class AiRecommendationService {
       userId,
     });
 
-    return { acceptedBillItemId: created.id };
+    return {
+      acceptedBillItemId: created.id,
+      acceptedChanges: [
+        buildAcceptedChange({
+          action: "create",
+          resourceType: "bill_item",
+          resourceId: created.id,
+          label: `${created.itemCode} ${created.itemName}`,
+          snapshot: created,
+          rollbackSupported: true,
+        }),
+      ],
+    };
   }
+}
+
+type AcceptedChange = {
+  action: "create" | "delete";
+  resourceType: string;
+  resourceId: string;
+  label: string;
+  snapshot: Record<string, unknown>;
+  rollbackSupported: boolean;
+};
+
+function buildAcceptedChange(input: AcceptedChange): AcceptedChange {
+  return input;
+}
+
+function readAcceptedChanges(payload: Record<string, unknown>): AcceptedChange[] {
+  const value = payload.acceptedChanges;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item !== null && typeof item === "object" && !Array.isArray(item),
+    )
+    .map((item): AcceptedChange => ({
+      action: item.action === "delete" ? "delete" : "create",
+      resourceType: readString(item, "resourceType") ?? "",
+      resourceId: readString(item, "resourceId") ?? "",
+      label: readString(item, "label") ?? "",
+      snapshot: readObject(item, "snapshot") ?? {},
+      rollbackSupported: item.rollbackSupported === true,
+    }))
+    .filter((item) => item.resourceType.length > 0 && item.resourceId.length > 0);
 }
 
 function readString(payload: Record<string, unknown>, key: string): string | null {
@@ -1257,7 +1460,10 @@ function readRequiredStringFromObject(
   );
 }
 
-function parseProviderRecommendations(content: string): Array<{
+function parseProviderRecommendations(
+  content: string,
+  recommendationType: AiRecommendationType,
+): Array<{
   resourceType?: string;
   resourceId?: string;
   outputPayload: Record<string, unknown>;
@@ -1288,11 +1494,16 @@ function parseProviderRecommendations(content: string): Array<{
     )
     .map((item) => {
       const outputPayload = readObject(item, "outputPayload");
-      return {
+      const parsedItem = {
         resourceType: readString(item, "resourceType") ?? undefined,
         resourceId: readString(item, "resourceId") ?? undefined,
         outputPayload: outputPayload ?? item,
       };
+      validateProviderRecommendationPayload(
+        parsedItem.outputPayload,
+        recommendationType,
+      );
+      return parsedItem;
     });
 
   if (recommendations.length === 0) {
@@ -1304,6 +1515,43 @@ function parseProviderRecommendations(content: string): Array<{
   }
 
   return recommendations;
+}
+
+function validateProviderRecommendationPayload(
+  payload: Record<string, unknown>,
+  recommendationType: AiRecommendationType,
+) {
+  if (Object.keys(payload).length === 0) {
+    throw new AppError(
+      502,
+      "AI_PROVIDER_RESPONSE_INVALID",
+      "AI provider recommendation outputPayload must not be empty",
+    );
+  }
+
+  const requiredKeys =
+    recommendationType === "bill_recommendation"
+      ? ["itemCode", "itemName", "quantity", "unit", "sortNo"]
+      : recommendationType === "quota_recommendation"
+        ? [
+            "billVersionId",
+            "sourceStandardSetCode",
+            "sourceQuotaId",
+            "chapterCode",
+            "quotaCode",
+            "quotaName",
+            "unit",
+            "quantity",
+          ]
+        : ["warning", "severity"];
+  const missing = requiredKeys.filter((key) => payload[key] === undefined);
+  if (missing.length > 0) {
+    throw new AppError(
+      502,
+      "AI_PROVIDER_RESPONSE_INVALID",
+      `AI provider recommendation outputPayload is missing ${missing.join(", ")}`,
+    );
+  }
 }
 
 function isVarianceExceeded(
@@ -1485,6 +1733,7 @@ function countByStatus(items: AiRecommendationRecord[]) {
     accepted: items.filter((item) => item.status === "accepted").length,
     ignored: items.filter((item) => item.status === "ignored").length,
     expired: items.filter((item) => item.status === "expired").length,
+    rolled_back: items.filter((item) => item.status === "rolled_back").length,
   };
 }
 

@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 
 from .knowledge_pipeline import extract_candidates, extract_candidates_batch
-from .llm_provider import describe_llm_provider, generate_llm_completion
+from .llm_provider import (
+    describe_llm_provider,
+    generate_llm_completion,
+    validate_llm_provider_config,
+)
 from .reference_quota_retrieval import (
     inspect_qdrant_snapshot,
     retrieve_reference_quota_candidates,
@@ -32,6 +36,7 @@ __all__ = [
     "extract_candidates",
     "extract_candidates_batch",
     "generate_llm_completion",
+    "validate_llm_provider_config",
     "inspect_qdrant_snapshot",
     "retrieve_reference_quota_candidates",
 ]

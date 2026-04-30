@@ -297,7 +297,8 @@ export type AiRecommendationStatus =
   | "generated"
   | "accepted"
   | "ignored"
-  | "expired";
+  | "expired"
+  | "rolled_back";
 
 export type AiRecommendationType =
   | "bill_recommendation"
@@ -352,6 +353,10 @@ export type VarianceWarningThresholdListResponse = {
 export type ExpireStaleAiRecommendationResponse = {
   items: AiRecommendation[];
   summary: AiRecommendationListResponse["summary"];
+};
+
+export type CreateAiRecommendationJobResponse = {
+  job: BackgroundJob;
 };
 
 export type BillItem = {

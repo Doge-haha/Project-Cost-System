@@ -584,6 +584,23 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 resource，后端 job processor 调用 AI Runtime 的 OpenAI-compatible LLM provider
 生成结构化推荐，再复用推荐服务写入审计和推荐记录。
 
+Async payload 示例：
+
+```json
+{
+  "projectId": "project-001",
+  "recommendationType": "bill_recommendation",
+  "resourceType": "bill_version",
+  "resourceId": "bill-version-001",
+  "stageCode": "estimate",
+  "disciplineCode": "building"
+}
+```
+
+MCP 返回的 `execution.statusResource.query.jobId` 可继续查询
+`GET /v1/resources/job-status?jobId=background-job-001`；当 job 为
+`completed` 后，再读 `ai_recommendations` resource 或 API 推荐列表。
+
 当前验证：
 
 - `npm --workspace @saas-pricing/mcp-gateway test`

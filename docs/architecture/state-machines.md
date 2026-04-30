@@ -260,6 +260,7 @@ queued -> processing -> completed
 | `accepted` | 用户接受推荐 |
 | `ignored` | 用户忽略推荐 |
 | `expired` | 推荐因版本变化失效 |
+| `rolled_back` | 已接受推荐产生的业务变更已撤销 |
 
 ### 10.2 状态流转
 
@@ -267,12 +268,14 @@ queued -> processing -> completed
 generated -> accepted
 generated -> ignored
 generated -> expired
+accepted -> rolled_back
 ```
 
 ### 10.3 规则
 
 - 推荐结果只能辅助，不直接推动主业务对象状态变化。
 - 若源清单版本或定额上下文发生变化，旧推荐应进入 `expired`。
+- 接受推荐后必须保留变更快照；仅对可安全撤销的新增业务对象开放回滚入口。
 
 ## 11. 状态联动规则
 

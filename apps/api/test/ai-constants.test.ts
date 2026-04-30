@@ -23,6 +23,7 @@ test("Iteration 5 AI and knowledge constants stay stable", () => {
     "accepted",
     "ignored",
     "expired",
+    "rolled_back",
   ]);
   assert.deepEqual(AI_TASK_FAILURE_ERROR_CODES, [
     "AI_RUNTIME_EXECUTION_FAILED",

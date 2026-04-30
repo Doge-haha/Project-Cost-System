@@ -3113,6 +3113,77 @@ test("POST /v1/tools/generate-ai-recommendations proxies recommendation generati
   await app.close();
 });
 
+test("POST /v1/tools/generate-ai-recommendations returns async job execution when output is omitted", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      generateAiRecommendations: async (input, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...input,
+        });
+        return {
+          job: {
+            id: "background-job-001",
+            jobType: "ai_recommendation",
+            status: "queued",
+            projectId: "project-001",
+          },
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "owner-001",
+    displayName: "Owner User",
+    roleCodes: ["project_owner"],
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/tools/generate-ai-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_version",
+      resourceId: "bill-version-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().mode, "accepted");
+  assert.deepEqual(response.json().execution, {
+    kind: "async_job",
+    jobId: "background-job-001",
+    statusResource: {
+      resourceType: "job_status",
+      query: {
+        jobId: "background-job-001",
+      },
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_version",
+      resourceId: "bill-version-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  ]);
+
+  await app.close();
+});
+
 test("POST /v1/tools/expire-stale-ai-recommendations proxies stale expiration", async () => {
   const requests: Array<Record<string, unknown>> = [];
   const app = createGatewayApp({

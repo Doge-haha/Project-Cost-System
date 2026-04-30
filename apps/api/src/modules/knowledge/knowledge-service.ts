@@ -40,7 +40,11 @@ type ExtractionBatchResult = {
   };
 };
 
-type RecommendationFeedbackStatus = "accepted" | "ignored" | "expired";
+type RecommendationFeedbackStatus =
+  | "accepted"
+  | "ignored"
+  | "expired"
+  | "rolled_back";
 
 export const KNOWLEDGE_ENTRY_TYPES = [
   "project_retrospective",

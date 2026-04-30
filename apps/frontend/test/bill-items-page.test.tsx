@@ -618,6 +618,118 @@ describe("BillItemsPage", () => {
     ]);
   });
 
+  test("filters pricing configuration options and shows empty states", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({
+          items: [
+            ...priceVersions,
+            {
+              id: "price-version-002",
+              versionCode: "ZJ-INSTALL-2026",
+              versionName: "浙江安装 2026",
+              regionCode: "ZJ",
+              disciplineCode: "installation",
+              status: "active",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "计价配置" })).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("暂无可用取费模板")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "单项计价" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("筛选价目版本"), {
+      target: { value: "浙江" },
+    });
+
+    expect(screen.getByText("已筛选 1/2 个价目版本。")).toBeInTheDocument();
+    expect(screen.getByText("浙江安装 2026（ZJ / installation）")).toBeInTheDocument();
+    expect(screen.queryByText("江苏土建 2026（JS / building）")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("筛选价目版本"), {
+      target: { value: "广东" },
+    });
+
+    expect(screen.getByText("没有匹配价目版本")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "清空价目筛选" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "清空价目筛选" }));
+
+    expect(screen.getByText("江苏土建 2026（JS / building）")).toBeInTheDocument();
+  });
+
   test("updates pricing defaults and recalculates the current bill version", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));

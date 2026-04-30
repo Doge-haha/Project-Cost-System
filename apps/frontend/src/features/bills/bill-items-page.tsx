@@ -52,6 +52,44 @@ function filterQuotaCandidates(
   );
 }
 
+function filterPriceVersions(priceVersions: PriceVersion[], filter: string) {
+  const normalizedFilter = filter.trim().toLowerCase();
+  if (!normalizedFilter) {
+    return priceVersions;
+  }
+
+  return priceVersions.filter((priceVersion) =>
+    [
+      priceVersion.versionCode,
+      priceVersion.versionName,
+      priceVersion.regionCode,
+      priceVersion.disciplineCode,
+      priceVersion.status,
+    ].some((value) => String(value).toLowerCase().includes(normalizedFilter)),
+  );
+}
+
+function filterFeeTemplates(feeTemplates: FeeTemplate[], filter: string) {
+  const normalizedFilter = filter.trim().toLowerCase();
+  if (!normalizedFilter) {
+    return feeTemplates;
+  }
+
+  return feeTemplates.filter((template) =>
+    [
+      template.templateName,
+      template.projectType,
+      template.regionCode,
+      template.stageScope.join(" "),
+      template.taxMode,
+      template.allocationMode,
+      template.status,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(normalizedFilter)),
+  );
+}
+
 export function BillItemsPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -75,6 +113,8 @@ export function BillItemsPage() {
   const [manualPricingReason, setManualPricingReason] = useState("市场询价调整");
   const [billItemFilter, setBillItemFilter] = useState("");
   const [quotaCandidateFilter, setQuotaCandidateFilter] = useState("");
+  const [priceVersionFilter, setPriceVersionFilter] = useState("");
+  const [feeTemplateFilter, setFeeTemplateFilter] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -138,6 +178,8 @@ export function BillItemsPage() {
       setPricingActionMessage(null);
       setBillItemFilter("");
       setQuotaCandidateFilter("");
+      setPriceVersionFilter("");
+      setFeeTemplateFilter("");
     } catch (fetchError) {
       setError(
         fetchError instanceof ApiError
@@ -382,6 +424,16 @@ export function BillItemsPage() {
     [quotaCandidateFilter, quotaCandidates],
   );
   const normalizedQuotaCandidateFilter = quotaCandidateFilter.trim().toLowerCase();
+  const filteredPriceVersions = useMemo(
+    () => filterPriceVersions(priceVersions, priceVersionFilter),
+    [priceVersionFilter, priceVersions],
+  );
+  const filteredFeeTemplates = useMemo(
+    () => filterFeeTemplates(feeTemplates, feeTemplateFilter),
+    [feeTemplateFilter, feeTemplates],
+  );
+  const normalizedPriceVersionFilter = priceVersionFilter.trim().toLowerCase();
+  const normalizedFeeTemplateFilter = feeTemplateFilter.trim().toLowerCase();
   const visibleQuotaLines = quotaLines.filter((quotaLine) => quotaLine.billVersionId === versionId);
   const selectedItemQuotaLines = selectedBillItem
     ? visibleQuotaLines.filter((quotaLine) => quotaLine.billItemId === selectedBillItem.id)
@@ -533,6 +585,62 @@ export function BillItemsPage() {
           </div>
         </div>
 
+        <div className="button-row">
+          <label className="form-field">
+            筛选价目版本
+            <input
+              placeholder="名称、编码、地区或专业"
+              value={priceVersionFilter}
+              onChange={(event) => {
+                setPriceVersionFilter(event.target.value);
+                setPricingActionMessage(null);
+              }}
+            />
+          </label>
+          <button
+            className="primary-button secondary"
+            disabled={!priceVersionFilter}
+            onClick={() => {
+              setPriceVersionFilter("");
+            }}
+            type="button"
+          >
+            清空价目筛选
+          </button>
+          <label className="form-field">
+            筛选取费模板
+            <input
+              placeholder="名称、阶段、地区或税制"
+              value={feeTemplateFilter}
+              onChange={(event) => {
+                setFeeTemplateFilter(event.target.value);
+                setPricingActionMessage(null);
+              }}
+            />
+          </label>
+          <button
+            className="primary-button secondary"
+            disabled={!feeTemplateFilter}
+            onClick={() => {
+              setFeeTemplateFilter("");
+            }}
+            type="button"
+          >
+            清空取费筛选
+          </button>
+        </div>
+
+        {normalizedPriceVersionFilter ? (
+          <p className="page-description">
+            已筛选 {filteredPriceVersions.length}/{priceVersions.length} 个价目版本。
+          </p>
+        ) : null}
+        {normalizedFeeTemplateFilter ? (
+          <p className="page-description">
+            已筛选 {filteredFeeTemplates.length}/{feeTemplates.length} 个取费模板。
+          </p>
+        ) : null}
+
         <div className="form-grid">
           <label className="form-field">
             默认价目版本
@@ -544,7 +652,7 @@ export function BillItemsPage() {
               }}
             >
               <option value="">未绑定</option>
-              {priceVersions.map((priceVersion) => (
+              {filteredPriceVersions.map((priceVersion) => (
                 <option key={priceVersion.id} value={priceVersion.id}>
                   {priceVersion.versionName}（{priceVersion.regionCode} /{" "}
                   {priceVersion.disciplineCode}）
@@ -562,7 +670,7 @@ export function BillItemsPage() {
               }}
             >
               <option value="">未绑定</option>
-              {feeTemplates.map((template) => (
+              {filteredFeeTemplates.map((template) => (
                 <option key={template.id} value={template.id}>
                   {template.templateName}（{template.stageScope.join(" / ")}）
                 </option>
@@ -570,6 +678,25 @@ export function BillItemsPage() {
             </select>
           </label>
         </div>
+
+        {priceVersions.length === 0 ? (
+          <EmptyState
+            title="暂无可用价目版本"
+            body="当前版本专业下没有可绑定的启用价目版本。"
+          />
+        ) : null}
+        {priceVersions.length > 0 && filteredPriceVersions.length === 0 ? (
+          <EmptyState title="没有匹配价目版本" body="请调整名称、编码、地区或专业筛选条件。" />
+        ) : null}
+        {feeTemplates.length === 0 ? (
+          <EmptyState
+            title="暂无可用取费模板"
+            body="当前版本阶段下没有可绑定的启用取费模板。"
+          />
+        ) : null}
+        {feeTemplates.length > 0 && filteredFeeTemplates.length === 0 ? (
+          <EmptyState title="没有匹配取费模板" body="请调整名称、阶段、地区或税制筛选条件。" />
+        ) : null}
 
         {selectedBillItem ? (
           <div className="form-grid">

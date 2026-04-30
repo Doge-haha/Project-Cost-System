@@ -83,6 +83,19 @@ export class AiRuntimePreviewService {
     });
   }
 
+  async checkLlmProvider(input?: {
+    provider?: string;
+    baseUrl?: string;
+    apiKey?: string;
+    model?: string;
+  }): Promise<Record<string, unknown>> {
+    return this.processPayload({
+      task: "llm_provider_health",
+      source: "llm_provider",
+      ...(input ?? {}),
+    });
+  }
+
   private async processPayload(input: Record<string, unknown>): Promise<Record<string, unknown>> {
     const { stdout, stderr } = await this.commandRunner(
       this.options.pythonExecutable,

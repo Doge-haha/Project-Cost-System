@@ -29,7 +29,10 @@ import {
   InMemoryBillItemRepository,
   type BillItemRecord,
 } from "../src/modules/bill/bill-item-repository.js";
-import { InMemoryQuotaLineRepository } from "../src/modules/quota/quota-line-repository.js";
+import {
+  InMemoryQuotaLineRepository,
+  type QuotaLineRecord,
+} from "../src/modules/quota/quota-line-repository.js";
 import { InMemoryBackgroundJobRepository } from "../src/modules/jobs/background-job-repository.js";
 import { AiRuntimePreviewService } from "../src/modules/ai/ai-runtime-preview-service.js";
 
@@ -117,7 +120,10 @@ const billItems: BillItemRecord[] = [
   },
 ];
 
-function createRecommendationApp(input?: { billItems?: BillItemRecord[] }) {
+function createRecommendationApp(input?: {
+  billItems?: BillItemRecord[];
+  quotaLines?: QuotaLineRecord[];
+}) {
   return createApp({
     jwtSecret,
     projectRepository: new InMemoryProjectRepository(projects),
@@ -128,7 +134,7 @@ function createRecommendationApp(input?: { billItems?: BillItemRecord[] }) {
     projectMemberRepository: new InMemoryProjectMemberRepository(members),
     billVersionRepository: new InMemoryBillVersionRepository(billVersions),
     billItemRepository: new InMemoryBillItemRepository(input?.billItems ?? billItems),
-    quotaLineRepository: new InMemoryQuotaLineRepository([]),
+    quotaLineRepository: new InMemoryQuotaLineRepository(input?.quotaLines ?? []),
     auditLogRepository: new InMemoryAuditLogRepository([]),
     aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
     backgroundJobRepository: new InMemoryBackgroundJobRepository([]),
@@ -499,6 +505,130 @@ test("POST /v1/ai/recommendation-jobs queues and processes provider-backed recom
     processResponse.json().result.recommendations[0].inputPayload.aiProvider.model,
     "cost-model-v1",
   );
+
+  await app.close();
+});
+
+test("provider-backed recommendation job stores failure summary for invalid schema", async () => {
+  const backgroundJobRepository = new InMemoryBackgroundJobRepository([]);
+  const auditLogRepository = new InMemoryAuditLogRepository([]);
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(projects),
+    projectStageRepository: new InMemoryProjectStageRepository(stages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      disciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(members),
+    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billItemRepository: new InMemoryBillItemRepository(billItems),
+    quotaLineRepository: new InMemoryQuotaLineRepository([]),
+    auditLogRepository,
+    aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
+    backgroundJobRepository,
+    aiRuntimePreviewService: new AiRuntimePreviewService({
+      pythonExecutable: "python3",
+      cliPath: "/tmp/ai-runtime-cli.py",
+      commandRunner: async () => ({
+        stdout: JSON.stringify({
+          source: "llm_provider",
+          result: {
+            provider: {
+              provider: "openai_compatible",
+              model: "cost-model-v1",
+            },
+            content: JSON.stringify({
+              recommendations: [{ outputPayload: { itemCode: "A-002" } }],
+            }),
+            telemetry: { durationMs: 12, retryCount: 0 },
+          },
+        }),
+        stderr: "",
+      }),
+    }),
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const queuedResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/recommendation-jobs",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_version",
+      resourceId: "bill-version-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  });
+  assert.equal(queuedResponse.statusCode, 202);
+
+  const processResponse = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${queuedResponse.json().job.id}/process`,
+    headers: {
+      authorization: `Bearer ${await createToken("admin-001", "system_admin")}`,
+    },
+  });
+  assert.equal(processResponse.statusCode, 200);
+  assert.equal(processResponse.json().status, "failed");
+  assert.equal(
+    processResponse.json().result.providerFailureSummary.code,
+    "AI_PROVIDER_RESPONSE_INVALID",
+  );
+  assert.match(
+    processResponse.json().errorMessage,
+    /AI provider response is invalid/,
+  );
+
+  await app.close();
+});
+
+test("GET /v1/ai/provider-health returns provider config status", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(projects),
+    projectStageRepository: new InMemoryProjectStageRepository(stages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      disciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(members),
+    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billItemRepository: new InMemoryBillItemRepository(billItems),
+    quotaLineRepository: new InMemoryQuotaLineRepository([]),
+    auditLogRepository: new InMemoryAuditLogRepository([]),
+    aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
+    backgroundJobRepository: new InMemoryBackgroundJobRepository([]),
+    aiRuntimePreviewService: new AiRuntimePreviewService({
+      pythonExecutable: "python3",
+      cliPath: "/tmp/ai-runtime-cli.py",
+      commandRunner: async () => ({
+        stdout: JSON.stringify({
+          source: "llm_provider",
+          result: {
+            provider: "openai_compatible",
+            model: "cost-model-v1",
+            configured: true,
+            healthy: true,
+            message: "ok",
+          },
+        }),
+        stderr: "",
+      }),
+    }),
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/ai/provider-health",
+    headers: {
+      authorization: `Bearer ${await createToken("admin-001", "system_admin")}`,
+    },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().healthy, true);
+  assert.equal(response.json().configured, true);
 
   await app.close();
 });
@@ -880,6 +1010,33 @@ test("POST /v1/ai/recommendations/:id/accept transitions generated recommendatio
   assert.equal(quotaLineResponse.json().items.length, 1);
   assert.equal(quotaLineResponse.json().items[0].sourceMode, "ai");
 
+  const rollbackResponse = await app.inject({
+    method: "POST",
+    url: `/v1/ai/recommendations/${createdResponse.json().id}/rollback`,
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+    payload: {
+      reason: "撤销套用",
+    },
+  });
+  assert.equal(rollbackResponse.statusCode, 200);
+  assert.equal(rollbackResponse.json().status, "rolled_back");
+  assert.equal(
+    rollbackResponse.json().outputPayload.rollback.changes[0].resourceType,
+    "quota_line",
+  );
+
+  const rollbackQuotaLineResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/items/bill-item-001/quota-lines",
+    headers: {
+      authorization: `Bearer ${engineerToken}`,
+    },
+  });
+  assert.equal(rollbackQuotaLineResponse.statusCode, 200);
+  assert.equal(rollbackQuotaLineResponse.json().items.length, 0);
+
   const repeatResponse = await app.inject({
     method: "POST",
     url: `/v1/ai/recommendations/${createdResponse.json().id}/ignore`,
@@ -891,6 +1048,72 @@ test("POST /v1/ai/recommendations/:id/accept transitions generated recommendatio
     },
   });
   assert.equal(repeatResponse.statusCode, 409);
+
+  await app.close();
+});
+
+test("POST /v1/ai/recommendations/:id/rollback blocks modified accepted resources", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const createdResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/bill-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_version",
+      resourceId: "bill-version-001",
+      outputPayload: {
+        parentId: null,
+        itemCode: "A-002",
+        itemName: "回填土",
+        quantity: 6,
+        unit: "m3",
+        sortNo: 2,
+      },
+    },
+  });
+  assert.equal(createdResponse.statusCode, 201);
+
+  const acceptResponse = await app.inject({
+    method: "POST",
+    url: `/v1/ai/recommendations/${createdResponse.json().id}/accept`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { reason: "确认新增清单" },
+  });
+  assert.equal(acceptResponse.statusCode, 200);
+  const acceptedBillItemId = acceptResponse.json().outputPayload.acceptedBillItemId;
+
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: `/v1/projects/project-001/bill-versions/bill-version-001/items/${acceptedBillItemId}`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      parentId: null,
+      itemCode: "A-002",
+      itemName: "人工改名",
+      quantity: 6,
+      unit: "m3",
+      sortNo: 2,
+    },
+  });
+  assert.equal(updateResponse.statusCode, 200);
+
+  const rollbackResponse = await app.inject({
+    method: "POST",
+    url: `/v1/ai/recommendations/${createdResponse.json().id}/rollback`,
+    headers: { authorization: `Bearer ${token}` },
+    payload: { reason: "撤销新增清单" },
+  });
+  assert.equal(rollbackResponse.statusCode, 409);
+  assert.equal(
+    rollbackResponse.json().error.code,
+    "AI_RECOMMENDATION_ROLLBACK_BLOCKED",
+  );
+  assert.equal(rollbackResponse.json().error.details.reason, "resource_modified");
 
   await app.close();
 });

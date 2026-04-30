@@ -11,6 +11,7 @@ type BackgroundJobReporter = {
   failJob: (
     jobId: string,
     errorMessage: string,
+    result?: Record<string, unknown> | null,
   ) => Promise<Record<string, unknown>>;
 };
 
@@ -37,6 +38,7 @@ export class WorkerPollingRunner {
         await this.reportJobState(() => this.reporter!.failJob(
           executedJob.id,
           executedJob.errorMessage ?? "Unknown worker failure",
+          executedJob.result ?? null,
         ));
       }
     }

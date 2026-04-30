@@ -11,9 +11,9 @@
 
 摘要：
 
-- 路由总数：98
+- 路由总数：99
 - 分组总数：15
-- 方法分布：GET 42 / POST 40 / PUT 12 / DELETE 4
+- 方法分布：GET 43 / POST 40 / PUT 12 / DELETE 4
 - 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
@@ -134,6 +134,7 @@
 ## AI Recommendations
 
 - `POST /v1/ai/bill-recommendations`
+- `GET /v1/ai/provider-health`
 - `POST /v1/ai/quota-recommendations`
 - `POST /v1/ai/recommendation-jobs`
 - `POST /v1/ai/recommendations/:recommendationId/accept`

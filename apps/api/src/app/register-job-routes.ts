@@ -13,6 +13,7 @@ const completeBackgroundJobSchema = z.object({
 
 const failBackgroundJobSchema = z.object({
   errorMessage: z.string().trim().min(1),
+  result: z.record(z.string(), z.unknown()).optional(),
 });
 
 const retryBackgroundJobSchema = z.object({
@@ -88,6 +89,7 @@ export function registerJobRoutes(
       backgroundJobService.failJob({
         jobId,
         errorMessage: payload.errorMessage,
+        result: payload.result,
       }),
     );
   });

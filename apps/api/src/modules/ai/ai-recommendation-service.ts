@@ -199,36 +199,108 @@ export class AiRecommendationService {
       billVersionId: input.billVersionId,
       userId: input.userId,
     });
-    const llmResult = await this.dependencies.aiRuntimePreviewService.processLlmChat({
-      provider: input.provider,
-      model: input.model,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You generate SaaS pricing AI recommendations. Return strict JSON with a recommendations array; each item must contain outputPayload.",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            recommendationType: input.recommendationType,
-            resourceType: input.resourceType,
-            resourceId: input.resourceId,
-            context,
-            inputPayload: input.inputPayload ?? {},
-          }),
-        },
-      ],
-      temperature: 0.2,
-      maxTokens: 1200,
-    });
+    const requestStartedAt = Date.now();
+    let llmResult: Record<string, unknown>;
+    try {
+      llmResult = await this.dependencies.aiRuntimePreviewService.processLlmChat({
+        provider: input.provider,
+        model: input.model,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You generate SaaS pricing AI recommendations. Return strict JSON with a recommendations array; each item must contain outputPayload.",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              recommendationType: input.recommendationType,
+              resourceType: input.resourceType,
+              resourceId: input.resourceId,
+              context,
+              inputPayload: input.inputPayload ?? {},
+            }),
+          },
+        ],
+        temperature: 0.2,
+        maxTokens: 1200,
+      });
+    } catch (error) {
+      const failureSummary = buildProviderFailureSummary(error, {
+        provider: input.provider ?? "openai_compatible",
+        model: input.model ?? null,
+        durationMs: Date.now() - requestStartedAt,
+      });
+      await this.auditLogService.writeAuditLog({
+        projectId: input.projectId,
+        stageCode: input.stageCode ?? null,
+        resourceType: "ai_provider",
+        resourceId: input.recommendationType,
+        action: "request_failed",
+        operatorId: input.userId,
+        afterPayload: failureSummary,
+      });
+      throw new AppError(
+        error instanceof AppError ? error.statusCode : 502,
+        "AI_PROVIDER_REQUEST_FAILED",
+        "AI provider request failed; manual handling may be required",
+        { providerFailureSummary: failureSummary },
+      );
+    }
     const providerResult = readObject(llmResult, "result");
     const provider = readObject(providerResult, "provider");
-    const content = readRequiredStringFromObject(providerResult, "content");
-    const recommendations = parseProviderRecommendations(
-      content,
-      input.recommendationType,
-    );
+    const telemetry = readObject(providerResult, "telemetry");
+    await this.auditLogService.writeAuditLog({
+      projectId: input.projectId,
+      stageCode: input.stageCode ?? null,
+      resourceType: "ai_provider",
+      resourceId: input.recommendationType,
+      action: "request_completed",
+      operatorId: input.userId,
+      afterPayload: {
+        provider: provider ?? {
+          provider: input.provider ?? "openai_compatible",
+          model: input.model ?? null,
+        },
+        telemetry: telemetry ?? { durationMs: Date.now() - requestStartedAt },
+      },
+    });
+    let recommendations: Array<{
+      resourceType?: string;
+      resourceId?: string;
+      outputPayload: Record<string, unknown>;
+    }>;
+    try {
+      const content = readRequiredStringFromObject(providerResult, "content");
+      recommendations = parseProviderRecommendations(
+        content,
+        input.recommendationType,
+      );
+    } catch (error) {
+      const failureSummary = buildProviderFailureSummary(error, {
+        provider:
+          readString(provider ?? {}, "provider") ??
+          input.provider ??
+          "openai_compatible",
+        model: readString(provider ?? {}, "model") ?? input.model ?? null,
+        durationMs: Date.now() - requestStartedAt,
+      });
+      await this.auditLogService.writeAuditLog({
+        projectId: input.projectId,
+        stageCode: input.stageCode ?? null,
+        resourceType: "ai_provider",
+        resourceId: input.recommendationType,
+        action: "response_invalid",
+        operatorId: input.userId,
+        afterPayload: failureSummary,
+      });
+      throw new AppError(
+        error instanceof AppError ? error.statusCode : 502,
+        "AI_PROVIDER_RESPONSE_INVALID",
+        "AI provider response is invalid; manual handling may be required",
+        { providerFailureSummary: failureSummary },
+      );
+    }
     const created: AiRecommendationRecord[] = [];
     for (const recommendation of recommendations.slice(0, input.limit ?? 10)) {
       created.push(
@@ -266,6 +338,56 @@ export class AiRecommendationService {
       provider: provider ?? null,
       createdCount: created.length,
     };
+  }
+
+  async checkProviderHealth(input: {
+    provider?: string;
+    model?: string;
+    userId: string;
+  }): Promise<Record<string, unknown>> {
+    if (!this.dependencies.aiRuntimePreviewService) {
+      return {
+        configured: false,
+        healthy: false,
+        message: "AI provider runtime is not configured",
+      };
+    }
+
+    try {
+      const result = await this.dependencies.aiRuntimePreviewService.checkLlmProvider({
+        provider: input.provider,
+        model: input.model,
+      });
+      const providerResult = readObject(result, "result") ?? {};
+      await this.auditLogService.writeAuditLog({
+        projectId: "global",
+        resourceType: "ai_provider",
+        resourceId: readString(providerResult, "provider") ?? input.provider ?? "openai_compatible",
+        action: "health_checked",
+        operatorId: input.userId,
+        afterPayload: providerResult,
+      });
+      return providerResult;
+    } catch (error) {
+      const failureSummary = buildProviderFailureSummary(error, {
+        provider: input.provider ?? "openai_compatible",
+        model: input.model ?? null,
+        durationMs: 0,
+      });
+      await this.auditLogService.writeAuditLog({
+        projectId: "global",
+        resourceType: "ai_provider",
+        resourceId: input.provider ?? "openai_compatible",
+        action: "health_check_failed",
+        operatorId: input.userId,
+        afterPayload: failureSummary,
+      });
+      return {
+        configured: false,
+        healthy: false,
+        failureSummary,
+      };
+    }
   }
 
   async generateVarianceWarnings(input: RecommendationContext & {
@@ -909,6 +1031,7 @@ export class AiRecommendationService {
       }
 
       if (change.resourceType === "quota_line") {
+        await this.assertQuotaLineRollbackable(change);
         if (!this.dependencies.quotaLineService) {
           throw new AppError(
             500,
@@ -922,6 +1045,7 @@ export class AiRecommendationService {
           userId: input.userId,
         });
       } else if (change.resourceType === "bill_item") {
+        await this.assertBillItemRollbackable(change);
         if (!this.dependencies.billItemService) {
           throw new AppError(
             500,
@@ -994,6 +1118,45 @@ export class AiRecommendationService {
     await this.persistRecommendationFeedback(updated, input.userId);
 
     return updated;
+  }
+
+  private async assertQuotaLineRollbackable(change: AcceptedChange) {
+    const current = await this.dependencies.quotaLineRepository?.findById(
+      change.resourceId,
+    );
+    if (!current) {
+      throwRollbackBlocked(change, "resource_missing");
+    }
+    if (!recordsMatchSnapshot(current as unknown as Record<string, unknown>, change.snapshot)) {
+      throwRollbackBlocked(change, "resource_modified");
+    }
+  }
+
+  private async assertBillItemRollbackable(change: AcceptedChange) {
+    const current = await this.dependencies.billItemRepository?.findById(
+      change.resourceId,
+    );
+    if (!current) {
+      throwRollbackBlocked(change, "resource_missing");
+    }
+    if (!recordsMatchSnapshot(current as unknown as Record<string, unknown>, change.snapshot)) {
+      throwRollbackBlocked(change, "resource_modified");
+    }
+
+    const billVersionId = readString(change.snapshot, "billVersionId");
+    const siblings = billVersionId
+      ? await this.dependencies.billItemRepository?.listByBillVersionId(billVersionId)
+      : [];
+    if (siblings?.some((item) => item.parentId === change.resourceId)) {
+      throwRollbackBlocked(change, "resource_has_children");
+    }
+
+    const quotaLines = await this.dependencies.quotaLineRepository?.listByBillItemId(
+      change.resourceId,
+    );
+    if (quotaLines && quotaLines.length > 0) {
+      throwRollbackBlocked(change, "resource_has_quota_lines");
+    }
   }
 
   summarizeRecommendations(items: AiRecommendationRecord[]): {
@@ -1320,7 +1483,7 @@ export class AiRecommendationService {
           resourceType: "quota_line",
           resourceId: created.id,
           label: `${created.quotaCode} ${created.quotaName}`,
-          snapshot: created,
+          snapshot: clonePlainRecord(created as unknown as Record<string, unknown>),
           rollbackSupported: true,
         }),
       ],
@@ -1376,7 +1539,7 @@ export class AiRecommendationService {
           resourceType: "bill_item",
           resourceId: created.id,
           label: `${created.itemCode} ${created.itemName}`,
-          snapshot: created,
+          snapshot: clonePlainRecord(created as unknown as Record<string, unknown>),
           rollbackSupported: true,
         }),
       ],
@@ -1395,6 +1558,10 @@ type AcceptedChange = {
 
 function buildAcceptedChange(input: AcceptedChange): AcceptedChange {
   return input;
+}
+
+function clonePlainRecord(input: Record<string, unknown>): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
 }
 
 function readAcceptedChanges(payload: Record<string, unknown>): AcceptedChange[] {
@@ -1552,6 +1719,62 @@ function validateProviderRecommendationPayload(
       `AI provider recommendation outputPayload is missing ${missing.join(", ")}`,
     );
   }
+}
+
+function recordsMatchSnapshot(
+  current: Record<string, unknown>,
+  snapshot: Record<string, unknown>,
+) {
+  for (const [key, snapshotValue] of Object.entries(snapshot)) {
+    if (!valuesEquivalent(current[key], snapshotValue)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function valuesEquivalent(left: unknown, right: unknown) {
+  if (left instanceof Date) {
+    return left.toISOString() === right;
+  }
+  if (right instanceof Date) {
+    return right.toISOString() === left;
+  }
+  if (typeof left === "number" && typeof right === "number") {
+    return Math.abs(left - right) < 0.000001;
+  }
+  return left === right;
+}
+
+function throwRollbackBlocked(change: AcceptedChange, reason: string): never {
+  throw new AppError(
+    409,
+    "AI_RECOMMENDATION_ROLLBACK_BLOCKED",
+    "Accepted recommendation cannot be rolled back automatically; please review and handle the business data manually",
+    {
+      reason,
+      resourceType: change.resourceType,
+      resourceId: change.resourceId,
+      label: change.label,
+    },
+  );
+}
+
+function buildProviderFailureSummary(
+  error: unknown,
+  context: { provider: string; model: string | null; durationMs: number },
+) {
+  const appError = error instanceof AppError ? error : null;
+  return {
+    provider: context.provider,
+    model: context.model,
+    durationMs: context.durationMs,
+    code: appError?.code ?? "AI_PROVIDER_REQUEST_FAILED",
+    message:
+      error instanceof Error ? error.message : "Unknown AI provider request failure",
+    retryCount: null,
+    manualActionRequired: true,
+  };
 }
 
 function isVarianceExceeded(

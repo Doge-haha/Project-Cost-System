@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .knowledge_pipeline import extract_candidates_batch
-from .llm_provider import generate_llm_completion
+from .llm_provider import check_llm_provider, generate_llm_completion
 from .main import describe_runtime
 from .reference_quota_retrieval import retrieve_reference_quota_candidates
 
@@ -14,6 +14,13 @@ def process_event_batch(input_payload: dict[str, Any]) -> dict[str, Any]:
             "runtime": describe_runtime(),
             "source": input_payload.get("source") or "llm_provider",
             "result": generate_llm_completion(input_payload),
+        }
+
+    if input_payload.get("task") == "llm_provider_health":
+        return {
+            "runtime": describe_runtime(),
+            "source": input_payload.get("source") or "llm_provider",
+            "result": check_llm_provider(input_payload),
         }
 
     if input_payload.get("task") == "reference_quota_semantic_search":

@@ -96,13 +96,33 @@ export async function runWorkerJob(
         };
       }
       const payload = job.payload as AiRecommendationJobPayload;
-      return {
-        status: "completed",
-        result: await dependencies.generateAiRecommendations({
+      try {
+        const result = await dependencies.generateAiRecommendations({
           payload,
           requestedBy: job.requestedBy,
-        }),
-      };
+        });
+        return {
+          status: "completed",
+          result,
+        };
+      } catch (error) {
+        return {
+          status: "failed",
+          errorMessage:
+            error instanceof Error
+              ? error.message
+              : "Unknown AI recommendation job error",
+          result: {
+            providerFailureSummary: {
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Unknown AI recommendation job error",
+              manualActionRequired: true,
+            },
+          },
+        };
+      }
     }
     default:
       return assertUnsupportedJobType(job.jobType);

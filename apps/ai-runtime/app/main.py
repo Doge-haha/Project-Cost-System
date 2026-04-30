@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .knowledge_pipeline import extract_candidates, extract_candidates_batch
 from .llm_provider import (
+    check_llm_provider,
     describe_llm_provider,
     generate_llm_completion,
     validate_llm_provider_config,
@@ -33,6 +34,7 @@ __all__ = [
     "descriptor",
     "describe_runtime",
     "describe_llm_provider",
+    "check_llm_provider",
     "extract_candidates",
     "extract_candidates_batch",
     "generate_llm_completion",

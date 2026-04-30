@@ -6,6 +6,7 @@ import type {
 } from "@saas-pricing/job-contracts";
 
 import { BackgroundJobService } from "./background-job-service.js";
+import { AppError } from "../../shared/errors/app-error.js";
 
 type Dependencies = {
   processProjectRecalculate: (input: {
@@ -81,7 +82,25 @@ export class BackgroundJobProcessor {
         jobId: job.id,
         errorMessage:
           error instanceof Error ? error.message : "Unknown background job error",
+        result: buildFailureResult(error),
       });
     }
   }
+}
+
+function buildFailureResult(error: unknown): Record<string, unknown> | undefined {
+  if (!(error instanceof AppError)) {
+    return undefined;
+  }
+  if (
+    error.details &&
+    typeof error.details === "object" &&
+    "providerFailureSummary" in error.details
+  ) {
+    return {
+      providerFailureSummary: (error.details as Record<string, unknown>)
+        .providerFailureSummary,
+    };
+  }
+  return undefined;
 }

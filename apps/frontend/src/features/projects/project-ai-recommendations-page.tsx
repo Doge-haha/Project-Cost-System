@@ -39,6 +39,16 @@ type ThresholdForm = {
   thresholdRate: string;
 };
 
+type AsyncJobForm = {
+  recommendationType: AiRecommendationType;
+  resourceType: string;
+  resourceId: string;
+  billVersionId: string;
+  stageCode: string;
+  disciplineCode: string;
+  limit: string;
+};
+
 type ContextPreviewState = {
   recommendation: AiRecommendation;
   payload: Record<string, unknown> | null;
@@ -61,6 +71,16 @@ const defaultThresholdForm: ThresholdForm = {
   disciplineCode: "",
   thresholdAmount: "",
   thresholdRate: "",
+};
+
+const defaultAsyncJobForm: AsyncJobForm = {
+  recommendationType: "bill_recommendation",
+  resourceType: "bill_version",
+  resourceId: "",
+  billVersionId: "",
+  stageCode: "",
+  disciplineCode: "",
+  limit: "10",
 };
 
 const recommendationTypeOptions: Array<{
@@ -92,6 +112,7 @@ export function ProjectAiRecommendationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionTargetId, setActionTargetId] = useState<string | null>(null);
   const [acceptTarget, setAcceptTarget] = useState<AiRecommendation | null>(null);
+  const [rollbackTarget, setRollbackTarget] = useState<AiRecommendation | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [thresholds, setThresholds] = useState<VarianceWarningThreshold[]>([]);
   const [thresholdForm, setThresholdForm] =
@@ -100,8 +121,11 @@ export function ProjectAiRecommendationsPage() {
   const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
   const [batchExpiring, setBatchExpiring] = useState(false);
   const [recommendationJobs, setRecommendationJobs] = useState<BackgroundJob[]>([]);
+  const [asyncJobForm, setAsyncJobForm] =
+    useState<AsyncJobForm>(defaultAsyncJobForm);
   const [jobSubmitting, setJobSubmitting] = useState(false);
   const [jobMessage, setJobMessage] = useState<string | null>(null);
+  const [jobPollDelay, setJobPollDelay] = useState(2000);
   const [contextPreview, setContextPreview] = useState<ContextPreviewState | null>(
     null,
   );
@@ -195,22 +219,37 @@ export function ProjectAiRecommendationsPage() {
       return undefined;
     }
 
-    const timer = window.setInterval(async () => {
+    const timer = window.setTimeout(async () => {
       try {
         const jobs = await apiClient.listProjectBackgroundJobs(projectId, {
           jobType: "ai_recommendation",
         });
+        const hadActiveJob = hasActiveJob;
+        const completedIds = new Set(
+          recommendationJobs
+            .filter((job) => job.status !== "completed")
+            .map((job) => job.id),
+        );
         setRecommendationJobs(jobs.items);
-        if (jobs.items.some((job) => job.status === "completed")) {
+        if (
+          hadActiveJob &&
+          jobs.items.some(
+            (job) => job.status === "completed" && completedIds.has(job.id),
+          )
+        ) {
           await loadRecommendations();
+          setJobMessage("AI 推荐任务已完成，列表已刷新。");
+          setJobPollDelay(2000);
+        } else {
+          setJobPollDelay((current) => Math.min(current + 1000, 10000));
         }
       } catch {
         setJobMessage("AI 推荐任务状态刷新失败。");
       }
-    }, 2000);
+    }, jobPollDelay);
 
-    return () => window.clearInterval(timer);
-  }, [projectId, recommendationJobs]);
+    return () => window.clearTimeout(timer);
+  }, [projectId, recommendationJobs, jobPollDelay]);
 
   useEffect(() => {
     void loadThresholds();
@@ -287,6 +326,7 @@ export function ProjectAiRecommendationsPage() {
         updateRecommendationState(current, updated, activeQuery),
       );
       setActionMessage("已回滚该推荐接受产生的业务变更。");
+      setRollbackTarget(null);
     } catch (submitError) {
       setActionMessage(
         submitError instanceof ApiError
@@ -308,21 +348,21 @@ export function ProjectAiRecommendationsPage() {
     try {
       const response = await apiClient.createAiRecommendationJob({
         projectId,
-        recommendationType:
-          activeQuery.recommendationType === ""
-            ? "bill_recommendation"
-            : (activeQuery.recommendationType as AiRecommendationType),
-        resourceType: activeQuery.resourceType || "bill_version",
+        recommendationType: asyncJobForm.recommendationType,
+        resourceType: asyncJobForm.resourceType || undefined,
         resourceId:
-          activeQuery.resourceId ||
+          asyncJobForm.resourceId ||
+          asyncJobForm.billVersionId ||
           state?.workspace.billVersions[0]?.id ||
           undefined,
-        stageCode: activeQuery.stageCode || undefined,
-        disciplineCode: activeQuery.disciplineCode || undefined,
-        limit: Number(activeQuery.limit),
+        billVersionId: asyncJobForm.billVersionId || undefined,
+        stageCode: asyncJobForm.stageCode || undefined,
+        disciplineCode: asyncJobForm.disciplineCode || undefined,
+        limit: Number(asyncJobForm.limit),
       });
       setRecommendationJobs((current) => [response.job, ...current]);
       setJobMessage(`已提交异步推荐任务 ${response.job.id}。`);
+      setJobPollDelay(2000);
     } catch (submitError) {
       setJobMessage(
         submitError instanceof ApiError
@@ -717,6 +757,140 @@ export function ProjectAiRecommendationsPage() {
       <section className="panel">
         <h2>异步生成</h2>
         {jobMessage ? <p className="page-description">{jobMessage}</p> : null}
+        <div className="form-grid">
+          <label className="form-field">
+            生成类型
+            <select
+              aria-label="生成类型"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  recommendationType: event.target.value as AiRecommendationType,
+                }))
+              }
+              value={asyncJobForm.recommendationType}
+            >
+              {recommendationTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            目标版本
+            <select
+              aria-label="目标版本"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  billVersionId: event.target.value,
+                  resourceId:
+                    current.resourceType === "bill_version"
+                      ? event.target.value
+                      : current.resourceId,
+                }))
+              }
+              value={asyncJobForm.billVersionId}
+            >
+              <option value="">默认版本</option>
+              {state.workspace.billVersions.map((version) => (
+                <option key={version.id} value={version.id}>
+                  {version.versionName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            目标资源类型
+            <input
+              aria-label="目标资源类型"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  resourceType: event.target.value,
+                }))
+              }
+              value={asyncJobForm.resourceType}
+            />
+          </label>
+          <label className="form-field">
+            目标资源 ID
+            <input
+              aria-label="目标资源 ID"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  resourceId: event.target.value,
+                }))
+              }
+              placeholder="bill-item-001"
+              value={asyncJobForm.resourceId}
+            />
+          </label>
+          <label className="form-field">
+            任务阶段
+            <select
+              aria-label="任务阶段"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  stageCode: event.target.value,
+                }))
+              }
+              value={asyncJobForm.stageCode}
+            >
+              <option value="">默认阶段</option>
+              {state.workspace.availableStages.map((stage) => (
+                <option key={stage.stageCode} value={stage.stageCode}>
+                  {formatStageOption(stage.stageCode, stage.stageName)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            任务专业
+            <select
+              aria-label="任务专业"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  disciplineCode: event.target.value,
+                }))
+              }
+              value={asyncJobForm.disciplineCode}
+            >
+              <option value="">默认专业</option>
+              {state.workspace.disciplines.map((discipline) => (
+                <option
+                  key={discipline.disciplineCode}
+                  value={discipline.disciplineCode}
+                >
+                  {formatDisciplineOption(
+                    discipline.disciplineCode,
+                    discipline.disciplineName,
+                  )}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            生成数量
+            <input
+              aria-label="生成数量"
+              min="1"
+              max="100"
+              onChange={(event) =>
+                setAsyncJobForm((current) => ({
+                  ...current,
+                  limit: event.target.value,
+                }))
+              }
+              type="number"
+              value={asyncJobForm.limit}
+            />
+          </label>
+        </div>
         <div className="button-row">
           <button
             className="primary-button"
@@ -904,18 +1078,53 @@ export function ProjectAiRecommendationsPage() {
                           {recommendation.status === "accepted" &&
                           canHandleRecommendations &&
                           canRollbackRecommendation(recommendation) ? (
-                            <div className="version-card-actions">
-                              <button
-                                className="connection-button secondary"
-                                disabled={actionTargetId === recommendation.id}
-                                onClick={() => {
-                                  void handleRollbackRecommendation(recommendation);
-                                }}
-                                type="button"
-                              >
-                                撤销接受
-                              </button>
-                            </div>
+                            <>
+                              <div className="version-card-actions">
+                                <button
+                                  className="connection-button secondary"
+                                  disabled={actionTargetId === recommendation.id}
+                                  onClick={() => {
+                                    setRollbackTarget(recommendation);
+                                    setActionMessage(null);
+                                  }}
+                                  type="button"
+                                >
+                                  撤销接受
+                                </button>
+                              </div>
+                              {rollbackTarget?.id === recommendation.id ? (
+                                <div
+                                  aria-label="确认撤销 AI 推荐"
+                                  className="action-confirmation"
+                                  role="dialog"
+                                >
+                                  <p className="page-description">
+                                    撤销前将校验业务数据是否仍与接受快照一致；若已被修改或引用，需要人工处理。
+                                  </p>
+                                  <AcceptedChangeSummary recommendation={recommendation} />
+                                  <div className="version-card-actions">
+                                    <button
+                                      className="connection-button secondary"
+                                      disabled={actionTargetId === recommendation.id}
+                                      onClick={() => setRollbackTarget(null)}
+                                      type="button"
+                                    >
+                                      取消
+                                    </button>
+                                    <button
+                                      className="connection-button"
+                                      disabled={actionTargetId === recommendation.id}
+                                      onClick={() => {
+                                        void handleRollbackRecommendation(recommendation);
+                                      }}
+                                      type="button"
+                                    >
+                                      确认撤销
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </>
                           ) : null}
                         </>
                       )}

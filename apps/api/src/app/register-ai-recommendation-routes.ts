@@ -224,6 +224,23 @@ export function registerAiRecommendationRoutes(
     );
   });
 
+  app.get("/v1/ai/provider-health", async (request) => {
+    const query = z
+      .object({
+        provider: z.string().min(1).optional(),
+        model: z.string().min(1).optional(),
+      })
+      .parse(request.query);
+
+    return transactionRunner.runInTransaction(() =>
+      aiRecommendationService.checkProviderHealth({
+        provider: query.provider,
+        model: query.model,
+        userId: request.currentUser!.id,
+      }),
+    );
+  });
+
   app.get("/v1/projects/:projectId/ai/variance-warning-thresholds", async (request) => {
     const { projectId } = request.params as { projectId: string };
     const query = z

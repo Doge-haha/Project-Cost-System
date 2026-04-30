@@ -96,10 +96,11 @@ export class ApiWorkerPlatformClient {
   async failJob(
     jobId: string,
     errorMessage: string,
+    result?: Record<string, unknown> | null,
   ): Promise<Record<string, unknown>> {
     return this.requestJson(`${this.dependencies.baseUrl}/v1/jobs/${jobId}/fail`, {
       method: "POST",
-      body: JSON.stringify({ errorMessage }),
+      body: JSON.stringify({ errorMessage, result: result ?? undefined }),
     });
   }
 

@@ -304,11 +304,13 @@ export class BackgroundJobService {
   async failJob(input: {
     jobId: string;
     errorMessage: string;
+    result?: Record<string, unknown>;
   }): Promise<BackgroundJobRecord> {
     await this.assertJobProcessing(input.jobId);
 
     const failed = await this.backgroundJobRepository.update(input.jobId, {
       status: "failed",
+      result: input.result ?? null,
       errorMessage: input.errorMessage,
       completedAt: new Date().toISOString(),
     });
@@ -328,12 +330,13 @@ export class BackgroundJobService {
       resourceId: failed.id,
       action: "failed",
       operatorId: failed.requestedBy,
-      afterPayload: {
-        jobType: failed.jobType,
-        status: failed.status,
-        errorMessage: failed.errorMessage ?? null,
-      },
-    });
+        afterPayload: {
+          jobType: failed.jobType,
+          status: failed.status,
+          errorMessage: failed.errorMessage ?? null,
+          result: failed.result ?? null,
+        },
+      });
 
     return failed;
   }

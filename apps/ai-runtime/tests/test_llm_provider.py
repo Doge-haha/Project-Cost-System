@@ -32,10 +32,13 @@ def test_generate_llm_completion_calls_openai_compatible_chat(monkeypatch) -> No
         assert api_key == "secret"
         assert timeout == 2
         assert retry_attempts == 2
-        return {
-            "choices": [{"message": {"content": "建议套用人工挖土方定额。"}}],
-            "usage": {"total_tokens": 12},
-        }
+        return (
+            {
+                "choices": [{"message": {"content": "建议套用人工挖土方定额。"}}],
+                "usage": {"total_tokens": 12},
+            },
+            {"durationMs": 15, "retryCount": 0, "attemptCount": 1},
+        )
 
     monkeypatch.setattr(llm_provider, "_post_json", fake_post_json)
 
@@ -52,6 +55,7 @@ def test_generate_llm_completion_calls_openai_compatible_chat(monkeypatch) -> No
     assert result["provider"]["configured"] is True
     assert result["content"] == "建议套用人工挖土方定额。"
     assert result["usage"] == {"total_tokens": 12}
+    assert result["telemetry"]["durationMs"] == 15
 
 
 def test_generate_llm_completion_rejects_missing_messages() -> None:
@@ -98,7 +102,7 @@ def test_generate_llm_completion_rejects_missing_response_content(monkeypatch) -
     monkeypatch.setattr(
         llm_provider,
         "_post_json",
-        lambda *args, **kwargs: {"choices": [{"message": {}}]},
+        lambda *args, **kwargs: ({"choices": [{"message": {}}]}, {"retryCount": 0}),
     )
 
     try:
@@ -123,7 +127,7 @@ def test_generate_llm_completion_can_include_raw_response(monkeypatch) -> None:
     monkeypatch.setattr(
         llm_provider,
         "_post_json",
-        lambda *args, **kwargs: raw_response,
+        lambda *args, **kwargs: (raw_response, {"retryCount": 0}),
     )
 
     result = generate_llm_completion(
@@ -156,3 +160,14 @@ def test_process_event_batch_routes_llm_chat(monkeypatch) -> None:
 
     assert result["source"] == "ai_recommendation"
     assert result["result"]["content"] == "ok"
+
+
+def test_process_event_batch_routes_llm_provider_health(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_API_KEY", "test-key")
+    monkeypatch.setenv("LLM_MODEL", "test-model")
+
+    result = process_event_batch({"task": "llm_provider_health"})
+
+    assert result["source"] == "llm_provider"
+    assert result["result"]["healthy"] is True
+    assert result["result"]["configured"] is True

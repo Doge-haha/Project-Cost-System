@@ -37,6 +37,7 @@ describe("ProjectAiRecommendationsPage", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
     fetchMock.mockReset();
   });
 
@@ -448,6 +449,194 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("estimate · building · 金额 8000 · 比率 12%")).toBeInTheDocument();
   });
 
+  test("submits async job form and refreshes recommendations when job completes", async () => {
+    let jobStatus: "queued" | "completed" = "queued";
+    let jobSubmitted = false;
+    let recommendationItems: unknown[] = [];
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(
+          createWorkspaceWithBillVersion("bill-version-001", "估算版 V1"),
+        );
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(createRecommendationListResponse(recommendationItems));
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/ai/recommendation-jobs") {
+        expect(init?.method).toBe("POST");
+        jobSubmitted = true;
+        expect(JSON.parse(String(init?.body))).toMatchObject({
+          projectId: "project-001",
+          recommendationType: "quota_recommendation",
+          resourceType: "bill_item",
+          resourceId: "bill-item-001",
+          billVersionId: "bill-version-001",
+          limit: 5,
+        });
+        return createJsonResponse({
+          job: createAiRecommendationJob(jobStatus),
+        });
+      }
+
+      if (url.pathname === "/v1/jobs") {
+        if (!jobSubmitted) {
+          return createJsonResponse({
+            items: [],
+            summary: {
+              totalCount: 0,
+              statusCounts: { queued: 0, processing: 0, completed: 0, failed: 0 },
+              jobTypeCounts: {},
+            },
+          });
+        }
+        if (jobSubmitted && jobStatus === "queued") {
+          jobStatus = "completed";
+          recommendationItems = [
+            createRecommendation({
+              id: "ai-recommendation-async",
+              recommendationType: "quota_recommendation",
+              outputPayload: { quotaName: "挖土方", reason: "任务生成" },
+            }),
+          ];
+        }
+        return createJsonResponse({
+          items: [createAiRecommendationJob(jobStatus)],
+          summary: {
+            totalCount: 1,
+            statusCounts: { queued: 0, processing: 0, completed: 1, failed: 0 },
+            jobTypeCounts: { ai_recommendation: 1 },
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "生成推荐" })).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText("生成类型"), {
+      target: { value: "quota_recommendation" },
+    });
+    fireEvent.change(screen.getByLabelText("目标版本"), {
+      target: { value: "bill-version-001" },
+    });
+    fireEvent.change(screen.getByLabelText("目标资源类型"), {
+      target: { value: "bill_item" },
+    });
+    fireEvent.change(screen.getByLabelText("目标资源 ID"), {
+      target: { value: "bill-item-001" },
+    });
+    fireEvent.change(screen.getByLabelText("生成数量"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成推荐" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("已提交异步推荐任务 background-job-001。")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("AI 推荐任务已完成，列表已刷新。")).toBeInTheDocument();
+    }, { timeout: 3500 });
+    expect(screen.getByText("任务生成 · 挖土方")).toBeInTheDocument();
+  });
+
+  test("confirms rollback before calling rollback API", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(
+          createRecommendationListResponse([
+            createRecommendation({
+              status: "accepted",
+              handledBy: "engineer-001",
+              handledAt: "2026-04-18T11:05:00.000Z",
+              statusReason: "人工确认接受",
+              outputPayload: {
+                quotaName: "挖土方",
+                acceptedChanges: [
+                  {
+                    action: "create",
+                    resourceType: "quota_line",
+                    resourceId: "quota-line-001",
+                    label: "010101 挖土方",
+                    rollbackSupported: true,
+                  },
+                ],
+              },
+            }),
+          ]),
+        );
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/ai/recommendations/ai-recommendation-001/rollback") {
+        expect(init?.method).toBe("POST");
+        return createJsonResponse(
+          createRecommendation({
+            status: "rolled_back",
+            handledBy: "engineer-001",
+            handledAt: "2026-04-18T11:06:00.000Z",
+            statusReason: "人工撤销已接受推荐",
+            outputPayload: {
+              quotaName: "挖土方",
+              acceptedChanges: [
+                {
+                  action: "create",
+                  resourceType: "quota_line",
+                  resourceId: "quota-line-001",
+                  label: "010101 挖土方",
+                  rollbackSupported: true,
+                },
+              ],
+              rollback: { changes: [] },
+            },
+          }),
+        );
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("定额推荐 · 已接受")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "撤销接受" }));
+    expect(screen.getByRole("dialog", { name: "确认撤销 AI 推荐" })).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).includes("/rollback")),
+    ).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "确认撤销" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("已回滚该推荐接受产生的业务变更。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("定额推荐 · 已回滚")).toBeInTheDocument();
+  });
+
   test("opens recommendation input context preview", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -818,6 +1007,72 @@ function createWorkspace(
         visibleDisciplineCodes: [],
       },
     },
+  };
+}
+
+function createWorkspaceWithBillVersion(id: string, versionName: string) {
+  return {
+    ...createWorkspace(),
+    billVersions: [
+      {
+        id,
+        versionNo: 1,
+        versionName,
+        versionStatus: "editable",
+        stageCode: "estimate",
+        disciplineCode: "building",
+      },
+    ],
+  };
+}
+
+function createRecommendation(
+  overrides: Partial<{
+    id: string;
+    recommendationType: "bill_recommendation" | "quota_recommendation" | "variance_warning";
+    status: "generated" | "accepted" | "ignored" | "expired" | "rolled_back";
+    outputPayload: Record<string, unknown>;
+    inputPayload: Record<string, unknown>;
+    handledBy: string | null;
+    handledAt: string | null;
+    statusReason: string | null;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? "ai-recommendation-001",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    resourceType: "bill_item",
+    resourceId: "bill-item-001",
+    recommendationType: overrides.recommendationType ?? "quota_recommendation",
+    inputPayload: overrides.inputPayload ?? {},
+    outputPayload: overrides.outputPayload ?? {
+      quotaName: "挖土方",
+      reason: "清单名称匹配",
+    },
+    status: overrides.status ?? "generated",
+    createdBy: "engineer-001",
+    handledBy: overrides.handledBy ?? null,
+    handledAt: overrides.handledAt ?? null,
+    statusReason: overrides.statusReason ?? null,
+    createdAt: "2026-04-18T11:00:00.000Z",
+    updatedAt: "2026-04-18T11:00:00.000Z",
+  };
+}
+
+function createAiRecommendationJob(status: "queued" | "completed") {
+  return {
+    id: "background-job-001",
+    jobType: "ai_recommendation",
+    status,
+    requestedBy: "engineer-001",
+    projectId: "project-001",
+    payload: {},
+    result: status === "completed" ? { createdCount: 1 } : null,
+    errorMessage: null,
+    createdAt: "2026-04-18T11:00:00.000Z",
+    completedAt: status === "completed" ? "2026-04-18T11:01:00.000Z" : null,
   };
 }
 

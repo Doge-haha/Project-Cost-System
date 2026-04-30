@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -84,7 +85,7 @@ def generate_llm_completion(input_payload: dict[str, Any]) -> dict[str, Any]:
     if isinstance(max_tokens, int) and max_tokens > 0:
         request_payload["max_tokens"] = max_tokens
 
-    response_payload = _post_json(
+    response_payload, telemetry = _post_json(
         f"{config.base_url}/chat/completions",
         request_payload,
         api_key=api_key,
@@ -97,7 +98,27 @@ def generate_llm_completion(input_payload: dict[str, Any]) -> dict[str, Any]:
         "content": content,
         "raw": response_payload if input_payload.get("includeRaw") is True else None,
         "usage": response_payload.get("usage") if isinstance(response_payload, dict) else None,
+        "telemetry": telemetry,
     }
+
+
+def check_llm_provider(input_payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        validate_llm_provider_config(input_payload)
+        config = describe_llm_provider(input_payload)
+        return {
+            **config.to_dict(),
+            "healthy": True,
+            "message": "LLM provider configuration is valid",
+        }
+    except ValueError as error:
+        config = describe_llm_provider(input_payload)
+        return {
+            **config.to_dict(),
+            "healthy": False,
+            "configured": False,
+            "message": str(error),
+        }
 
 
 def _post_json(
@@ -107,7 +128,7 @@ def _post_json(
     api_key: str,
     timeout: float,
     retry_attempts: int = 2,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     request = urllib.request.Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -118,10 +139,15 @@ def _post_json(
         method="POST",
     )
     last_error: Exception | None = None
+    started_at = time.monotonic()
     for attempt in range(max(1, retry_attempts + 1)):
         try:
             with urllib.request.urlopen(request, timeout=timeout) as response:
-                return json.loads(response.read().decode("utf-8"))
+                return json.loads(response.read().decode("utf-8")), {
+                    "durationMs": round((time.monotonic() - started_at) * 1000),
+                    "retryCount": attempt,
+                    "attemptCount": attempt + 1,
+                }
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
             if error.code < 500 or attempt >= retry_attempts:

@@ -166,3 +166,38 @@ test("runWorkerJob processes knowledge extraction jobs", async () => {
     result: { summary: { knowledgeCount: 1 } },
   });
 });
+
+test("runWorkerJob preserves AI recommendation provider failure summary", async () => {
+  const result = await runWorkerJob(
+    {
+      id: "job-006",
+      jobType: "ai_recommendation",
+      status: "queued",
+      requestedBy: "user-001",
+      projectId: "project-001",
+      payload: {
+        projectId: "project-001",
+        recommendationType: "bill_recommendation",
+        resourceType: "bill_version",
+        resourceId: "bill-version-001",
+      },
+      createdAt: "2026-04-17T00:00:00.000Z",
+    },
+    {
+      fetchSummary: async () => ({ totalFinalAmount: 0 }),
+      fetchVariance: async () => ({ items: [] }),
+      recalculateProject: async () => ({ versions: [] }),
+      generateAiRecommendations: async () => {
+        throw new Error("AI provider response is invalid");
+      },
+      aiRuntimeClient: { processEventBatch: async () => ({}) } as never,
+    },
+  );
+
+  assert.equal(result.status, "failed");
+  assert.equal(result.errorMessage, "AI provider response is invalid");
+  assert.deepEqual(result.result?.providerFailureSummary, {
+    message: "AI provider response is invalid",
+    manualActionRequired: true,
+  });
+});

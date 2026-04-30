@@ -110,6 +110,87 @@ function getPricingActionDisabledReason(
   return `计价类动作不可用：请先绑定${missingRequirements.join("和")}。`;
 }
 
+type PricingApiAction = "calculate-item" | "recalculate-version" | "recalculate-project";
+
+const pricingApiActionLabels: Record<PricingApiAction, string> = {
+  "calculate-item": "单项计价",
+  "recalculate-version": "当前版本重算",
+  "recalculate-project": "项目重算任务创建",
+};
+
+function getUnmatchedQuotaCodes(details: unknown) {
+  if (!Array.isArray(details)) {
+    return [];
+  }
+
+  return details
+    .map((detail) =>
+      detail &&
+      typeof detail === "object" &&
+      typeof (detail as { quotaCode?: unknown }).quotaCode === "string"
+        ? (detail as { quotaCode: string }).quotaCode
+        : null,
+    )
+    .filter((value): value is string => value !== null);
+}
+
+function getPricingApiErrorGuidance(error: ApiError) {
+  if (
+    error.message ===
+    "Some quota lines could not be matched to the selected price version"
+  ) {
+    const quotaCodes = getUnmatchedQuotaCodes(error.details);
+    const quotaText =
+      quotaCodes.length > 0 ? `定额 ${quotaCodes.join("、")}` : "部分定额";
+    return `价目明细未命中，${quotaText} 在所选价目版本中没有价格。`;
+  }
+
+  if (
+    error.message ===
+      "Price version discipline does not match the requested recalculation scope" ||
+    error.message === "Price version discipline does not match the bill version discipline"
+  ) {
+    return "所选价目版本专业与当前重算范围不匹配。";
+  }
+
+  if (
+    error.message === "Fee template does not apply to the requested recalculation scope"
+  ) {
+    return "所选取费模板不适用于当前阶段或重算范围。";
+  }
+
+  if (error.message === "Price version must be active before calculation") {
+    return "所选价目版本未启用，不能用于计价。";
+  }
+
+  if (error.message === "Fee template must be active before calculation") {
+    return "所选取费模板未启用，不能用于计价。";
+  }
+
+  if (
+    error.message ===
+    "Price version is required when the project has no default price version"
+  ) {
+    return "项目未绑定默认价目版本，请先选择价目版本后再计价。";
+  }
+
+  return null;
+}
+
+function formatPricingApiError(action: PricingApiAction, error: unknown) {
+  const actionLabel = pricingApiActionLabels[action];
+  if (!(error instanceof ApiError)) {
+    return `${actionLabel}失败，请稍后重试。`;
+  }
+
+  const guidance = getPricingApiErrorGuidance(error);
+  if (!guidance) {
+    return `${actionLabel}失败：${error.message}`;
+  }
+
+  return `${actionLabel}失败：${guidance}原始错误：${error.message}`;
+}
+
 export function BillItemsPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -335,11 +416,7 @@ export function BillItemsPage() {
         `重算完成：已更新 ${result.recalculatedCount} 条清单项，跳过 ${result.skippedItems.length} 条。`,
       );
     } catch (mutationError) {
-      setPricingActionMessage(
-        mutationError instanceof ApiError
-          ? mutationError.message
-          : "当前版本重算失败，请稍后重试。",
-      );
+      setPricingActionMessage(formatPricingApiError("recalculate-version", mutationError));
     }
   }
 
@@ -359,11 +436,7 @@ export function BillItemsPage() {
       });
       setPricingActionMessage(`项目重算任务已创建：${job.id}（${job.status}）。`);
     } catch (mutationError) {
-      setPricingActionMessage(
-        mutationError instanceof ApiError
-          ? mutationError.message
-          : "项目重算任务创建失败，请稍后重试。",
-      );
+      setPricingActionMessage(formatPricingApiError("recalculate-project", mutationError));
     }
   }
 
@@ -382,11 +455,7 @@ export function BillItemsPage() {
       await loadBillItems();
       setPricingActionMessage("当前清单项计价完成。");
     } catch (mutationError) {
-      setPricingActionMessage(
-        mutationError instanceof ApiError
-          ? mutationError.message
-          : "当前清单项计价失败，请稍后重试。",
-      );
+      setPricingActionMessage(formatPricingApiError("calculate-item", mutationError));
     }
   }
 

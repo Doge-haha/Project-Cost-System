@@ -13,6 +13,15 @@ function createJsonResponse(body: unknown) {
   });
 }
 
+function createJsonErrorResponse(body: unknown, status = 422) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}
+
 const priceVersions = [
   {
     id: "price-version-001",
@@ -1094,5 +1103,155 @@ describe("BillItemsPage", () => {
         );
       }),
     ).toBe(true);
+  });
+
+  test("shows action-specific pricing API error guidance", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: "price-version-001",
+          defaultFeeTemplateId: "fee-template-001",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      if (url.pathname === "/v1/engine/calculate" && init?.method === "POST") {
+        return createJsonErrorResponse({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Some quota lines could not be matched to the selected price version",
+            details: [
+              {
+                quotaCode: "010101002",
+                quotaLineId: "quota-line-002",
+              },
+            ],
+          },
+        });
+      }
+
+      if (
+        url.pathname ===
+          "/v1/projects/project-001/bill-versions/version-001/recalculate" &&
+        init?.method === "POST"
+      ) {
+        return createJsonErrorResponse({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Price version discipline does not match the requested recalculation scope",
+          },
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/recalculate" &&
+        init?.method === "POST"
+      ) {
+        return createJsonErrorResponse({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Fee template does not apply to the requested recalculation scope",
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "计价配置" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "单项计价" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "单项计价失败：价目明细未命中，定额 010101002 在所选价目版本中没有价格。原始错误：Some quota lines could not be matched to the selected price version",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "重算当前版本" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "当前版本重算失败：所选价目版本专业与当前重算范围不匹配。原始错误：Price version discipline does not match the requested recalculation scope",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "创建项目重算" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "项目重算任务创建失败：所选取费模板不适用于当前阶段或重算范围。原始错误：Fee template does not apply to the requested recalculation scope",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 });

@@ -41,6 +41,7 @@ export class ApiError extends Error {
     message: string,
     readonly statusCode: number,
     readonly code?: string,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -88,21 +89,24 @@ async function request<T>(
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
     let code: string | undefined;
+    let details: unknown;
     try {
       const payload = (await response.json()) as {
         error?: {
           code?: string;
           message?: string;
+          details?: unknown;
         };
       };
       if (payload.error?.message) {
         message = payload.error.message;
       }
       code = payload.error?.code;
+      details = payload.error?.details;
     } catch {
       // Ignore JSON parsing failures and keep the default message.
     }
-    throw new ApiError(message, response.status, code);
+    throw new ApiError(message, response.status, code, details);
   }
 
   return (await response.json()) as T;
@@ -130,21 +134,24 @@ async function requestBlob(
   if (!response.ok) {
     let message = `Request failed with status ${response.status}`;
     let code: string | undefined;
+    let details: unknown;
     try {
       const payload = (await response.json()) as {
         error?: {
           code?: string;
           message?: string;
+          details?: unknown;
         };
       };
       if (payload.error?.message) {
         message = payload.error.message;
       }
       code = payload.error?.code;
+      details = payload.error?.details;
     } catch {
       // Ignore JSON parsing failures and keep the default message.
     }
-    throw new ApiError(message, response.status, code);
+    throw new ApiError(message, response.status, code, details);
   }
 
   const contentDisposition = response.headers.get("content-disposition") ?? "";

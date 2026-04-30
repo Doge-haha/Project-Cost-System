@@ -15,6 +15,7 @@ import {
   extractKnowledgeFromAuditToolSchema,
   extractKnowledgePreviewToolSchema,
   extractKnowledgeToolSchema,
+  generateAiRecommendationsToolSchema,
   recalculateProjectToolSchema,
   retryImportFailureScopeToolSchema,
   updateProcessDocumentStatusToolSchema,
@@ -327,6 +328,7 @@ export function registerToolRoutes(
       target: {
         projectId: payload.projectId,
         stageCode: payload.stageCode ?? null,
+        disciplineCode: payload.disciplineCode ?? null,
       },
       result,
       related: {
@@ -335,6 +337,41 @@ export function registerToolRoutes(
           query: {
             projectId: payload.projectId,
             stageCode: payload.stageCode,
+            disciplineCode: payload.disciplineCode,
+          },
+        },
+      },
+    });
+  });
+
+  app.post("/v1/tools/generate-ai-recommendations", async (request) => {
+    assertCanInvokeWriteTool(request.currentUser!);
+
+    const payload = generateAiRecommendationsToolSchema.parse(request.body);
+    const result = await apiClient.generateAiRecommendations(
+      payload,
+      request.bearerToken!,
+    );
+
+    return toolEnvelope({
+      tool: "generate_ai_recommendations",
+      mode: "synchronous",
+      target: {
+        projectId: payload.projectId,
+        recommendationType: payload.recommendationType,
+        resourceType: payload.resourceType ?? null,
+        resourceId: payload.resourceId ?? null,
+        stageCode: payload.stageCode ?? null,
+        disciplineCode: payload.disciplineCode ?? null,
+      },
+      result,
+      related: {
+        recommendationsResource: {
+          resourceType: "ai_recommendations",
+          query: {
+            projectId: payload.projectId,
+            recommendationType: payload.recommendationType,
+            status: "generated",
           },
         },
       },

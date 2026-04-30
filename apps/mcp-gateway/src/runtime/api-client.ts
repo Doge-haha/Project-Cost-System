@@ -119,8 +119,24 @@ export type RetryImportFailureScopeInput = {
 export type ConfigureVarianceWarningThresholdInput = {
   projectId: string;
   stageCode?: string;
+  disciplineCode?: string;
   thresholdAmount: number;
   thresholdRate: number;
+};
+
+export type GenerateAiRecommendationsInput = {
+  projectId: string;
+  recommendationType: AiRecommendationType;
+  resourceType?: string;
+  resourceId?: string;
+  billVersionId?: string;
+  stageCode?: string;
+  disciplineCode?: string;
+  thresholdAmount?: number;
+  thresholdRate?: number;
+  limit?: number;
+  inputPayload?: Record<string, unknown>;
+  outputPayload?: Record<string, unknown>;
 };
 
 export type ExpireStaleAiRecommendationsInput = {
@@ -992,6 +1008,7 @@ export class GatewayApiClient {
         },
         body: JSON.stringify({
           stageCode: input.stageCode ?? null,
+          disciplineCode: input.disciplineCode ?? null,
           thresholdAmount: input.thresholdAmount,
           thresholdRate: input.thresholdRate,
         }),
@@ -1014,6 +1031,62 @@ export class GatewayApiClient {
           "UPSTREAM_REQUEST_FAILED",
         (payload as { error?: { message?: string } }).error?.message ??
           "Failed to configure variance warning threshold",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async generateAiRecommendations(
+    input: GenerateAiRecommendationsInput,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const endpoint =
+      input.recommendationType === "variance_warning"
+        ? "/v1/ai/variance-warnings"
+        : input.recommendationType === "bill_recommendation"
+          ? "/v1/ai/bill-recommendations"
+          : "/v1/ai/quota-recommendations";
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}${endpoint}`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: input.projectId,
+          resourceType: input.resourceType,
+          resourceId: input.resourceId,
+          billVersionId: input.billVersionId,
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          thresholdAmount: input.thresholdAmount,
+          thresholdRate: input.thresholdRate,
+          limit: input.limit,
+          inputPayload: input.inputPayload,
+          outputPayload: input.outputPayload ?? {},
+        }),
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to generate AI recommendations",
       );
     }
 

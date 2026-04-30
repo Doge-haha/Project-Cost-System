@@ -9,6 +9,7 @@ export type VarianceWarningThresholdRecord = {
   id: string;
   projectId: string;
   stageCode?: string | null;
+  disciplineCode?: string | null;
   thresholdAmount: number;
   thresholdRate: number;
   createdAt: string;
@@ -20,6 +21,7 @@ export interface VarianceWarningThresholdRepository {
   upsert(input: {
     projectId: string;
     stageCode?: string | null;
+    disciplineCode?: string | null;
     thresholdAmount: number;
     thresholdRate: number;
   }): Promise<VarianceWarningThresholdRecord>;
@@ -39,15 +41,14 @@ export class InMemoryVarianceWarningThresholdRepository
   ): Promise<VarianceWarningThresholdRecord[]> {
     return this.thresholds
       .filter((threshold) => threshold.projectId === projectId)
-      .sort((left, right) =>
-        (left.stageCode ?? "").localeCompare(right.stageCode ?? ""),
-      )
+      .sort(compareThresholdScope)
       .map((threshold) => ({ ...threshold }));
   }
 
   async upsert(input: {
     projectId: string;
     stageCode?: string | null;
+    disciplineCode?: string | null;
     thresholdAmount: number;
     thresholdRate: number;
   }): Promise<VarianceWarningThresholdRecord> {
@@ -55,7 +56,8 @@ export class InMemoryVarianceWarningThresholdRepository
     const target = this.thresholds.find(
       (threshold) =>
         threshold.projectId === input.projectId &&
-        (threshold.stageCode ?? null) === (input.stageCode ?? null),
+        (threshold.stageCode ?? null) === (input.stageCode ?? null) &&
+        (threshold.disciplineCode ?? null) === (input.disciplineCode ?? null),
     );
     if (target) {
       target.thresholdAmount = input.thresholdAmount;
@@ -68,6 +70,7 @@ export class InMemoryVarianceWarningThresholdRepository
       id: `variance-threshold-${String(this.thresholds.length + 1).padStart(3, "0")}`,
       projectId: input.projectId,
       stageCode: input.stageCode ?? null,
+      disciplineCode: input.disciplineCode ?? null,
       thresholdAmount: input.thresholdAmount,
       thresholdRate: input.thresholdRate,
       createdAt: now,
@@ -88,7 +91,11 @@ export class DbVarianceWarningThresholdRepository
   ): Promise<VarianceWarningThresholdRecord[]> {
     const records = await this.db.query.varianceWarningThresholds.findMany({
       where: (table, { eq: isEqual }) => isEqual(table.projectId, projectId),
-      orderBy: (table, { asc }) => [asc(table.stageCode), asc(table.id)],
+      orderBy: (table, { asc }) => [
+        asc(table.stageCode),
+        asc(table.disciplineCode),
+        asc(table.id),
+      ],
     });
 
     return records.map(mapThresholdRecord);
@@ -97,6 +104,7 @@ export class DbVarianceWarningThresholdRepository
   async upsert(input: {
     projectId: string;
     stageCode?: string | null;
+    disciplineCode?: string | null;
     thresholdAmount: number;
     thresholdRate: number;
   }): Promise<VarianceWarningThresholdRecord> {
@@ -105,6 +113,9 @@ export class DbVarianceWarningThresholdRepository
         and(
           eq(table.projectId, input.projectId),
           input.stageCode ? eq(table.stageCode, input.stageCode) : isNull(table.stageCode),
+          input.disciplineCode
+            ? eq(table.disciplineCode, input.disciplineCode)
+            : isNull(table.disciplineCode),
         ),
     });
 
@@ -128,6 +139,7 @@ export class DbVarianceWarningThresholdRepository
         id: randomUUID(),
         projectId: input.projectId,
         stageCode: input.stageCode ?? null,
+        disciplineCode: input.disciplineCode ?? null,
         thresholdAmount: input.thresholdAmount,
         thresholdRate: input.thresholdRate,
         createdAt: now,
@@ -146,9 +158,21 @@ function mapThresholdRecord(
     id: record.id,
     projectId: record.projectId,
     stageCode: record.stageCode ?? null,
+    disciplineCode: record.disciplineCode ?? null,
     thresholdAmount: record.thresholdAmount,
     thresholdRate: record.thresholdRate,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
+}
+
+function compareThresholdScope(
+  left: VarianceWarningThresholdRecord,
+  right: VarianceWarningThresholdRecord,
+) {
+  const stageCompare = (left.stageCode ?? "").localeCompare(right.stageCode ?? "");
+  if (stageCompare !== 0) {
+    return stageCompare;
+  }
+  return (left.disciplineCode ?? "").localeCompare(right.disciplineCode ?? "");
 }

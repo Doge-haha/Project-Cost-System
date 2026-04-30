@@ -451,7 +451,7 @@ test("GET /v1/projects/:id/ai/recommendation-context builds bill, quota, and var
   await app.close();
 });
 
-test("variance warning thresholds can be configured per stage", async () => {
+test("variance warning thresholds can be configured per stage and discipline", async () => {
   const app = createRecommendationApp({
     billItems: [
       {
@@ -469,12 +469,14 @@ test("variance warning thresholds can be configured per stage", async () => {
     headers: { authorization: `Bearer ${token}` },
     payload: {
       stageCode: "estimate",
+      disciplineCode: "building",
       thresholdAmount: 10,
       thresholdRate: 0.1,
     },
   });
   assert.equal(thresholdResponse.statusCode, 200);
   assert.equal(thresholdResponse.json().stageCode, "estimate");
+  assert.equal(thresholdResponse.json().disciplineCode, "building");
 
   const response = await app.inject({
     method: "POST",
@@ -488,11 +490,11 @@ test("variance warning thresholds can be configured per stage", async () => {
     },
   });
   assert.equal(response.statusCode, 201);
-  assert.equal(response.json().items[0].inputPayload.thresholdScope, "stage");
+  assert.equal(response.json().items[0].inputPayload.thresholdScope, "stage_discipline");
 
   const listResponse = await app.inject({
     method: "GET",
-    url: "/v1/projects/project-001/ai/variance-warning-thresholds",
+    url: "/v1/projects/project-001/ai/variance-warning-thresholds?stageCode=estimate&disciplineCode=building",
     headers: { authorization: `Bearer ${token}` },
   });
   assert.equal(listResponse.statusCode, 200);

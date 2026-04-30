@@ -139,6 +139,7 @@ export class AiRecommendationService {
     const thresholds = await this.resolveVarianceThresholds({
       projectId: input.projectId,
       stageCode: input.stageCode,
+      disciplineCode: input.disciplineCode,
       thresholdAmount: input.thresholdAmount,
       thresholdRate: input.thresholdRate,
     });
@@ -453,6 +454,7 @@ export class AiRecommendationService {
       const thresholds = await this.resolveVarianceThresholds({
         projectId: input.projectId,
         stageCode: input.stageCode,
+        disciplineCode: input.disciplineCode,
       });
       const billVersionId = input.billVersionId ?? input.resourceId;
       const details = this.dependencies.summaryService
@@ -481,11 +483,23 @@ export class AiRecommendationService {
     VarianceWarningThresholdRecord[]
   > {
     await this.assertProjectAccess(input, "view");
-    return (
+    const thresholds =
       await this.dependencies.varianceWarningThresholdRepository?.listByProjectId(
         input.projectId,
-      )
-    ) ?? [];
+      );
+
+    return (thresholds ?? []).filter((threshold) => {
+      if (input.stageCode && threshold.stageCode !== input.stageCode) {
+        return false;
+      }
+      if (
+        input.disciplineCode &&
+        threshold.disciplineCode !== input.disciplineCode
+      ) {
+        return false;
+      }
+      return true;
+    });
   }
 
   async configureVarianceWarningThreshold(input: RecommendationContext & {
@@ -505,6 +519,7 @@ export class AiRecommendationService {
       await this.dependencies.varianceWarningThresholdRepository.upsert({
         projectId: input.projectId,
         stageCode: input.stageCode ?? null,
+        disciplineCode: input.disciplineCode ?? null,
         thresholdAmount: input.thresholdAmount,
         thresholdRate: input.thresholdRate,
       });
@@ -855,12 +870,19 @@ export class AiRecommendationService {
   private async resolveVarianceThresholds(input: {
     projectId: string;
     stageCode?: string;
+    disciplineCode?: string;
     thresholdAmount?: number;
     thresholdRate?: number;
   }): Promise<{
     thresholdAmount: number;
     thresholdRate: number;
-    scope: "request" | "stage" | "project" | "default";
+    scope:
+      | "request"
+      | "stage_discipline"
+      | "stage"
+      | "discipline"
+      | "project"
+      | "default";
   }> {
     if (
       input.thresholdAmount !== undefined ||
@@ -877,8 +899,23 @@ export class AiRecommendationService {
       await this.dependencies.varianceWarningThresholdRepository?.listByProjectId(
         input.projectId,
       );
+    const stageDisciplineThreshold = thresholds?.find(
+      (threshold) =>
+        threshold.stageCode === input.stageCode &&
+        threshold.disciplineCode === input.disciplineCode,
+    );
+    if (stageDisciplineThreshold) {
+      return {
+        thresholdAmount: stageDisciplineThreshold.thresholdAmount,
+        thresholdRate: stageDisciplineThreshold.thresholdRate,
+        scope: "stage_discipline",
+      };
+    }
+
     const stageThreshold = thresholds?.find(
-      (threshold) => threshold.stageCode === input.stageCode,
+      (threshold) =>
+        threshold.stageCode === input.stageCode &&
+        threshold.disciplineCode === null,
     );
     if (stageThreshold) {
       return {
@@ -888,8 +925,22 @@ export class AiRecommendationService {
       };
     }
 
+    const disciplineThreshold = thresholds?.find(
+      (threshold) =>
+        threshold.stageCode === null &&
+        threshold.disciplineCode === input.disciplineCode,
+    );
+    if (disciplineThreshold) {
+      return {
+        thresholdAmount: disciplineThreshold.thresholdAmount,
+        thresholdRate: disciplineThreshold.thresholdRate,
+        scope: "discipline",
+      };
+    }
+
     const projectThreshold = thresholds?.find(
-      (threshold) => threshold.stageCode === null,
+      (threshold) =>
+        threshold.stageCode === null && threshold.disciplineCode === null,
     );
     if (projectThreshold) {
       return {

@@ -2,6 +2,7 @@ import { getRuntimeConfig } from "./config";
 import type {
   AuditLogListResponse,
   AiRecommendation,
+  ExpireStaleAiRecommendationResponse,
   AiRecommendationInputContext,
   AiRecommendationListResponse,
   AiRecommendationStatus,
@@ -496,6 +497,7 @@ export const apiClient = {
     projectId: string,
     input: {
       stageCode?: string | null;
+      disciplineCode?: string | null;
       thresholdAmount: number;
       thresholdRate: number;
     },
@@ -505,6 +507,24 @@ export const apiClient = {
       undefined,
       {
         method: "PUT",
+        body: input,
+      },
+    );
+  },
+  expireStaleAiRecommendations(input: {
+    projectId: string;
+    reason: string;
+    recommendationType?: AiRecommendationType;
+    resourceType?: string;
+    resourceId?: string;
+    stageCode?: string;
+    disciplineCode?: string;
+  }) {
+    return request<ExpireStaleAiRecommendationResponse>(
+      "/v1/ai/recommendations/expire-stale",
+      undefined,
+      {
+        method: "POST",
         body: input,
       },
     );

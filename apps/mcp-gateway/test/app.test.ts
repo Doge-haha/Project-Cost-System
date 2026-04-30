@@ -304,8 +304,36 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         name: "configure-variance-warning-threshold",
         uri: "/v1/tools/configure-variance-warning-threshold",
         mode: "invoke",
-        description: "Create or update a project or stage variance warning threshold",
-        parameters: ["projectId", "stageCode?", "thresholdAmount", "thresholdRate"],
+        description:
+          "Create or update a project, stage, or discipline variance warning threshold",
+        parameters: [
+          "projectId",
+          "stageCode?",
+          "disciplineCode?",
+          "thresholdAmount",
+          "thresholdRate",
+        ],
+      },
+      {
+        name: "generate-ai-recommendations",
+        uri: "/v1/tools/generate-ai-recommendations",
+        mode: "invoke",
+        description:
+          "Generate bill, quota, or variance-warning AI recommendations through the API",
+        parameters: [
+          "projectId",
+          "recommendationType",
+          "resourceType?",
+          "resourceId?",
+          "billVersionId?",
+          "stageCode?",
+          "disciplineCode?",
+          "thresholdAmount?",
+          "thresholdRate?",
+          "limit?",
+          "inputPayload?",
+          "outputPayload?",
+        ],
       },
       {
         name: "expire-stale-ai-recommendations",
@@ -2919,6 +2947,7 @@ test("POST /v1/tools/configure-variance-warning-threshold proxies threshold upda
           id: "threshold-001",
           projectId: "project-001",
           stageCode: "estimate",
+          disciplineCode: "building",
           thresholdAmount: 8000,
           thresholdRate: 0.12,
         };
@@ -2940,6 +2969,7 @@ test("POST /v1/tools/configure-variance-warning-threshold proxies threshold upda
     payload: {
       projectId: "project-001",
       stageCode: "estimate",
+      disciplineCode: "building",
       thresholdAmount: 8000,
       thresholdRate: 0.12,
     },
@@ -2953,11 +2983,13 @@ test("POST /v1/tools/configure-variance-warning-threshold proxies threshold upda
     target: {
       projectId: "project-001",
       stageCode: "estimate",
+      disciplineCode: "building",
     },
     result: {
       id: "threshold-001",
       projectId: "project-001",
       stageCode: "estimate",
+      disciplineCode: "building",
       thresholdAmount: 8000,
       thresholdRate: 0.12,
     },
@@ -2965,10 +2997,11 @@ test("POST /v1/tools/configure-variance-warning-threshold proxies threshold upda
     related: {
       thresholdsResource: {
         resourceType: "variance_warning_thresholds",
-        query: {
-          projectId: "project-001",
-          stageCode: "estimate",
-        },
+          query: {
+            projectId: "project-001",
+            stageCode: "estimate",
+            disciplineCode: "building",
+          },
       },
     },
   });
@@ -2977,8 +3010,103 @@ test("POST /v1/tools/configure-variance-warning-threshold proxies threshold upda
       token,
       projectId: "project-001",
       stageCode: "estimate",
+      disciplineCode: "building",
       thresholdAmount: 8000,
       thresholdRate: 0.12,
+    },
+  ]);
+
+  await app.close();
+});
+
+test("POST /v1/tools/generate-ai-recommendations proxies recommendation generation", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      generateAiRecommendations: async (input, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...input,
+        });
+        return {
+          id: "ai-recommendation-001",
+          projectId: "project-001",
+          status: "generated",
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "owner-001",
+    displayName: "Owner User",
+    roleCodes: ["project_owner"],
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/tools/generate-ai-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      outputPayload: {
+        itemName: "土方工程",
+        reason: "历史清单匹配",
+      },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "tool_result",
+    tool: "generate_ai_recommendations",
+    mode: "synchronous",
+    target: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+    result: {
+      id: "ai-recommendation-001",
+      projectId: "project-001",
+      status: "generated",
+    },
+    execution: null,
+    related: {
+      recommendationsResource: {
+        resourceType: "ai_recommendations",
+        query: {
+          projectId: "project-001",
+          recommendationType: "bill_recommendation",
+          status: "generated",
+        },
+      },
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      outputPayload: {
+        itemName: "土方工程",
+        reason: "历史清单匹配",
+      },
     },
   ]);
 

@@ -651,6 +651,7 @@ export const varianceWarningThresholds = pgTable(
       .notNull()
       .references(() => projects.id),
     stageCode: text("stage_code"),
+    disciplineCode: text("discipline_code"),
     thresholdAmount: doublePrecision("threshold_amount").notNull(),
     thresholdRate: doublePrecision("threshold_rate").notNull(),
     ...auditColumns,
@@ -658,7 +659,7 @@ export const varianceWarningThresholds = pgTable(
   (table) => ({
     varianceWarningThresholdProjectIndex: index(
       "variance_warning_threshold_project_idx",
-    ).on(table.projectId, table.stageCode),
+    ).on(table.projectId, table.stageCode, table.disciplineCode),
   }),
 );
 

@@ -387,6 +387,7 @@ describe("ProjectAiRecommendationsPage", () => {
         if (init?.method === "PUT") {
           expect(JSON.parse(String(init.body))).toEqual({
             stageCode: "estimate",
+            disciplineCode: "building",
             thresholdAmount: 8000,
             thresholdRate: 0.12,
           });
@@ -394,6 +395,7 @@ describe("ProjectAiRecommendationsPage", () => {
             id: "threshold-002",
             projectId: "project-001",
             stageCode: "estimate",
+            disciplineCode: "building",
             thresholdAmount: 8000,
             thresholdRate: 0.12,
             createdAt: "2026-04-18T12:00:00.000Z",
@@ -407,6 +409,7 @@ describe("ProjectAiRecommendationsPage", () => {
               id: "threshold-001",
               projectId: "project-001",
               stageCode: null,
+              disciplineCode: null,
               thresholdAmount: 5000,
               thresholdRate: 0.08,
               createdAt: "2026-04-18T11:00:00.000Z",
@@ -422,11 +425,14 @@ describe("ProjectAiRecommendationsPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText("默认范围 · 金额 5000 · 比率 8%")).toBeInTheDocument();
+      expect(screen.getByText("全部阶段 · 全部专业 · 金额 5000 · 比率 8%")).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByRole("textbox", { name: "阈值阶段" }), {
+    fireEvent.change(screen.getByRole("combobox", { name: "阈值阶段" }), {
       target: { value: "estimate" },
+    });
+    fireEvent.change(screen.getByRole("combobox", { name: "阈值专业" }), {
+      target: { value: "building" },
     });
     fireEvent.change(screen.getByLabelText("金额阈值"), {
       target: { value: "8000" },
@@ -439,7 +445,7 @@ describe("ProjectAiRecommendationsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("阈值配置已保存。")).toBeInTheDocument();
     });
-    expect(screen.getByText("estimate · 金额 8000 · 比率 12%")).toBeInTheDocument();
+    expect(screen.getByText("estimate · building · 金额 8000 · 比率 12%")).toBeInTheDocument();
   });
 
   test("opens recommendation input context preview", async () => {
@@ -523,8 +529,10 @@ describe("ProjectAiRecommendationsPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: "AI 输入上下文预览" })).toBeInTheDocument();
     });
-    expect(screen.getByText(/"currentStage": "estimate"/)).toBeInTheDocument();
-    expect(screen.getByText(/"name": "土方工程"/)).toBeInTheDocument();
+    expect(screen.getByText("当前阶段")).toBeInTheDocument();
+    expect(screen.getByText("estimate")).toBeInTheDocument();
+    expect(screen.getByText("目标资源")).toBeInTheDocument();
+    expect(screen.getByText("土方工程")).toBeInTheDocument();
   });
 
   test("shows enriched expired recommendation reason", async () => {
@@ -746,9 +754,30 @@ function createWorkspace(
       name: "新点造价项目",
       status: "draft",
     },
-    currentStage: null,
-    availableStages: [],
-    disciplines: [],
+    currentStage: {
+      id: "stage-001",
+      stageCode: "estimate",
+      stageName: "概算",
+      status: "active",
+      sequenceNo: 1,
+    },
+    availableStages: [
+      {
+        id: "stage-001",
+        stageCode: "estimate",
+        stageName: "概算",
+        status: "active",
+        sequenceNo: 1,
+      },
+    ],
+    disciplines: [
+      {
+        id: "discipline-001",
+        disciplineCode: "building",
+        disciplineName: "土建",
+        status: "active",
+      },
+    ],
     billVersions: [],
     todoSummary: {
       totalCount: 0,

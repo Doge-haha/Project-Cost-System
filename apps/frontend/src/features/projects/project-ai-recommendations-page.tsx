@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactElement } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { apiClient, ApiError } from "../../lib/api";
@@ -33,6 +33,7 @@ type RecommendationFilters = {
 
 type ThresholdForm = {
   stageCode: string;
+  disciplineCode: string;
   thresholdAmount: string;
   thresholdRate: string;
 };
@@ -56,6 +57,7 @@ const defaultFilters: RecommendationFilters = {
 
 const defaultThresholdForm: ThresholdForm = {
   stageCode: "",
+  disciplineCode: "",
   thresholdAmount: "",
   thresholdRate: "",
 };
@@ -94,6 +96,7 @@ export function ProjectAiRecommendationsPage() {
     useState<ThresholdForm>(defaultThresholdForm);
   const [thresholdSaving, setThresholdSaving] = useState(false);
   const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
+  const [batchExpiring, setBatchExpiring] = useState(false);
   const [contextPreview, setContextPreview] = useState<ContextPreviewState | null>(
     null,
   );
@@ -257,6 +260,7 @@ export function ProjectAiRecommendationsPage() {
     try {
       const saved = await apiClient.upsertVarianceWarningThreshold(projectId, {
         stageCode: thresholdForm.stageCode.trim() || null,
+        disciplineCode: thresholdForm.disciplineCode.trim() || null,
         thresholdAmount,
         thresholdRate,
       });
@@ -271,6 +275,40 @@ export function ProjectAiRecommendationsPage() {
       );
     } finally {
       setThresholdSaving(false);
+    }
+  }
+
+  async function handleExpireStaleRecommendations() {
+    if (!projectId) {
+      return;
+    }
+
+    setBatchExpiring(true);
+    setActionMessage(null);
+
+    try {
+      const response = await apiClient.expireStaleAiRecommendations({
+        projectId,
+        recommendationType:
+          activeQuery.recommendationType === ""
+            ? undefined
+            : (activeQuery.recommendationType as AiRecommendationType),
+        resourceType: activeQuery.resourceType || undefined,
+        resourceId: activeQuery.resourceId || undefined,
+        stageCode: activeQuery.stageCode || undefined,
+        disciplineCode: activeQuery.disciplineCode || undefined,
+        reason: "人工批量失效",
+      });
+      await loadRecommendations();
+      setActionMessage(`已批量失效 ${response.items.length} 条待处理推荐。`);
+    } catch (submitError) {
+      setActionMessage(
+        submitError instanceof ApiError
+          ? submitError.message
+          : "AI 推荐批量失效失败，请稍后重试。",
+      );
+    } finally {
+      setBatchExpiring(false);
     }
   }
 
@@ -411,21 +449,39 @@ export function ProjectAiRecommendationsPage() {
           </label>
           <label className="form-field">
             阶段
-            <input
+            <select
               aria-label="阶段"
               onChange={(event) => updateFilter("stageCode", event.target.value)}
-              placeholder="estimate"
               value={filters.stageCode}
-            />
+            >
+              <option value="">全部</option>
+              {state.workspace.availableStages.map((stage) => (
+                <option key={stage.stageCode} value={stage.stageCode}>
+                  {formatStageOption(stage.stageCode, stage.stageName)}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="form-field">
             专业
-            <input
+            <select
               aria-label="专业"
               onChange={(event) => updateFilter("disciplineCode", event.target.value)}
-              placeholder="building"
               value={filters.disciplineCode}
-            />
+            >
+              <option value="">全部</option>
+              {state.workspace.disciplines.map((discipline) => (
+                <option
+                  key={discipline.disciplineCode}
+                  value={discipline.disciplineCode}
+                >
+                  {formatDisciplineOption(
+                    discipline.disciplineCode,
+                    discipline.disciplineName,
+                  )}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="form-field">
             数量
@@ -458,7 +514,7 @@ export function ProjectAiRecommendationsPage() {
         <div className="form-grid">
           <label className="form-field">
             阈值阶段
-            <input
+            <select
               aria-label="阈值阶段"
               onChange={(event) =>
                 setThresholdForm((current) => ({
@@ -466,9 +522,41 @@ export function ProjectAiRecommendationsPage() {
                   stageCode: event.target.value,
                 }))
               }
-              placeholder="留空为项目默认"
               value={thresholdForm.stageCode}
-            />
+            >
+              <option value="">项目默认</option>
+              {state.workspace.availableStages.map((stage) => (
+                <option key={stage.stageCode} value={stage.stageCode}>
+                  {formatStageOption(stage.stageCode, stage.stageName)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field">
+            阈值专业
+            <select
+              aria-label="阈值专业"
+              onChange={(event) =>
+                setThresholdForm((current) => ({
+                  ...current,
+                  disciplineCode: event.target.value,
+                }))
+              }
+              value={thresholdForm.disciplineCode}
+            >
+              <option value="">全部专业</option>
+              {state.workspace.disciplines.map((discipline) => (
+                <option
+                  key={discipline.disciplineCode}
+                  value={discipline.disciplineCode}
+                >
+                  {formatDisciplineOption(
+                    discipline.disciplineCode,
+                    discipline.disciplineName,
+                  )}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="form-field">
             金额阈值
@@ -531,6 +619,22 @@ export function ProjectAiRecommendationsPage() {
       <section className="panel">
         <h2>推荐列表</h2>
         {actionMessage ? <p className="page-description">{actionMessage}</p> : null}
+        <div className="button-row">
+          <button
+            className="primary-button secondary"
+            disabled={
+              !canHandleRecommendations ||
+              batchExpiring ||
+              state.recommendations.summary.statusCounts.generated === 0
+            }
+            onClick={() => {
+              void handleExpireStaleRecommendations();
+            }}
+            type="button"
+          >
+            批量标记失效
+          </button>
+        </div>
         {state.recommendations.items.length > 0 ? (
           <div className="recommendation-group-list">
             {recommendationGroups.map((group) => (
@@ -697,9 +801,7 @@ export function ProjectAiRecommendationsPage() {
           ) : contextPreview.error ? (
             <p className="page-description">{contextPreview.error}</p>
           ) : (
-            <pre className="context-preview-code">
-              {JSON.stringify(contextPreview.payload, null, 2)}
-            </pre>
+            <ContextPreviewDetails payload={contextPreview.payload ?? {}} />
           )}
           <div className="version-card-actions">
             <button
@@ -729,6 +831,72 @@ function groupRecommendationsByResourceType(items: AiRecommendation[]) {
     resourceType,
     items: groupItems,
   }));
+}
+
+function ContextPreviewDetails(props: { payload: Record<string, unknown> }) {
+  const sections = Object.entries(props.payload);
+
+  if (sections.length === 0) {
+    return <p className="page-description">当前推荐没有可展示的输入上下文。</p>;
+  }
+
+  return (
+    <div className="context-preview-grid">
+      {sections.map(([key, value]) => (
+        <section className="context-preview-section" key={key}>
+          <h3>{formatContextKey(key)}</h3>
+          {renderContextValue(value)}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function renderContextValue(value: unknown): ReactElement {
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <p className="page-description">暂无数据</p>;
+    }
+
+    return (
+      <div className="context-preview-list">
+        {value.slice(0, 8).map((item, index) => (
+          <div className="context-preview-item" key={index}>
+            {renderContextValue(item)}
+          </div>
+        ))}
+        {value.length > 8 ? (
+          <p className="page-description">其余 {value.length - 8} 项已折叠。</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) {
+      return <p className="page-description">暂无数据</p>;
+    }
+
+    return (
+      <dl className="context-preview-fields">
+        {entries.slice(0, 12).map(([entryKey, entryValue]) => (
+          <div key={entryKey}>
+            <dt>{formatContextKey(entryKey)}</dt>
+            <dd>{formatContextPrimitive(entryValue)}</dd>
+          </div>
+        ))}
+        {entries.length > 12 ? (
+          <div>
+            <dt>更多字段</dt>
+            <dd>{entries.length - 12} 项</dd>
+          </div>
+        ) : null}
+      </dl>
+    );
+  }
+
+  return <p className="page-description">{formatContextPrimitive(value)}</p>;
 }
 
 function readFilters(searchParams: URLSearchParams): RecommendationFilters {
@@ -837,18 +1005,75 @@ function upsertThreshold(
   saved: VarianceWarningThreshold,
 ) {
   const next = current.filter(
-    (item) => (item.stageCode ?? null) !== (saved.stageCode ?? null),
+    (item) =>
+      (item.stageCode ?? null) !== (saved.stageCode ?? null) ||
+      (item.disciplineCode ?? null) !== (saved.disciplineCode ?? null),
   );
-  return [...next, saved].sort((left, right) =>
-    (left.stageCode ?? "").localeCompare(right.stageCode ?? ""),
-  );
+  return [...next, saved].sort(compareThresholdScope);
 }
 
 function formatThreshold(threshold: VarianceWarningThreshold) {
-  const scope = threshold.stageCode ? threshold.stageCode : "默认范围";
+  const stageScope = threshold.stageCode ? threshold.stageCode : "全部阶段";
+  const disciplineScope = threshold.disciplineCode
+    ? threshold.disciplineCode
+    : "全部专业";
+  const scope = `${stageScope} · ${disciplineScope}`;
   return `${scope} · 金额 ${formatPlainNumber(threshold.thresholdAmount)} · 比率 ${formatPercent(
     threshold.thresholdRate,
   )}`;
+}
+
+function compareThresholdScope(
+  left: VarianceWarningThreshold,
+  right: VarianceWarningThreshold,
+) {
+  const stageCompare = (left.stageCode ?? "").localeCompare(right.stageCode ?? "");
+  if (stageCompare !== 0) {
+    return stageCompare;
+  }
+  return (left.disciplineCode ?? "").localeCompare(right.disciplineCode ?? "");
+}
+
+function formatStageOption(stageCode: string, stageName: string) {
+  return stageName === stageCode ? stageCode : `${stageName} (${stageCode})`;
+}
+
+function formatDisciplineOption(disciplineCode: string, disciplineName: string) {
+  return disciplineName === disciplineCode
+    ? disciplineCode
+    : `${disciplineName} (${disciplineCode})`;
+}
+
+function formatContextKey(key: string) {
+  const labels: Record<string, string> = {
+    project: "项目",
+    currentStage: "当前阶段",
+    targetResource: "目标资源",
+    billVersion: "清单版本",
+    billItem: "清单项",
+    quotaLine: "定额行",
+    varianceSummary: "偏差摘要",
+    summaryDetails: "汇总明细",
+    knowledge: "知识上下文",
+    memory: "记忆上下文",
+  };
+  return labels[key] ?? key;
+}
+
+function formatContextPrimitive(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(4)));
+  }
+  if (typeof value === "boolean") {
+    return value ? "是" : "否";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return JSON.stringify(value);
 }
 
 function formatPlainNumber(value: number) {

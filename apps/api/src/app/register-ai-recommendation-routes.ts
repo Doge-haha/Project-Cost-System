@@ -64,6 +64,7 @@ const expireStaleSchema = z.object({
 
 const varianceWarningThresholdSchema = z.object({
   stageCode: z.string().min(1).nullable().optional(),
+  disciplineCode: z.string().min(1).nullable().optional(),
   thresholdAmount: z.number().nonnegative(),
   thresholdRate: z.number().nonnegative(),
 });
@@ -208,6 +209,7 @@ export function registerAiRecommendationRoutes(
       aiRecommendationService.configureVarianceWarningThreshold({
         projectId,
         stageCode: payload.stageCode ?? undefined,
+        disciplineCode: payload.disciplineCode ?? undefined,
         thresholdAmount: payload.thresholdAmount,
         thresholdRate: payload.thresholdRate,
         userId: request.currentUser!.id,

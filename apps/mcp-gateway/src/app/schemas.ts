@@ -161,8 +161,24 @@ export const retryImportFailureScopeToolSchema = z.object({
 export const configureVarianceWarningThresholdToolSchema = z.object({
   projectId: z.string().min(1),
   stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
   thresholdAmount: z.number().nonnegative(),
   thresholdRate: z.number().nonnegative(),
+});
+
+export const generateAiRecommendationsToolSchema = z.object({
+  projectId: z.string().min(1),
+  recommendationType: aiRecommendationTypeSchema,
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  billVersionId: z.string().min(1).optional(),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+  thresholdAmount: z.number().nonnegative().optional(),
+  thresholdRate: z.number().nonnegative().optional(),
+  limit: z.number().int().positive().max(100).optional(),
+  inputPayload: z.record(z.string(), z.unknown()).optional(),
+  outputPayload: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const expireStaleAiRecommendationsToolSchema = z.object({

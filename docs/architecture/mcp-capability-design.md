@@ -574,6 +574,7 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - `extract-knowledge-from-audit`
 - `retry-import-failure-scope`
 - `configure-variance-warning-threshold`
+- `generate-ai-recommendations`
 - `expire-stale-ai-recommendations`
 - `decide-review`
 - `update-process-document-status`

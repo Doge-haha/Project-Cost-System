@@ -57,6 +57,7 @@ npm --workspace @saas-pricing/mcp-gateway run typecheck
 - `extract-knowledge-from-audit`
 - `retry-import-failure-scope`
 - `configure-variance-warning-threshold`
+- `generate-ai-recommendations`
 - `expire-stale-ai-recommendations`
 - `decide-review`
 - `update-process-document-status`

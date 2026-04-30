@@ -338,6 +338,7 @@ export type VarianceWarningThreshold = {
   id: string;
   projectId: string;
   stageCode?: string | null;
+  disciplineCode?: string | null;
   thresholdAmount: number;
   thresholdRate: number;
   createdAt: string;
@@ -346,6 +347,11 @@ export type VarianceWarningThreshold = {
 
 export type VarianceWarningThresholdListResponse = {
   items: VarianceWarningThreshold[];
+};
+
+export type ExpireStaleAiRecommendationResponse = {
+  items: AiRecommendation[];
+  summary: AiRecommendationListResponse["summary"];
 };
 
 export type BillItem = {

@@ -98,6 +98,28 @@ export const importFailureContextQuerySchema = z.object({
   failureAction: z.string().min(1).optional(),
 });
 
+export const aiRecommendationTypeSchema = z.enum([
+  "bill_recommendation",
+  "quota_recommendation",
+  "variance_warning",
+]);
+
+export const aiRecommendationContextQuerySchema = z.object({
+  projectId: z.string().min(1),
+  recommendationType: aiRecommendationTypeSchema,
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  billVersionId: z.string().min(1).optional(),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+});
+
+export const varianceWarningThresholdsQuerySchema = z.object({
+  projectId: z.string().min(1),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
+});
+
 export const exportSummaryReportToolSchema = z.object({
   projectId: z.string().min(1),
   reportType: z.enum(["summary", "variance"]),
@@ -134,6 +156,23 @@ export const retryImportFailureScopeToolSchema = z.object({
   failureReason: z.string().min(1).optional(),
   failureResourceType: z.string().min(1).optional(),
   failureAction: z.string().min(1).optional(),
+});
+
+export const configureVarianceWarningThresholdToolSchema = z.object({
+  projectId: z.string().min(1),
+  stageCode: z.string().min(1).optional(),
+  thresholdAmount: z.number().nonnegative(),
+  thresholdRate: z.number().nonnegative(),
+});
+
+export const expireStaleAiRecommendationsToolSchema = z.object({
+  projectId: z.string().min(1),
+  reason: z.string().min(1),
+  recommendationType: aiRecommendationTypeSchema.optional(),
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  stageCode: z.string().min(1).optional(),
+  disciplineCode: z.string().min(1).optional(),
 });
 
 export const decideReviewToolSchema = z

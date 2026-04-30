@@ -216,6 +216,28 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
           "failureAction?",
         ],
       },
+      {
+        name: "ai-recommendation-context",
+        uri: "/v1/resources/ai-recommendation-context",
+        mode: "read",
+        description: "AI recommendation input context for bill, quota, and variance warning tasks",
+        parameters: [
+          "projectId",
+          "recommendationType",
+          "resourceType?",
+          "resourceId?",
+          "billVersionId?",
+          "stageCode?",
+          "disciplineCode?",
+        ],
+      },
+      {
+        name: "variance-warning-thresholds",
+        uri: "/v1/resources/variance-warning-thresholds",
+        mode: "read",
+        description: "Project and stage scoped variance warning thresholds",
+        parameters: ["projectId", "stageCode?", "disciplineCode?"],
+      },
     ],
     tools: [
       {
@@ -277,6 +299,28 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         mode: "invoke",
         description: "Retry a failed knowledge-extraction job for the current import failure scope",
         parameters: ["jobId", "failureReason?", "failureResourceType?", "failureAction?"],
+      },
+      {
+        name: "configure-variance-warning-threshold",
+        uri: "/v1/tools/configure-variance-warning-threshold",
+        mode: "invoke",
+        description: "Create or update a project or stage variance warning threshold",
+        parameters: ["projectId", "stageCode?", "thresholdAmount", "thresholdRate"],
+      },
+      {
+        name: "expire-stale-ai-recommendations",
+        uri: "/v1/tools/expire-stale-ai-recommendations",
+        mode: "invoke",
+        description: "Expire generated AI recommendations whose upstream context is stale",
+        parameters: [
+          "projectId",
+          "reason",
+          "recommendationType?",
+          "resourceType?",
+          "resourceId?",
+          "stageCode?",
+          "disciplineCode?",
+        ],
       },
       {
         name: "decide-review",
@@ -2045,6 +2089,140 @@ test("GET /v1/resources/import-failure-context proxies filtered import failure s
   await app.close();
 });
 
+test("GET /v1/resources/ai-recommendation-context proxies AI input context", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchAiRecommendationContext: async (query, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...query,
+        });
+        return {
+          project: { id: "project-001" },
+          targetResource: { id: "bill-item-001" },
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/ai-recommendation-context?projectId=project-001&recommendationType=bill_recommendation&resourceType=bill_item&resourceId=bill-item-001&stageCode=estimate&disciplineCode=building",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "ai_recommendation_context",
+    scope: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      billVersionId: null,
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+    data: {
+      project: { id: "project-001" },
+      targetResource: { id: "bill-item-001" },
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      recommendationType: "bill_recommendation",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  ]);
+
+  await app.close();
+});
+
+test("GET /v1/resources/variance-warning-thresholds proxies threshold config", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchVarianceWarningThresholds: async (query, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...query,
+        });
+        return {
+          items: [
+            {
+              id: "threshold-001",
+              stageCode: "estimate",
+              thresholdAmount: 5000,
+              thresholdRate: 0.08,
+            },
+          ],
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/variance-warning-thresholds?projectId=project-001&stageCode=estimate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "variance_warning_thresholds",
+    scope: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: null,
+    },
+    data: {
+      items: [
+        {
+          id: "threshold-001",
+          stageCode: "estimate",
+          thresholdAmount: 5000,
+          thresholdRate: 0.08,
+        },
+      ],
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      stageCode: "estimate",
+    },
+  ]);
+
+  await app.close();
+});
+
 test("POST /v1/tools/export-summary-report returns async job and report task references", async () => {
   const app = createGatewayApp({
     jwtSecret,
@@ -2720,6 +2898,171 @@ test("POST /v1/tools/retry-import-failure-scope proxies scoped retry for allowed
       failureReason: "missing_field",
       failureResourceType: "bill_item",
       failureAction: "create",
+    },
+  ]);
+
+  await app.close();
+});
+
+test("POST /v1/tools/configure-variance-warning-threshold proxies threshold updates", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      configureVarianceWarningThreshold: async (input, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...input,
+        });
+        return {
+          id: "threshold-001",
+          projectId: "project-001",
+          stageCode: "estimate",
+          thresholdAmount: 8000,
+          thresholdRate: 0.12,
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "owner-001",
+    displayName: "Owner User",
+    roleCodes: ["project_owner"],
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/tools/configure-variance-warning-threshold",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      thresholdAmount: 8000,
+      thresholdRate: 0.12,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "tool_result",
+    tool: "configure_variance_warning_threshold",
+    mode: "synchronous",
+    target: {
+      projectId: "project-001",
+      stageCode: "estimate",
+    },
+    result: {
+      id: "threshold-001",
+      projectId: "project-001",
+      stageCode: "estimate",
+      thresholdAmount: 8000,
+      thresholdRate: 0.12,
+    },
+    execution: null,
+    related: {
+      thresholdsResource: {
+        resourceType: "variance_warning_thresholds",
+        query: {
+          projectId: "project-001",
+          stageCode: "estimate",
+        },
+      },
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      stageCode: "estimate",
+      thresholdAmount: 8000,
+      thresholdRate: 0.12,
+    },
+  ]);
+
+  await app.close();
+});
+
+test("POST /v1/tools/expire-stale-ai-recommendations proxies stale expiration", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      expireStaleAiRecommendations: async (input, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...input,
+        });
+        return {
+          items: [{ id: "ai-recommendation-001", status: "expired" }],
+          summary: {
+            totalCount: 1,
+          },
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "owner-001",
+    displayName: "Owner User",
+    roleCodes: ["project_owner"],
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/tools/expire-stale-ai-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      recommendationType: "variance_warning",
+      stageCode: "estimate",
+      reason: "价目版本变化",
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "tool_result",
+    tool: "expire_stale_ai_recommendations",
+    mode: "synchronous",
+    target: {
+      projectId: "project-001",
+      recommendationType: "variance_warning",
+      resourceType: null,
+      resourceId: null,
+      stageCode: "estimate",
+      disciplineCode: null,
+    },
+    result: {
+      items: [{ id: "ai-recommendation-001", status: "expired" }],
+      summary: {
+        totalCount: 1,
+      },
+    },
+    execution: null,
+    related: {
+      recommendationsResource: {
+        resourceType: "ai_recommendations",
+        query: {
+          projectId: "project-001",
+          recommendationType: "variance_warning",
+          status: "expired",
+        },
+      },
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      recommendationType: "variance_warning",
+      stageCode: "estimate",
+      reason: "价目版本变化",
     },
   ]);
 

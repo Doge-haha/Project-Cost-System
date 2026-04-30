@@ -5,6 +5,7 @@ import { AppError } from "../shared/app-error.js";
 import { buildImportFailureContextResource } from "./import-failure-context.js";
 import { resourceEnvelope } from "./responders.js";
 import {
+  aiRecommendationContextQuerySchema,
   importFailureContextQuerySchema,
   billVersionContextQuerySchema,
   jobStatusQuerySchema,
@@ -18,6 +19,7 @@ import {
   reviewSummaryQuerySchema,
   stageContextQuerySchema,
   summaryDetailsQuerySchema,
+  varianceWarningThresholdsQuerySchema,
 } from "./schemas.js";
 
 export function registerResourceRoutes(
@@ -403,6 +405,46 @@ export function registerResourceRoutes(
         failureResourceType: query.failureResourceType,
         failureAction: query.failureAction,
       }),
+    });
+  });
+
+  app.get("/v1/resources/ai-recommendation-context", async (request) => {
+    const query = aiRecommendationContextQuerySchema.parse(request.query);
+    const data = await apiClient.fetchAiRecommendationContext(
+      query,
+      request.bearerToken!,
+    );
+
+    return resourceEnvelope({
+      resourceType: "ai_recommendation_context",
+      scope: {
+        projectId: query.projectId,
+        recommendationType: query.recommendationType,
+        resourceType: query.resourceType ?? null,
+        resourceId: query.resourceId ?? null,
+        billVersionId: query.billVersionId ?? null,
+        stageCode: query.stageCode ?? null,
+        disciplineCode: query.disciplineCode ?? null,
+      },
+      data,
+    });
+  });
+
+  app.get("/v1/resources/variance-warning-thresholds", async (request) => {
+    const query = varianceWarningThresholdsQuerySchema.parse(request.query);
+    const data = await apiClient.fetchVarianceWarningThresholds(
+      query,
+      request.bearerToken!,
+    );
+
+    return resourceEnvelope({
+      resourceType: "variance_warning_thresholds",
+      scope: {
+        projectId: query.projectId,
+        stageCode: query.stageCode ?? null,
+        disciplineCode: query.disciplineCode ?? null,
+      },
+      data,
     });
   });
 }

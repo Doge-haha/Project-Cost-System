@@ -130,6 +130,28 @@ export const RESOURCE_DEFINITIONS = [
       "failureAction?",
     ],
   },
+  {
+    name: "ai-recommendation-context",
+    uri: "/v1/resources/ai-recommendation-context",
+    mode: "read",
+    description: "AI recommendation input context for bill, quota, and variance warning tasks",
+    parameters: [
+      "projectId",
+      "recommendationType",
+      "resourceType?",
+      "resourceId?",
+      "billVersionId?",
+      "stageCode?",
+      "disciplineCode?",
+    ],
+  },
+  {
+    name: "variance-warning-thresholds",
+    uri: "/v1/resources/variance-warning-thresholds",
+    mode: "read",
+    description: "Project and stage scoped variance warning thresholds",
+    parameters: ["projectId", "stageCode?", "disciplineCode?"],
+  },
 ] as const;
 
 export const TOOL_DEFINITIONS = [
@@ -185,6 +207,28 @@ export const TOOL_DEFINITIONS = [
     mode: "invoke",
     description: "Retry a failed knowledge-extraction job for the current import failure scope",
     parameters: ["jobId", "failureReason?", "failureResourceType?", "failureAction?"],
+  },
+  {
+    name: "configure-variance-warning-threshold",
+    uri: "/v1/tools/configure-variance-warning-threshold",
+    mode: "invoke",
+    description: "Create or update a project or stage variance warning threshold",
+    parameters: ["projectId", "stageCode?", "thresholdAmount", "thresholdRate"],
+  },
+  {
+    name: "expire-stale-ai-recommendations",
+    uri: "/v1/tools/expire-stale-ai-recommendations",
+    mode: "invoke",
+    description: "Expire generated AI recommendations whose upstream context is stale",
+    parameters: [
+      "projectId",
+      "reason",
+      "recommendationType?",
+      "resourceType?",
+      "resourceId?",
+      "stageCode?",
+      "disciplineCode?",
+    ],
   },
   {
     name: "decide-review",

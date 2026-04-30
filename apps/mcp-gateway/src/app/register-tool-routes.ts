@@ -8,7 +8,9 @@ import {
 } from "./permissions.js";
 import { toolEnvelope } from "./responders.js";
 import {
+  configureVarianceWarningThresholdToolSchema,
   decideReviewToolSchema,
+  expireStaleAiRecommendationsToolSchema,
   exportSummaryReportToolSchema,
   extractKnowledgeFromAuditToolSchema,
   extractKnowledgePreviewToolSchema,
@@ -304,6 +306,69 @@ export function registerToolRoutes(
           resourceType: "job_status",
           query: {
             jobId: asyncJobId,
+          },
+        },
+      },
+    });
+  });
+
+  app.post("/v1/tools/configure-variance-warning-threshold", async (request) => {
+    assertCanInvokeWriteTool(request.currentUser!);
+
+    const payload = configureVarianceWarningThresholdToolSchema.parse(request.body);
+    const result = await apiClient.configureVarianceWarningThreshold(
+      payload,
+      request.bearerToken!,
+    );
+
+    return toolEnvelope({
+      tool: "configure_variance_warning_threshold",
+      mode: "synchronous",
+      target: {
+        projectId: payload.projectId,
+        stageCode: payload.stageCode ?? null,
+      },
+      result,
+      related: {
+        thresholdsResource: {
+          resourceType: "variance_warning_thresholds",
+          query: {
+            projectId: payload.projectId,
+            stageCode: payload.stageCode,
+          },
+        },
+      },
+    });
+  });
+
+  app.post("/v1/tools/expire-stale-ai-recommendations", async (request) => {
+    assertCanInvokeWriteTool(request.currentUser!);
+
+    const payload = expireStaleAiRecommendationsToolSchema.parse(request.body);
+    const result = await apiClient.expireStaleAiRecommendations(
+      payload,
+      request.bearerToken!,
+    );
+
+    return toolEnvelope({
+      tool: "expire_stale_ai_recommendations",
+      mode: "synchronous",
+      target: {
+        projectId: payload.projectId,
+        recommendationType: payload.recommendationType ?? null,
+        resourceType: payload.resourceType ?? null,
+        resourceId: payload.resourceId ?? null,
+        stageCode: payload.stageCode ?? null,
+        disciplineCode: payload.disciplineCode ?? null,
+      },
+      result,
+      related: {
+        recommendationsResource: {
+          resourceType: "ai_recommendations",
+          query: {
+            projectId: payload.projectId,
+            recommendationType: payload.recommendationType,
+            status: "expired",
           },
         },
       },

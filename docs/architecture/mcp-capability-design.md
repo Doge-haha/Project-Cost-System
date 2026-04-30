@@ -562,6 +562,8 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - `process-document-summary`
 - `report-export-status`
 - `import-failure-context`
+- `ai-recommendation-context`
+- `variance-warning-thresholds`
 
 已落地 tools：
 
@@ -571,6 +573,8 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - `preview-knowledge-extraction`
 - `extract-knowledge-from-audit`
 - `retry-import-failure-scope`
+- `configure-variance-warning-threshold`
+- `expire-stale-ai-recommendations`
 - `decide-review`
 - `update-process-document-status`
 

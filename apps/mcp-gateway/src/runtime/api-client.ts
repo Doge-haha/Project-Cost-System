@@ -52,6 +52,27 @@ export type ImportFailureContextQuery = {
   projectId: string;
 };
 
+export type AiRecommendationType =
+  | "bill_recommendation"
+  | "quota_recommendation"
+  | "variance_warning";
+
+export type AiRecommendationContextQuery = {
+  projectId: string;
+  recommendationType: AiRecommendationType;
+  resourceType?: string;
+  resourceId?: string;
+  billVersionId?: string;
+  stageCode?: string;
+  disciplineCode?: string;
+};
+
+export type VarianceWarningThresholdsQuery = {
+  projectId: string;
+  stageCode?: string;
+  disciplineCode?: string;
+};
+
 export type KnowledgeEntriesQuery = {
   projectId: string;
   sourceJobId?: string;
@@ -93,6 +114,23 @@ export type RetryImportFailureScopeInput = {
   failureReason?: string;
   failureResourceType?: string;
   failureAction?: string;
+};
+
+export type ConfigureVarianceWarningThresholdInput = {
+  projectId: string;
+  stageCode?: string;
+  thresholdAmount: number;
+  thresholdRate: number;
+};
+
+export type ExpireStaleAiRecommendationsInput = {
+  projectId: string;
+  reason: string;
+  recommendationType?: AiRecommendationType;
+  resourceType?: string;
+  resourceId?: string;
+  stageCode?: string;
+  disciplineCode?: string;
 };
 
 export type DecideReviewInput = {
@@ -852,6 +890,176 @@ export class GatewayApiClient {
           "UPSTREAM_REQUEST_FAILED",
         (payload as { error?: { message?: string } }).error?.message ??
           "Failed to retry import failure scope",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async fetchAiRecommendationContext(
+    query: AiRecommendationContextQuery,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/projects/${query.projectId}/ai/recommendation-context?${this.buildQuery({
+        recommendationType: query.recommendationType,
+        resourceType: query.resourceType,
+        resourceId: query.resourceId,
+        billVersionId: query.billVersionId,
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode,
+      }).toString()}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+        },
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to load AI recommendation context",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async fetchVarianceWarningThresholds(
+    query: VarianceWarningThresholdsQuery,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/projects/${query.projectId}/ai/variance-warning-thresholds?${this.buildQuery({
+        stageCode: query.stageCode,
+        disciplineCode: query.disciplineCode,
+      }).toString()}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+        },
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to load variance warning thresholds",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async configureVarianceWarningThreshold(
+    input: ConfigureVarianceWarningThresholdInput,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/projects/${input.projectId}/ai/variance-warning-thresholds`,
+      {
+        method: "PUT",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          stageCode: input.stageCode ?? null,
+          thresholdAmount: input.thresholdAmount,
+          thresholdRate: input.thresholdRate,
+        }),
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to configure variance warning threshold",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async expireStaleAiRecommendations(
+    input: ExpireStaleAiRecommendationsInput,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/ai/recommendations/expire-stale`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId: input.projectId,
+          recommendationType: input.recommendationType,
+          resourceType: input.resourceType,
+          resourceId: input.resourceId,
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          reason: input.reason,
+        }),
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to expire stale AI recommendations",
       );
     }
 

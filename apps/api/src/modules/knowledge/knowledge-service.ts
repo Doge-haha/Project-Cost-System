@@ -42,6 +42,19 @@ type ExtractionBatchResult = {
 
 type RecommendationFeedbackStatus = "accepted" | "ignored" | "expired";
 
+export const KNOWLEDGE_ENTRY_TYPES = [
+  "project_retrospective",
+  "review_submission",
+  "ai_recommendation",
+] as const;
+
+export const MEMORY_ENTRY_SCOPES = [
+  "project",
+  "organization",
+  "ai_runtime",
+  "user",
+] as const;
+
 export const KNOWLEDGE_AUDIT_ACTIONS = {
   createKnowledgeEntry: "knowledge_entry.create",
   createMemoryEntry: "memory_entry.create",

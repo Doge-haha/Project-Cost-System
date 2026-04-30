@@ -9,6 +9,8 @@ import type {
   BackgroundJobListResponse,
   BillItem,
   BillVersion,
+  BillVersionSourceChainResponse,
+  BillVersionValidationSummary,
   CreateReportExportResponse,
   FeeTemplate,
   ImportTaskListResponse,
@@ -225,6 +227,20 @@ export const apiClient = {
       items: response.items.map((version) => normalizeBillVersion(version)),
     };
   },
+  async getBillVersionSourceChain(projectId: string, billVersionId: string) {
+    const response = await request<BillVersionSourceChainResponse>(
+      `/v1/projects/${projectId}/bill-versions/${billVersionId}/source-chain`,
+    );
+    return {
+      ...response,
+      items: response.items.map((version) => normalizeBillVersion(version)),
+    };
+  },
+  getBillVersionValidationSummary(projectId: string, billVersionId: string) {
+    return request<BillVersionValidationSummary>(
+      `/v1/projects/${projectId}/bill-versions/${billVersionId}/validation-summary`,
+    );
+  },
   lockBillVersion(projectId: string, billVersionId: string) {
     return request<BillVersion>(
       `/v1/projects/${projectId}/bill-versions/${billVersionId}/lock`,
@@ -233,7 +249,7 @@ export const apiClient = {
         method: "POST",
         body: {},
       },
-    );
+    ).then((version) => normalizeBillVersion(version));
   },
   unlockBillVersion(projectId: string, billVersionId: string, reason: string) {
     return request<BillVersion>(
@@ -243,7 +259,27 @@ export const apiClient = {
         method: "POST",
         body: { reason },
       },
-    );
+    ).then((version) => normalizeBillVersion(version));
+  },
+  submitBillVersion(projectId: string, billVersionId: string, comment?: string) {
+    return request<BillVersion>(
+      `/v1/projects/${projectId}/bill-versions/${billVersionId}/submit`,
+      undefined,
+      {
+        method: "POST",
+        body: comment ? { comment } : {},
+      },
+    ).then((version) => normalizeBillVersion(version));
+  },
+  withdrawBillVersion(projectId: string, billVersionId: string, comment?: string) {
+    return request<BillVersion>(
+      `/v1/projects/${projectId}/bill-versions/${billVersionId}/withdraw`,
+      undefined,
+      {
+        method: "POST",
+        body: comment ? { comment } : {},
+      },
+    ).then((version) => normalizeBillVersion(version));
   },
   listProjectReviews(projectId: string) {
     return request<ReviewSubmissionListResponse>(`/v1/projects/${projectId}/reviews`);

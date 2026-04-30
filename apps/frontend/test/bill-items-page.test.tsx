@@ -238,6 +238,34 @@ describe("BillItemsPage", () => {
         });
       }
 
+      if (
+        url.pathname ===
+        "/v1/projects/project-001/bill-versions/version-001/source-chain"
+      ) {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              versionNo: 2,
+              stageCode: "estimate",
+              disciplineCode: "building",
+              versionStatus: "editable",
+              sourceVersionId: "version-source-001",
+            },
+            {
+              id: "version-source-001",
+              versionName: "招标清单 V1",
+              versionNo: 1,
+              stageCode: "tender",
+              disciplineCode: "building",
+              versionStatus: "locked",
+              sourceVersionId: null,
+            },
+          ],
+        });
+      }
+
       if (url.pathname === "/v1/projects/project-001/quota-lines") {
         return createJsonResponse({
           items: [],
@@ -331,6 +359,9 @@ describe("BillItemsPage", () => {
     expect(screen.getByText("当前阶段：estimate")).toBeInTheDocument();
     expect(screen.getByText("当前版本：估算版 V1（V2）")).toBeInTheDocument();
     expect(screen.getByText("来源版本：招标清单 V1")).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "当前版本" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "上游 1" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "招标清单 V1（V1）" })).toBeInTheDocument();
     expect(screen.getByText("锁定状态：editable")).toBeInTheDocument();
     expect(screen.getByText("创建人：engineer-001")).toBeInTheDocument();
     expect(screen.getByText("变更原因：补充土建清单")).toBeInTheDocument();
@@ -349,6 +380,697 @@ describe("BillItemsPage", () => {
     });
     expect(screen.getByText("UNIT_MISMATCH")).toBeInTheDocument();
     expect(screen.getByText("m3 / m2")).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const url = new URL(String(input));
+        return (
+          url.pathname ===
+          "/v1/projects/project-001/bill-versions/version-001/source-chain"
+        );
+      }),
+    ).toBe(true);
+  });
+
+  test("runs bill version submit and withdraw actions from the source panel", async () => {
+    let versionStatus = "editable";
+    const actionPaths: string[] = [];
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: versionStatus,
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-versions/version-001/submit" &&
+        init?.method === "POST"
+      ) {
+        actionPaths.push(url.pathname);
+        versionStatus = "submitted";
+        return createJsonResponse({
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          status: versionStatus,
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-versions/version-001/withdraw" &&
+        init?.method === "POST"
+      ) {
+        actionPaths.push(url.pathname);
+        versionStatus = "editable";
+        return createJsonResponse({
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          status: versionStatus,
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "提交审核" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "提交审核" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("估算版 V1 已提交审核。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("锁定状态：submitted")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "撤回提交" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "撤回提交" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("估算版 V1 已撤回提交。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("锁定状态：editable")).toBeInTheDocument();
+    expect(actionPaths).toEqual([
+      "/v1/projects/project-001/bill-versions/version-001/submit",
+      "/v1/projects/project-001/bill-versions/version-001/withdraw",
+    ]);
+  });
+
+  test("shows bill version validation summary before submit", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname ===
+        "/v1/projects/project-001/bill-versions/version-001/validation-summary"
+      ) {
+        return createJsonResponse({
+          passed: false,
+          errorCount: 1,
+          warningCount: 1,
+          issues: [
+            {
+              code: "EMPTY_VERSION",
+              severity: "error",
+              message: "Bill version must contain at least one item before submission",
+            },
+            {
+              code: "MISSING_WORK_ITEMS",
+              severity: "warning",
+              message: "Bill item has no work items",
+              itemCode: "A.1",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("提交校验：不可提交，1 个错误、1 个提醒")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/\[error\]清单版本为空/)).toBeInTheDocument();
+    expect(screen.getByText(/\[warning\]缺少工作内容：A\.1/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "提交审核" })).toBeDisabled();
+    expect(
+      fetchMock.mock.calls.some(([input]) => {
+        const url = new URL(String(input));
+        return url.pathname.endsWith("/submit");
+      }),
+    ).toBe(false);
+  });
+
+  test("refreshes bill version validation summary after load failure", async () => {
+    let validationRequestCount = 0;
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname ===
+        "/v1/projects/project-001/bill-versions/version-001/validation-summary"
+      ) {
+        validationRequestCount += 1;
+        if (validationRequestCount === 1) {
+          return createJsonErrorResponse({
+            error: {
+              code: "INTERNAL_ERROR",
+              message: "Validation service unavailable",
+            },
+          }, 500);
+        }
+
+        return createJsonResponse({
+          passed: true,
+          errorCount: 0,
+          warningCount: 0,
+          issues: [],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("提交校验加载失败：Validation service unavailable"),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新校验" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("提交校验：可提交")).toBeInTheDocument();
+    });
+    expect(screen.getByText("提交校验已通过。")).toBeInTheDocument();
+    expect(validationRequestCount).toBe(2);
+  });
+
+  test("refreshes source chain after load failure", async () => {
+    let sourceChainRequestCount = 0;
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              versionNo: 2,
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+              sourceVersionId: "version-source-001",
+            },
+            {
+              id: "version-source-001",
+              versionName: "招标清单 V1",
+              versionNo: 1,
+              stageCode: "tender",
+              disciplineCode: "building",
+              status: "locked",
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname ===
+        "/v1/projects/project-001/bill-versions/version-001/source-chain"
+      ) {
+        sourceChainRequestCount += 1;
+        if (sourceChainRequestCount === 1) {
+          return createJsonErrorResponse({
+            error: {
+              code: "INTERNAL_ERROR",
+              message: "Source chain unavailable",
+            },
+          }, 500);
+        }
+
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              versionNo: 2,
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+              sourceVersionId: "version-source-001",
+            },
+            {
+              id: "version-source-001",
+              versionName: "招标清单 V1",
+              versionNo: 1,
+              stageCode: "tender",
+              disciplineCode: "building",
+              status: "locked",
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname ===
+        "/v1/projects/project-001/bill-versions/version-001/validation-summary"
+      ) {
+        return createJsonResponse({
+          passed: true,
+          errorCount: 0,
+          warningCount: 0,
+          issues: [],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("来源链加载失败：Source chain unavailable")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新来源" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("来源链已刷新。")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("cell", { name: "上游 1" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "招标清单 V1（V1）" })).toBeInTheDocument();
+    expect(sourceChainRequestCount).toBe(2);
+  });
+
+  test("shows structured validation details when submit is rejected", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "bill-item-001",
+              parentId: null,
+              code: "A.1",
+              name: "土建工程",
+              level: 1,
+              quantity: 1,
+              unit: "项",
+            },
+          ],
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: "editable",
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname ===
+        "/v1/projects/project-001/bill-versions/version-001/validation-summary"
+      ) {
+        return createJsonResponse({
+          passed: true,
+          errorCount: 0,
+          warningCount: 0,
+          issues: [],
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-versions/version-001/submit" &&
+        init?.method === "POST"
+      ) {
+        return createJsonErrorResponse({
+          error: {
+            code: "VALIDATION_ERROR",
+            message: "Bill version cannot be submitted",
+            details: [
+              {
+                code: "DUPLICATE_ITEM_CODE",
+                severity: "error",
+                message: "Duplicate bill item code detected",
+                itemCode: "A.1",
+              },
+            ],
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("提交校验：可提交")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "提交审核" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "提交审核失败：清单编码重复：A.1，Duplicate bill item code detected",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
+  test("runs bill version lock and unlock actions from the source panel", async () => {
+    let versionStatus = "approved";
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001") {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions/version-001/items") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/bill-versions") {
+        return createJsonResponse({
+          items: [
+            {
+              id: "version-001",
+              versionName: "估算版 V1",
+              stageCode: "estimate",
+              disciplineCode: "building",
+              status: versionStatus,
+            },
+          ],
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-versions/version-001/lock" &&
+        init?.method === "POST"
+      ) {
+        versionStatus = "locked";
+        return createJsonResponse({
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          status: versionStatus,
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/bill-versions/version-001/unlock" &&
+        init?.method === "POST"
+      ) {
+        expect(JSON.parse(String(init.body))).toEqual({ reason: "清单页解锁" });
+        versionStatus = "editable";
+        return createJsonResponse({
+          id: "version-001",
+          versionName: "估算版 V1",
+          stageCode: "estimate",
+          disciplineCode: "building",
+          status: versionStatus,
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/quota-lines/candidates") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/price-versions") {
+        return createJsonResponse({ items: priceVersions });
+      }
+
+      if (url.pathname === "/v1/fee-templates") {
+        return createJsonResponse({ items: feeTemplates });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/projects/project-001/bill-versions/version-001/items"]}>
+        <Routes>
+          <Route
+            path="/projects/:projectId/bill-versions/:versionId/items"
+            element={<BillItemsPage />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "锁定版本" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "锁定版本" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("估算版 V1 已锁定。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("锁定状态：locked")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "解锁版本" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "解锁版本" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("估算版 V1 已解锁。")).toBeInTheDocument();
+    });
+    expect(screen.getByText("锁定状态：editable")).toBeInTheDocument();
   });
 
   test("adds selected quota candidates to the current bill item", async () => {

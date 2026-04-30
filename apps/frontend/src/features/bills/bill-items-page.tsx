@@ -5,6 +5,7 @@ import { apiClient, ApiError } from "../../lib/api";
 import type {
   BillItem,
   BillVersion,
+  BillVersionValidationSummary,
   FeeTemplate,
   PriceVersion,
   ProjectListItem,
@@ -111,6 +112,7 @@ function getPricingActionDisabledReason(
 }
 
 type PricingApiAction = "calculate-item" | "recalculate-version" | "recalculate-project";
+type BillVersionAction = "submit" | "withdraw" | "lock" | "unlock";
 
 type RecalculateSkippedItem = {
   billItemId: string;
@@ -124,6 +126,82 @@ const pricingApiActionLabels: Record<PricingApiAction, string> = {
   "recalculate-version": "当前版本重算",
   "recalculate-project": "项目重算任务创建",
 };
+
+const billVersionActionLabels: Record<BillVersionAction, string> = {
+  submit: "提交审核",
+  withdraw: "撤回提交",
+  lock: "锁定版本",
+  unlock: "解锁版本",
+};
+
+const billVersionValidationIssueLabels: Record<
+  BillVersionValidationSummary["issues"][number]["code"],
+  string
+> = {
+  EMPTY_VERSION: "清单版本为空",
+  DUPLICATE_ITEM_CODE: "清单编码重复",
+  MISSING_WORK_ITEMS: "缺少工作内容",
+};
+
+function isBillVersionValidationIssue(
+  value: unknown,
+): value is BillVersionValidationSummary["issues"][number] {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const issue = value as {
+    code?: unknown;
+    severity?: unknown;
+    message?: unknown;
+  };
+  return (
+    typeof issue.code === "string" &&
+    issue.code in billVersionValidationIssueLabels &&
+    (issue.severity === "error" || issue.severity === "warning") &&
+    typeof issue.message === "string"
+  );
+}
+
+function formatBillVersionValidationIssue(
+  issue: BillVersionValidationSummary["issues"][number],
+) {
+  const itemCode = issue.itemCode ? `${issue.itemCode}，` : "";
+  return `${billVersionValidationIssueLabels[issue.code]}：${itemCode}${issue.message}`;
+}
+
+function formatBillVersionActionError(action: BillVersionAction, error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return "版本状态更新失败，请稍后重试。";
+  }
+
+  if (action === "submit" && Array.isArray(error.details)) {
+    const issues = error.details.filter(isBillVersionValidationIssue);
+    if (issues.length > 0) {
+      return `提交审核失败：${issues.map(formatBillVersionValidationIssue).join("；")}`;
+    }
+  }
+
+  return `版本状态更新失败：${error.message}`;
+}
+
+function getAvailableBillVersionActions(
+  status: string,
+): BillVersionAction[] {
+  if (status === "editable") {
+    return ["submit"];
+  }
+  if (status === "submitted") {
+    return ["withdraw"];
+  }
+  if (status === "approved") {
+    return ["lock"];
+  }
+  if (status === "locked") {
+    return ["unlock"];
+  }
+  return [];
+}
 
 function getUnmatchedQuotaCodes(details: unknown) {
   if (!Array.isArray(details)) {
@@ -267,6 +345,12 @@ export function BillItemsPage() {
   const [project, setProject] = useState<ProjectListItem | null>(null);
   const [items, setItems] = useState<BillItem[]>([]);
   const [versions, setVersions] = useState<BillVersion[]>([]);
+  const [sourceChain, setSourceChain] = useState<BillVersion[]>([]);
+  const [sourceChainMessage, setSourceChainMessage] = useState<string | null>(null);
+  const [billVersionValidationSummary, setBillVersionValidationSummary] =
+    useState<BillVersionValidationSummary | null>(null);
+  const [billVersionValidationMessage, setBillVersionValidationMessage] =
+    useState<string | null>(null);
   const [quotaLines, setQuotaLines] = useState<ProjectQuotaLine[]>([]);
   const [quotaCandidates, setQuotaCandidates] = useState<QuotaSourceCandidate[]>([]);
   const [priceVersions, setPriceVersions] = useState<PriceVersion[]>([]);
@@ -278,6 +362,8 @@ export function BillItemsPage() {
   const [quotaActionMessage, setQuotaActionMessage] = useState<string | null>(null);
   const [quotaValidation, setQuotaValidation] = useState<QuotaLineValidationResult | null>(null);
   const [pricingActionMessage, setPricingActionMessage] = useState<string | null>(null);
+  const [billVersionActionMessage, setBillVersionActionMessage] = useState<string | null>(null);
+  const [billVersionActionTarget, setBillVersionActionTarget] = useState<BillVersionAction | null>(null);
   const [recalculateSkippedItems, setRecalculateSkippedItems] = useState<RecalculateSkippedItem[]>([]);
   const [projectRecalculateJobPath, setProjectRecalculateJobPath] = useState<string | null>(null);
   const [manualUnitPrice, setManualUnitPrice] = useState("");
@@ -289,6 +375,49 @@ export function BillItemsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  async function refreshSourceChain() {
+    if (!projectId || !versionId) {
+      return;
+    }
+
+    setSourceChainMessage("正在刷新来源链...");
+    try {
+      const response = await apiClient.getBillVersionSourceChain(projectId, versionId);
+      setSourceChain(response.items);
+      setSourceChainMessage("来源链已刷新。");
+    } catch (sourceChainError) {
+      setSourceChainMessage(
+        sourceChainError instanceof ApiError
+          ? `来源链加载失败：${sourceChainError.message}`
+          : "来源链加载失败，请稍后重试。",
+      );
+    }
+  }
+
+  async function refreshBillVersionValidationSummary() {
+    if (!projectId || !versionId) {
+      return;
+    }
+
+    setBillVersionValidationMessage("正在刷新提交校验...");
+    try {
+      const summary = await apiClient.getBillVersionValidationSummary(
+        projectId,
+        versionId,
+      );
+      setBillVersionValidationSummary(summary);
+      setBillVersionValidationMessage(
+        summary.passed ? "提交校验已通过。" : "提交校验已刷新，请处理错误项。",
+      );
+    } catch (validationError) {
+      setBillVersionValidationMessage(
+        validationError instanceof ApiError
+          ? `提交校验加载失败：${validationError.message}`
+          : "提交校验加载失败，请稍后重试。",
+      );
+    }
+  }
+
   async function loadBillItems() {
     if (!projectId || !versionId) {
       setError("项目或版本标识缺失。");
@@ -298,6 +427,8 @@ export function BillItemsPage() {
 
     setLoading(true);
     setError(null);
+    setSourceChainMessage(null);
+    setBillVersionValidationMessage(null);
 
     try {
       const [
@@ -326,10 +457,42 @@ export function BillItemsPage() {
             status: "active",
           }),
         ]);
+      const sourceChainResponse = selected
+        ? await apiClient
+            .getBillVersionSourceChain(projectId, versionId)
+            .catch((sourceChainError) => {
+              setSourceChainMessage(
+                sourceChainError instanceof ApiError
+                  ? `来源链加载失败：${sourceChainError.message}`
+                  : "来源链加载失败，请稍后重试。",
+              );
+              return { items: [] };
+            })
+        : { items: [] };
+      const validationSummaryResponse = selected
+        ? await apiClient
+            .getBillVersionValidationSummary(projectId, versionId)
+            .catch((validationError) => {
+              setBillVersionValidationMessage(
+                validationError instanceof ApiError
+                  ? `提交校验加载失败：${validationError.message}`
+                  : "提交校验加载失败，请稍后重试。",
+              );
+              return null;
+            })
+        : null;
       const flatItems = flattenBillItems(itemsResponse.items);
       setProject(projectResponse);
       setItems(itemsResponse.items);
       setVersions(versionsResponse.items);
+      setSourceChain(sourceChainResponse.items);
+      if (sourceChainResponse.items.length > 0) {
+        setSourceChainMessage(null);
+      }
+      setBillVersionValidationSummary(validationSummaryResponse);
+      if (validationSummaryResponse) {
+        setBillVersionValidationMessage(null);
+      }
       setQuotaLines(quotaLinesResponse.items);
       setQuotaCandidates(candidatesResponse.items);
       setPriceVersions(priceVersionsResponse.items);
@@ -347,6 +510,8 @@ export function BillItemsPage() {
       setQuotaActionMessage(null);
       setQuotaValidation(null);
       setPricingActionMessage(null);
+      setBillVersionActionMessage(null);
+      setBillVersionActionTarget(null);
       setRecalculateSkippedItems([]);
       setProjectRecalculateJobPath(null);
       setBillItemFilter("");
@@ -580,11 +745,59 @@ export function BillItemsPage() {
     }
   }
 
+  async function handleBillVersionAction(action: BillVersionAction) {
+    if (!projectId || !versionId || !selectedVersion) {
+      return;
+    }
+
+    if (action === "submit" && billVersionValidationSummary?.passed === false) {
+      setBillVersionActionMessage("提交审核失败：请先处理校验摘要中的错误项。");
+      return;
+    }
+
+    setBillVersionActionTarget(action);
+    setBillVersionActionMessage(`正在${billVersionActionLabels[action]}...`);
+    try {
+      if (action === "submit") {
+        await apiClient.submitBillVersion(projectId, versionId);
+        await loadBillItems();
+        setBillVersionActionMessage(`${selectedVersion.versionName} 已提交审核。`);
+      } else if (action === "withdraw") {
+        await apiClient.withdrawBillVersion(projectId, versionId);
+        await loadBillItems();
+        setBillVersionActionMessage(`${selectedVersion.versionName} 已撤回提交。`);
+      } else if (action === "lock") {
+        await apiClient.lockBillVersion(projectId, versionId);
+        await loadBillItems();
+        setBillVersionActionMessage(`${selectedVersion.versionName} 已锁定。`);
+      } else {
+        await apiClient.unlockBillVersion(projectId, versionId, "清单页解锁");
+        await loadBillItems();
+        setBillVersionActionMessage(`${selectedVersion.versionName} 已解锁。`);
+      }
+    } catch (actionError) {
+      setBillVersionActionMessage(formatBillVersionActionError(action, actionError));
+    } finally {
+      setBillVersionActionTarget(null);
+    }
+  }
+
   const selectedVersion =
     versions.find((version) => version.id === versionId) ?? null;
+  const billVersionActions = selectedVersion
+    ? getAvailableBillVersionActions(selectedVersion.status)
+    : [];
+  const canSubmitBillVersion =
+    !billVersionValidationSummary || billVersionValidationSummary.passed;
   const sourceVersion = selectedVersion?.sourceVersionId
     ? versions.find((version) => version.id === selectedVersion.sourceVersionId) ?? null
     : null;
+  const lineageVersions =
+    sourceChain.length > 0
+      ? sourceChain
+      : selectedVersion
+        ? [selectedVersion, ...(sourceVersion ? [sourceVersion] : [])]
+        : [];
   const flatItems = useMemo(() => flattenBillItems(items), [items]);
   const normalizedBillItemFilter = billItemFilter.trim().toLowerCase();
   const filteredFlatItems = useMemo(() => {
@@ -744,6 +957,51 @@ export function BillItemsPage() {
                 展示当前清单版本的阶段、版本号、来源与锁定信息。
               </p>
             </div>
+            <div className="button-row">
+              <button
+                className="primary-button secondary"
+                onClick={() => {
+                  void refreshSourceChain();
+                }}
+                type="button"
+              >
+                刷新来源
+              </button>
+              <button
+                className="primary-button secondary"
+                onClick={() => {
+                  void refreshBillVersionValidationSummary();
+                }}
+                type="button"
+              >
+                刷新校验
+              </button>
+              {billVersionActions.length > 0
+                ? billVersionActions.map((action) => (
+                    <button
+                      className="primary-button secondary"
+                      disabled={
+                        billVersionActionTarget !== null ||
+                        (action === "submit" && !canSubmitBillVersion)
+                      }
+                      key={action}
+                      onClick={() => {
+                        void handleBillVersionAction(action);
+                      }}
+                      title={
+                        action === "submit" && !canSubmitBillVersion
+                          ? "请先处理校验摘要中的错误项。"
+                          : undefined
+                      }
+                      type="button"
+                    >
+                      {billVersionActionTarget === action
+                        ? `${billVersionActionLabels[action]}中`
+                        : billVersionActionLabels[action]}
+                    </button>
+                  ))
+                : null}
+            </div>
           </div>
           <div className="form-grid">
             <p className="page-description">当前阶段：{selectedVersion.stageCode || "-"}</p>
@@ -760,6 +1018,70 @@ export function BillItemsPage() {
               变更原因：{selectedVersion.changeReason ?? "无"}
             </p>
           </div>
+          {billVersionValidationSummary ? (
+            <div>
+              <p className="page-description">
+                提交校验：
+                {billVersionValidationSummary.passed
+                  ? "可提交"
+                  : `不可提交，${billVersionValidationSummary.errorCount} 个错误、${billVersionValidationSummary.warningCount} 个提醒`}
+              </p>
+              {billVersionValidationSummary.issues.length > 0 ? (
+                <ul className="page-description">
+                  {billVersionValidationSummary.issues.map((issue, index) => (
+                    <li key={`${issue.code}-${issue.itemCode ?? index}`}>
+                      [{issue.severity}]
+                      {formatBillVersionValidationIssue(issue)}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {billVersionValidationMessage ? (
+            <p className="page-description">{billVersionValidationMessage}</p>
+          ) : null}
+          {sourceChainMessage ? (
+            <p className="page-description">{sourceChainMessage}</p>
+          ) : null}
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>链路</th>
+                  <th>版本</th>
+                  <th>阶段</th>
+                  <th>专业</th>
+                  <th>状态</th>
+                  <th>来源版本</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineageVersions.map((version, index) => {
+                  const parent = version.sourceVersionId
+                    ? lineageVersions.find((item) => item.id === version.sourceVersionId) ??
+                      versions.find((item) => item.id === version.sourceVersionId)
+                    : null;
+                  return (
+                    <tr key={version.id}>
+                      <td>{index === 0 ? "当前版本" : `上游 ${index}`}</td>
+                      <td>
+                        {version.versionName}
+                        {version.versionNo === undefined ? "" : `（V${version.versionNo}）`}
+                      </td>
+                      <td>{version.stageCode || "-"}</td>
+                      <td>{version.disciplineCode || "-"}</td>
+                      <td>{version.status || "-"}</td>
+                      <td>{parent?.versionName ?? "无"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {billVersionActionMessage ? (
+            <p className="page-description">{billVersionActionMessage}</p>
+          ) : null}
         </section>
       ) : null}
 

@@ -46,6 +46,24 @@ export type BillVersion = {
   itemCount?: number;
 };
 
+export type BillVersionSourceChainResponse = {
+  items: BillVersion[];
+};
+
+export type BillVersionValidationIssue = {
+  code: "EMPTY_VERSION" | "DUPLICATE_ITEM_CODE" | "MISSING_WORK_ITEMS";
+  severity: "error" | "warning";
+  message: string;
+  itemCode?: string;
+};
+
+export type BillVersionValidationSummary = {
+  passed: boolean;
+  errorCount: number;
+  warningCount: number;
+  issues: BillVersionValidationIssue[];
+};
+
 export type ProjectWorkspace = {
   project: ProjectListItem;
   currentStage: ProjectStage | null;

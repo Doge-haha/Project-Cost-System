@@ -519,6 +519,9 @@ export const knowledgeEntries = pgTable(
       table.sourceAction,
     ),
     knowledgeEntryCreatedIndex: index("knowledge_entry_created_idx").on(table.createdAt),
+    knowledgeEntryTypeActionCreatedIndex: index(
+      "knowledge_entry_type_action_created_idx",
+    ).on(table.sourceType, table.sourceAction, table.createdAt),
   }),
 );
 
@@ -544,6 +547,11 @@ export const memoryEntries = pgTable(
     memoryEntrySubjectIndex: index("memory_entry_subject_idx").on(
       table.subjectType,
       table.subjectId,
+    ),
+    memoryEntryScopeKeyIndex: index("memory_entry_scope_key_idx").on(
+      table.subjectType,
+      table.subjectId,
+      table.memoryKey,
     ),
   }),
 );

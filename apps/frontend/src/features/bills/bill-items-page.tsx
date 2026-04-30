@@ -232,6 +232,33 @@ function formatSkippedItemDetails(item: RecalculateSkippedItem) {
   return "所选价目版本中没有匹配的价目明细";
 }
 
+function getPriceVersionDisplayName(priceVersion: PriceVersion | undefined) {
+  return priceVersion?.versionName ?? "未绑定";
+}
+
+function getFeeTemplateDisplayName(template: FeeTemplate | undefined) {
+  return template?.templateName ?? "未绑定";
+}
+
+function buildProjectRecalculateJobPath(input: {
+  projectId: string;
+  stageCode?: string;
+  disciplineCode?: string;
+}) {
+  const searchParams = new URLSearchParams({
+    jobType: "project_recalculate",
+  });
+
+  if (input.stageCode) {
+    searchParams.set("stageCode", input.stageCode);
+  }
+  if (input.disciplineCode) {
+    searchParams.set("disciplineCode", input.disciplineCode);
+  }
+
+  return `/projects/${input.projectId}/jobs?${searchParams.toString()}`;
+}
+
 export function BillItemsPage() {
   const params = useParams();
   const navigate = useNavigate();
@@ -486,7 +513,11 @@ export function BillItemsPage() {
         feeTemplateId: selectedFeeTemplateId || undefined,
       });
       setProjectRecalculateJobPath(
-        `/projects/${projectId}/jobs?jobType=project_recalculate`,
+        buildProjectRecalculateJobPath({
+          projectId,
+          stageCode: selectedVersion.stageCode,
+          disciplineCode: selectedVersion.disciplineCode,
+        }),
       );
       setPricingActionMessage(
         `项目重算任务已创建：${job.id}（${job.status}）。可前往任务页查看状态。`,
@@ -578,6 +609,20 @@ export function BillItemsPage() {
     () => filterFeeTemplates(feeTemplates, feeTemplateFilter),
     [feeTemplateFilter, feeTemplates],
   );
+  const boundPriceVersion = priceVersions.find(
+    (priceVersion) => priceVersion.id === project?.defaultPriceVersionId,
+  );
+  const boundFeeTemplate = feeTemplates.find(
+    (template) => template.id === project?.defaultFeeTemplateId,
+  );
+  const selectedPriceVersion = priceVersions.find(
+    (priceVersion) => priceVersion.id === selectedPriceVersionId,
+  );
+  const selectedFeeTemplate = feeTemplates.find(
+    (template) => template.id === selectedFeeTemplateId,
+  );
+  const selectedPriceVersionName = getPriceVersionDisplayName(selectedPriceVersion);
+  const selectedFeeTemplateName = getFeeTemplateDisplayName(selectedFeeTemplate);
   const normalizedPriceVersionFilter = priceVersionFilter.trim().toLowerCase();
   const normalizedFeeTemplateFilter = feeTemplateFilter.trim().toLowerCase();
   const visibleQuotaLines = quotaLines.filter((quotaLine) => quotaLine.billVersionId === versionId);
@@ -744,6 +789,14 @@ export function BillItemsPage() {
         {pricingActionDisabledReason ? (
           <p className="page-description">{pricingActionDisabledReason}</p>
         ) : null}
+        <div className="form-grid">
+          <p className="page-description">
+            当前已绑定价目版本：{getPriceVersionDisplayName(boundPriceVersion)}
+          </p>
+          <p className="page-description">
+            当前已绑定取费模板：{getFeeTemplateDisplayName(boundFeeTemplate)}
+          </p>
+        </div>
 
         <div className="button-row">
           <label className="form-field">
@@ -809,6 +862,8 @@ export function BillItemsPage() {
               onChange={(event) => {
                 setSelectedPriceVersionId(event.target.value);
                 setPricingActionMessage(null);
+                setRecalculateSkippedItems([]);
+                setProjectRecalculateJobPath(null);
               }}
             >
               <option value="">未绑定</option>
@@ -827,6 +882,8 @@ export function BillItemsPage() {
               onChange={(event) => {
                 setSelectedFeeTemplateId(event.target.value);
                 setPricingActionMessage(null);
+                setRecalculateSkippedItems([]);
+                setProjectRecalculateJobPath(null);
               }}
             >
               <option value="">未绑定</option>
@@ -842,20 +899,26 @@ export function BillItemsPage() {
         {priceVersions.length === 0 ? (
           <EmptyState
             title="暂无可用价目版本"
-            body="当前版本专业下没有可绑定的启用价目版本。"
+            body={`当前已绑定：${getPriceVersionDisplayName(boundPriceVersion)}。可先维护或启用当前专业价目版本，或改用未绑定后保存。`}
           />
         ) : null}
         {priceVersions.length > 0 && filteredPriceVersions.length === 0 ? (
-          <EmptyState title="没有匹配价目版本" body="请调整名称、编码、地区或专业筛选条件。" />
+          <EmptyState
+            title="没有匹配价目版本"
+            body={`当前选择：${selectedPriceVersionName}。可清空筛选或改用未绑定后保存。`}
+          />
         ) : null}
         {feeTemplates.length === 0 ? (
           <EmptyState
             title="暂无可用取费模板"
-            body="当前版本阶段下没有可绑定的启用取费模板。"
+            body={`当前已绑定：${getFeeTemplateDisplayName(boundFeeTemplate)}。可先维护或启用当前阶段取费模板，或改用未绑定后保存。`}
           />
         ) : null}
         {feeTemplates.length > 0 && filteredFeeTemplates.length === 0 ? (
-          <EmptyState title="没有匹配取费模板" body="请调整名称、阶段、地区或税制筛选条件。" />
+          <EmptyState
+            title="没有匹配取费模板"
+            body={`当前选择：${selectedFeeTemplateName}。可清空筛选或改用未绑定后保存。`}
+          />
         ) : null}
 
         {selectedBillItem ? (

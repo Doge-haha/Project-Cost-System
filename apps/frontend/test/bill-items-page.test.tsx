@@ -1255,7 +1255,7 @@ describe("BillItemsPage", () => {
     });
   });
 
-  test("shows recalculate skipped item details and links project jobs", async () => {
+  test("shows pricing binding status, clears stale skipped details, and links scoped project jobs", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));
 
@@ -1309,7 +1309,19 @@ describe("BillItemsPage", () => {
       }
 
       if (url.pathname === "/v1/price-versions") {
-        return createJsonResponse({ items: priceVersions });
+        return createJsonResponse({
+          items: [
+            ...priceVersions,
+            {
+              id: "price-version-002",
+              versionCode: "JS-BUILDING-2027",
+              versionName: "江苏土建 2027",
+              regionCode: "JS",
+              disciplineCode: "building",
+              status: "active",
+            },
+          ],
+        });
       }
 
       if (url.pathname === "/v1/fee-templates") {
@@ -1367,6 +1379,34 @@ describe("BillItemsPage", () => {
         });
       }
 
+      if (
+        url.pathname === "/v1/projects/project-001/default-price-version" &&
+        init?.method === "PUT"
+      ) {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: "price-version-001",
+          defaultFeeTemplateId: "fee-template-001",
+        });
+      }
+
+      if (
+        url.pathname === "/v1/projects/project-001/default-fee-template" &&
+        init?.method === "PUT"
+      ) {
+        return createJsonResponse({
+          id: "project-001",
+          code: "XM-001",
+          name: "新点造价项目",
+          status: "active",
+          defaultPriceVersionId: "price-version-001",
+          defaultFeeTemplateId: "fee-template-001",
+        });
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -1384,6 +1424,13 @@ describe("BillItemsPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "计价配置" })).toBeInTheDocument();
     });
+
+    fireEvent.click(screen.getByRole("button", { name: "保存配置" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("当前已绑定价目版本：江苏土建 2026")).toBeInTheDocument();
+    });
+    expect(screen.getByText("当前已绑定取费模板：估算取费模板")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "重算当前版本" }));
 
@@ -1403,6 +1450,21 @@ describe("BillItemsPage", () => {
     expect(screen.getByText("价目匹配失败")).toBeInTheDocument();
     expect(screen.getByText("未命中定额 010101002、010101003")).toBeInTheDocument();
 
+    fireEvent.change(screen.getByLabelText("默认价目版本"), {
+      target: { value: "price-version-002" },
+    });
+
+    expect(screen.queryByRole("heading", { name: "重算跳过明细" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("筛选价目版本"), {
+      target: { value: "不存在的价目" },
+    });
+
+    expect(screen.getByText("没有匹配价目版本")).toBeInTheDocument();
+    expect(
+      screen.getByText("当前选择：江苏土建 2027。可清空筛选或改用未绑定后保存。"),
+    ).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: "创建项目重算" }));
 
     await waitFor(() => {
@@ -1412,7 +1474,7 @@ describe("BillItemsPage", () => {
     });
     expect(screen.getByRole("link", { name: "查看项目重算任务" })).toHaveAttribute(
       "href",
-      "/projects/project-001/jobs?jobType=project_recalculate",
+      "/projects/project-001/jobs?jobType=project_recalculate&stageCode=estimate&disciplineCode=building",
     );
   });
 });

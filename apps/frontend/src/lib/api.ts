@@ -180,9 +180,13 @@ function normalizeBillVersion(
   return {
     id: input.id ?? "",
     versionName: input.versionName ?? "",
+    versionNo: input.versionNo,
     stageCode: input.stageCode ?? "",
     disciplineCode: input.disciplineCode ?? "",
     status: input.status ?? input.versionStatus ?? "",
+    sourceVersionId: input.sourceVersionId,
+    createdBy: input.createdBy,
+    changeReason: input.changeReason,
     itemCount: input.itemCount,
   };
 }

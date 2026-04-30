@@ -36,9 +36,13 @@ export type ProjectMember = {
 export type BillVersion = {
   id: string;
   versionName: string;
+  versionNo?: number;
   stageCode: string;
   disciplineCode: string;
   status: string;
+  sourceVersionId?: string | null;
+  createdBy?: string | null;
+  changeReason?: string | null;
   itemCount?: number;
 };
 

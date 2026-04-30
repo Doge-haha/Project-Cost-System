@@ -582,6 +582,9 @@ export function BillItemsPage() {
 
   const selectedVersion =
     versions.find((version) => version.id === versionId) ?? null;
+  const sourceVersion = selectedVersion?.sourceVersionId
+    ? versions.find((version) => version.id === selectedVersion.sourceVersionId) ?? null
+    : null;
   const flatItems = useMemo(() => flattenBillItems(items), [items]);
   const normalizedBillItemFilter = billItemFilter.trim().toLowerCase();
   const filteredFlatItems = useMemo(() => {
@@ -728,6 +731,34 @@ export function BillItemsPage() {
                 versions={versions}
               />
             ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      {selectedVersion ? (
+        <section className="panel">
+          <div className="page-header">
+            <div>
+              <h3>版本与来源</h3>
+              <p className="page-description">
+                展示当前清单版本的阶段、版本号、来源与锁定信息。
+              </p>
+            </div>
+          </div>
+          <div className="form-grid">
+            <p className="page-description">当前阶段：{selectedVersion.stageCode || "-"}</p>
+            <p className="page-description">
+              当前版本：{selectedVersion.versionName}
+              {selectedVersion.versionNo === undefined ? "" : `（V${selectedVersion.versionNo}）`}
+            </p>
+            <p className="page-description">
+              来源版本：{sourceVersion?.versionName ?? "无"}
+            </p>
+            <p className="page-description">锁定状态：{selectedVersion.status || "-"}</p>
+            <p className="page-description">创建人：{selectedVersion.createdBy ?? "-"}</p>
+            <p className="page-description">
+              变更原因：{selectedVersion.changeReason ?? "无"}
+            </p>
           </div>
         </section>
       ) : null}

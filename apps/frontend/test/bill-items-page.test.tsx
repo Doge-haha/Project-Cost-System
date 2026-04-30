@@ -114,9 +114,22 @@ describe("BillItemsPage", () => {
             {
               id: "version-001",
               versionName: "估算版 V1",
+              versionNo: 2,
               stageCode: "estimate",
               disciplineCode: "building",
               status: "editable",
+              sourceVersionId: "version-source-001",
+              createdBy: "engineer-001",
+              changeReason: "补充土建清单",
+            },
+            {
+              id: "version-source-001",
+              versionName: "招标清单 V1",
+              versionNo: 1,
+              stageCode: "tender",
+              disciplineCode: "building",
+              status: "locked",
+              sourceVersionId: null,
             },
           ],
         });
@@ -204,9 +217,22 @@ describe("BillItemsPage", () => {
             {
               id: "version-001",
               versionName: "估算版 V1",
+              versionNo: 2,
               stageCode: "estimate",
               disciplineCode: "building",
               status: "editable",
+              sourceVersionId: "version-source-001",
+              createdBy: "engineer-001",
+              changeReason: "补充土建清单",
+            },
+            {
+              id: "version-source-001",
+              versionName: "招标清单 V1",
+              versionNo: 1,
+              stageCode: "tender",
+              disciplineCode: "building",
+              status: "locked",
+              sourceVersionId: null,
             },
           ],
         });
@@ -301,6 +327,13 @@ describe("BillItemsPage", () => {
     );
     expect(screen.getByText("当前项目：新点造价项目（XM-001）")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "计价配置" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "版本与来源" })).toBeInTheDocument();
+    expect(screen.getByText("当前阶段：estimate")).toBeInTheDocument();
+    expect(screen.getByText("当前版本：估算版 V1（V2）")).toBeInTheDocument();
+    expect(screen.getByText("来源版本：招标清单 V1")).toBeInTheDocument();
+    expect(screen.getByText("锁定状态：editable")).toBeInTheDocument();
+    expect(screen.getByText("创建人：engineer-001")).toBeInTheDocument();
+    expect(screen.getByText("变更原因：补充土建清单")).toBeInTheDocument();
     expect(screen.getByText("江苏土建 2026（JS / building）")).toBeInTheDocument();
     expect(screen.getByText("估算取费模板（estimate）")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "定额选择器" })).toBeInTheDocument();

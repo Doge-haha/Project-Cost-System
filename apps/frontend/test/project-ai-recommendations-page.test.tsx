@@ -14,6 +14,15 @@ function createJsonResponse(body: unknown) {
   });
 }
 
+function createErrorResponse(status: number, body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+}
+
 function renderPage(initialEntry = "/projects/project-001/ai-recommendations") {
   render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -553,6 +562,89 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("任务生成 · 挖土方")).toBeInTheDocument();
   });
 
+  test("shows provider diagnostics and telemetry alerts", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(createRecommendationListResponse([]));
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/jobs") {
+        return createJsonResponse({
+          items: [
+            {
+              ...createAiRecommendationJob("completed"),
+              result: {
+                createdCount: 1,
+                telemetry: { durationMs: 12000, retryCount: 1 },
+              },
+            },
+            {
+              ...createAiRecommendationJob("failed"),
+              id: "background-job-002",
+              result: {
+                providerFailureSummary: {
+                  durationMs: 8000,
+                  retryCount: 2,
+                },
+              },
+              errorMessage: "AI provider response is invalid",
+            },
+          ],
+          summary: {
+            totalCount: 2,
+            statusCounts: { queued: 0, processing: 0, completed: 1, failed: 1 },
+            jobTypeCounts: { ai_recommendation: 2 },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/ai/provider-health") {
+        return createJsonResponse({
+          provider: "openai_compatible",
+          model: "cost-model-v1",
+          configured: true,
+          healthy: true,
+          message: "ok",
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Provider 诊断" })).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText("最近任务 2 个 · 成功 1 个 · 失败 1 个 · 平均耗时 10000ms · 最大重试 2"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("运维告警：最近 1 个 Provider 任务失败。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("运维提示：最近最大重试次数 2。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "检查 Provider" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Provider 连通性正常。")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("openai_compatible / cost-model-v1 · 已配置 · 健康 · ok"),
+    ).toBeInTheDocument();
+  });
+
   test("confirms rollback before calling rollback API", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));
@@ -635,6 +727,80 @@ describe("ProjectAiRecommendationsPage", () => {
       expect(screen.getByText("已回滚该推荐接受产生的业务变更。")).toBeInTheDocument();
     });
     expect(screen.getByText("定额推荐 · 已回滚")).toBeInTheDocument();
+  });
+
+  test("maps rollback blocked reasons to actionable copy", async () => {
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(
+          createRecommendationListResponse([
+            createRecommendation({
+              status: "accepted",
+              handledBy: "engineer-001",
+              handledAt: "2026-04-18T11:05:00.000Z",
+              statusReason: "人工确认接受",
+              outputPayload: {
+                quotaName: "挖土方",
+                acceptedChanges: [
+                  {
+                    action: "create",
+                    resourceType: "bill_item",
+                    resourceId: "bill-item-002",
+                    label: "A-002 回填土",
+                    rollbackSupported: true,
+                  },
+                ],
+              },
+            }),
+          ]),
+        );
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/ai/recommendations/ai-recommendation-001/rollback") {
+        expect(init?.method).toBe("POST");
+        return createErrorResponse(409, {
+          error: {
+            code: "AI_RECOMMENDATION_ROLLBACK_BLOCKED",
+            message:
+              "Accepted recommendation cannot be rolled back automatically; please review and handle the business data manually",
+            details: {
+              reason: "resource_has_quota_lines",
+              resourceType: "bill_item",
+              resourceId: "bill-item-002",
+              label: "A-002 回填土",
+            },
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("定额推荐 · 已接受")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "撤销接受" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认撤销" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "无法自动撤销：清单下存在定额行（bill_item · bill-item-002 · A-002 回填土），请人工核对后处理。",
+        ),
+      ).toBeInTheDocument();
+    });
   });
 
   test("opens recommendation input context preview", async () => {
@@ -1061,7 +1227,7 @@ function createRecommendation(
   };
 }
 
-function createAiRecommendationJob(status: "queued" | "completed") {
+function createAiRecommendationJob(status: "queued" | "completed" | "failed") {
   return {
     id: "background-job-001",
     jobType: "ai_recommendation",
@@ -1070,9 +1236,9 @@ function createAiRecommendationJob(status: "queued" | "completed") {
     projectId: "project-001",
     payload: {},
     result: status === "completed" ? { createdCount: 1 } : null,
-    errorMessage: null,
+    errorMessage: status === "failed" ? "AI provider response is invalid" : null,
     createdAt: "2026-04-18T11:00:00.000Z",
-    completedAt: status === "completed" ? "2026-04-18T11:01:00.000Z" : null,
+    completedAt: status === "queued" ? null : "2026-04-18T11:01:00.000Z",
   };
 }
 

@@ -7,6 +7,7 @@ import type {
   AiRecommendationListResponse,
   AiRecommendationStatus,
   AiRecommendationType,
+  AiProviderHealthResponse,
   BackgroundJob,
   BackgroundJobListResponse,
   BillItem,
@@ -500,6 +501,12 @@ export const apiClient = {
         body: input,
       },
     );
+  },
+  getAiProviderHealth(query?: { provider?: string; model?: string }) {
+    return request<AiProviderHealthResponse>("/v1/ai/provider-health", {
+      provider: query?.provider,
+      model: query?.model,
+    });
   },
   listVarianceWarningThresholds(
     projectId: string,

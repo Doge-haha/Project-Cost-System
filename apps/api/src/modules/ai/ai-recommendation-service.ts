@@ -142,6 +142,7 @@ export class AiRecommendationService {
   }): Promise<{
     recommendations: AiRecommendationRecord[];
     provider: Record<string, unknown> | null;
+    telemetry: Record<string, unknown>;
     createdCount: number;
   }> {
     if (input.recommendationType === "variance_warning") {
@@ -158,6 +159,7 @@ export class AiRecommendationService {
       return {
         recommendations,
         provider: { provider: "rules_engine", model: "variance_thresholds" },
+        telemetry: { durationMs: 0, retryCount: 0 },
         createdCount: recommendations.length,
       };
     }
@@ -177,6 +179,7 @@ export class AiRecommendationService {
       return {
         recommendations: [created],
         provider: readAiProvider(created.inputPayload),
+        telemetry: { durationMs: 0, retryCount: 0 },
         createdCount: 1,
       };
     }
@@ -336,6 +339,7 @@ export class AiRecommendationService {
     return {
       recommendations: created,
       provider: provider ?? null,
+      telemetry: telemetry ?? { durationMs: Date.now() - requestStartedAt },
       createdCount: created.length,
     };
   }

@@ -7,6 +7,7 @@ import type {
   AiRecommendationListResponse,
   AiRecommendationStatus,
   AiRecommendationType,
+  AiProviderHealthResponse,
   BackgroundJob,
   ProjectWorkspace,
   VarianceWarningThreshold,
@@ -54,6 +55,12 @@ type ContextPreviewState = {
   payload: Record<string, unknown> | null;
   loading: boolean;
   error: string | null;
+};
+
+type ProviderDiagnosticsState = {
+  health: AiProviderHealthResponse | null;
+  loading: boolean;
+  message: string | null;
 };
 
 const defaultFilters: RecommendationFilters = {
@@ -126,6 +133,12 @@ export function ProjectAiRecommendationsPage() {
   const [jobSubmitting, setJobSubmitting] = useState(false);
   const [jobMessage, setJobMessage] = useState<string | null>(null);
   const [jobPollDelay, setJobPollDelay] = useState(2000);
+  const [providerDiagnostics, setProviderDiagnostics] =
+    useState<ProviderDiagnosticsState>({
+      health: null,
+      loading: false,
+      message: null,
+    });
   const [contextPreview, setContextPreview] = useState<ContextPreviewState | null>(
     null,
   );
@@ -133,6 +146,10 @@ export function ProjectAiRecommendationsPage() {
   const recommendationGroups = useMemo(
     () => groupRecommendationsByResourceType(state?.recommendations.items ?? []),
     [state?.recommendations.items],
+  );
+  const providerTelemetrySummary = useMemo(
+    () => summarizeProviderTelemetry(recommendationJobs),
+    [recommendationJobs],
   );
   const canHandleRecommendations =
     state?.workspace.currentUser.permissionSummary.canEditProject ?? false;
@@ -330,7 +347,7 @@ export function ProjectAiRecommendationsPage() {
     } catch (submitError) {
       setActionMessage(
         submitError instanceof ApiError
-          ? submitError.message
+          ? formatRollbackApiError(submitError)
           : "AI 推荐回滚失败，请检查业务数据是否仍可编辑。",
       );
     } finally {
@@ -371,6 +388,32 @@ export function ProjectAiRecommendationsPage() {
       );
     } finally {
       setJobSubmitting(false);
+    }
+  }
+
+  async function handleCheckProviderHealth() {
+    setProviderDiagnostics((current) => ({
+      ...current,
+      loading: true,
+      message: null,
+    }));
+
+    try {
+      const health = await apiClient.getAiProviderHealth();
+      setProviderDiagnostics({
+        health,
+        loading: false,
+        message: health.healthy ? "Provider 连通性正常。" : "Provider 当前不可用。",
+      });
+    } catch (healthError) {
+      setProviderDiagnostics({
+        health: null,
+        loading: false,
+        message:
+          healthError instanceof ApiError
+            ? healthError.message
+            : "Provider 健康检查失败。",
+      });
     }
   }
 
@@ -919,6 +962,48 @@ export function ProjectAiRecommendationsPage() {
       </section>
 
       <section className="panel">
+        <h2>Provider 诊断</h2>
+        <div className="recommendation-meta-list">
+          <p className="page-description">
+            最近任务 {providerTelemetrySummary.totalCount} 个 · 成功{" "}
+            {providerTelemetrySummary.successCount} 个 · 失败{" "}
+            {providerTelemetrySummary.failureCount} 个
+            {providerTelemetrySummary.averageDurationMs === null
+              ? ""
+              : ` · 平均耗时 ${providerTelemetrySummary.averageDurationMs}ms`}
+            {providerTelemetrySummary.maxRetryCount === null
+              ? ""
+              : ` · 最大重试 ${providerTelemetrySummary.maxRetryCount}`}
+          </p>
+          {providerTelemetrySummary.alerts.map((alert) => (
+            <p className="recommendation-expired" key={alert}>
+              {alert}
+            </p>
+          ))}
+          {providerDiagnostics.message ? (
+            <p className="page-description">{providerDiagnostics.message}</p>
+          ) : null}
+          {providerDiagnostics.health ? (
+            <p className="page-description">
+              {formatProviderHealth(providerDiagnostics.health)}
+            </p>
+          ) : null}
+        </div>
+        <div className="button-row">
+          <button
+            className="primary-button secondary"
+            disabled={providerDiagnostics.loading}
+            onClick={() => {
+              void handleCheckProviderHealth();
+            }}
+            type="button"
+          >
+            检查 Provider
+          </button>
+        </div>
+      </section>
+
+      <section className="panel">
         <h2>推荐列表</h2>
         {actionMessage ? <p className="page-description">{actionMessage}</p> : null}
         <div className="button-row">
@@ -1458,6 +1543,102 @@ function formatJobStatus(status: BackgroundJob["status"]) {
     failed: "失败",
   };
   return labels[status] ?? status;
+}
+
+function summarizeProviderTelemetry(jobs: BackgroundJob[]) {
+  const providerJobs = jobs.filter((job) => job.jobType === "ai_recommendation");
+  const durations = providerJobs
+    .map((job) => readProviderDurationMs(job))
+    .filter((value): value is number => value !== null);
+  const retryCounts = providerJobs
+    .map((job) => readProviderRetryCount(job))
+    .filter((value): value is number => value !== null);
+  const failureCount = providerJobs.filter((job) => job.status === "failed").length;
+  const successCount = providerJobs.filter((job) => job.status === "completed").length;
+  const averageDurationMs =
+    durations.length === 0
+      ? null
+      : Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length);
+  const maxRetryCount =
+    retryCounts.length === 0 ? null : Math.max(...retryCounts);
+  const alerts = [
+    failureCount > 0 ? `运维告警：最近 ${failureCount} 个 Provider 任务失败。` : null,
+    averageDurationMs !== null && averageDurationMs > 10000
+      ? `运维告警：Provider 平均耗时 ${averageDurationMs}ms，已超过 10000ms。`
+      : null,
+    maxRetryCount !== null && maxRetryCount > 0
+      ? `运维提示：最近最大重试次数 ${maxRetryCount}。`
+      : null,
+  ].filter((item): item is string => item !== null);
+
+  return {
+    totalCount: providerJobs.length,
+    successCount,
+    failureCount,
+    averageDurationMs,
+    maxRetryCount,
+    alerts,
+  };
+}
+
+function readProviderDurationMs(job: BackgroundJob) {
+  const telemetry = readObjectFromUnknown(job.result?.telemetry);
+  const failureSummary = readObjectFromUnknown(job.result?.providerFailureSummary);
+  const value = telemetry?.durationMs ?? failureSummary?.durationMs;
+  return typeof value === "number" ? Math.round(value) : null;
+}
+
+function readProviderRetryCount(job: BackgroundJob) {
+  const telemetry = readObjectFromUnknown(job.result?.telemetry);
+  const failureSummary = readObjectFromUnknown(job.result?.providerFailureSummary);
+  const value =
+    telemetry?.retryCount ?? telemetry?.attemptCount ?? failureSummary?.retryCount;
+  return typeof value === "number" ? Math.round(value) : null;
+}
+
+function formatProviderHealth(health: AiProviderHealthResponse) {
+  const provider = health.provider ?? "openai_compatible";
+  const model = health.model ?? "-";
+  const status = health.healthy ? "健康" : "异常";
+  const configured = health.configured ? "已配置" : "未配置";
+  return `${provider} / ${model} · ${configured} · ${status}${
+    health.message ? ` · ${health.message}` : ""
+  }`;
+}
+
+function formatRollbackApiError(error: ApiError) {
+  if (error.code !== "AI_RECOMMENDATION_ROLLBACK_BLOCKED") {
+    return error.message;
+  }
+
+  const details = readObjectFromUnknown(error.details);
+  const reason =
+    typeof details?.reason === "string" ? details.reason : "unknown";
+  const resourceType =
+    typeof details?.resourceType === "string" ? details.resourceType : "资源";
+  const resourceId =
+    typeof details?.resourceId === "string" ? details.resourceId : "-";
+  const label = typeof details?.label === "string" && details.label ? details.label : "";
+
+  return `无法自动撤销：${formatRollbackBlockedReason(reason)}（${resourceType} · ${resourceId}${
+    label ? ` · ${label}` : ""
+  }），请人工核对后处理。`;
+}
+
+function formatRollbackBlockedReason(reason: string) {
+  const labels: Record<string, string> = {
+    resource_missing: "业务资源已缺失",
+    resource_modified: "业务资源已被修改",
+    resource_has_children: "清单下存在子清单",
+    resource_has_quota_lines: "清单下存在定额行",
+  };
+  return labels[reason] ?? "业务数据当前不可安全回滚";
+}
+
+function readObjectFromUnknown(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function readAcceptedChanges(recommendation: AiRecommendation) {

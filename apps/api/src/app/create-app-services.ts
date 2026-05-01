@@ -303,6 +303,7 @@ export function createAppServices(
       return {
         createdCount: result.createdCount,
         provider: result.provider,
+        telemetry: result.telemetry,
         recommendationIds: result.recommendations.map((item) => item.id),
         recommendations: result.recommendations,
       };

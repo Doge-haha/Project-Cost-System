@@ -335,6 +335,16 @@ export type AiRecommendationListResponse = {
 
 export type AiRecommendationInputContext = Record<string, unknown>;
 
+export type AiProviderHealthResponse = {
+  provider?: string;
+  model?: string;
+  configured: boolean;
+  healthy: boolean;
+  message?: string;
+  telemetry?: Record<string, unknown>;
+  failureSummary?: Record<string, unknown>;
+};
+
 export type VarianceWarningThreshold = {
   id: string;
   projectId: string;

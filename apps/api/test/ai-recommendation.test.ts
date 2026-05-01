@@ -463,6 +463,7 @@ test("POST /v1/ai/recommendation-jobs queues and processes provider-backed recom
                   },
                 ],
               }),
+              telemetry: { durationMs: 25, retryCount: 1 },
             },
           }),
           stderr: "",
@@ -501,6 +502,8 @@ test("POST /v1/ai/recommendation-jobs queues and processes provider-backed recom
   assert.equal(processResponse.statusCode, 200);
   assert.equal(processResponse.json().status, "completed");
   assert.equal(processResponse.json().result.createdCount, 1);
+  assert.equal(processResponse.json().result.telemetry.durationMs, 25);
+  assert.equal(processResponse.json().result.telemetry.retryCount, 1);
   assert.equal(
     processResponse.json().result.recommendations[0].inputPayload.aiProvider.model,
     "cost-model-v1",

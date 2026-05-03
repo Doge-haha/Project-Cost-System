@@ -164,6 +164,23 @@ export class AiRecommendationService {
       };
     }
 
+    if (input.recommendationType === "bill_recommendation") {
+      const recommendations = await this.generateBillRecommendationCandidates(
+        input,
+      );
+      if (recommendations.length > 0) {
+        return {
+          recommendations,
+          provider: {
+            provider: "rules_engine",
+            model: "bill_version_source_diff",
+          },
+          telemetry: { durationMs: 0, retryCount: 0 },
+          createdCount: recommendations.length,
+        };
+      }
+    }
+
     if (input.outputPayload && Object.keys(input.outputPayload).length > 0) {
       const created = await this.createRecommendation({
         projectId: input.projectId,
@@ -392,6 +409,83 @@ export class AiRecommendationService {
         failureSummary,
       };
     }
+  }
+
+  private async generateBillRecommendationCandidates(
+    input: RecommendationContext & {
+      resourceType?: string;
+      resourceId?: string;
+      limit?: number;
+      inputPayload?: Record<string, unknown>;
+    },
+  ): Promise<AiRecommendationRecord[]> {
+    if (input.resourceType !== "bill_version" || !input.resourceId) {
+      return [];
+    }
+
+    const sourceChain = await this.buildBillVersionSourceChain(input.resourceId);
+    const currentVersion = sourceChain[0] ?? null;
+    const sourceVersion = sourceChain[1] ?? null;
+    if (!currentVersion || !sourceVersion) {
+      return [];
+    }
+
+    await this.assertProjectAccess(
+      {
+        projectId: input.projectId,
+        stageCode: currentVersion.stageCode,
+        disciplineCode: currentVersion.disciplineCode,
+        userId: input.userId,
+      },
+      "edit",
+    );
+
+    const [currentItems, sourceItems] = await Promise.all([
+      this.dependencies.billItemRepository?.listByBillVersionId(currentVersion.id) ??
+        Promise.resolve([]),
+      this.dependencies.billItemRepository?.listByBillVersionId(sourceVersion.id) ??
+        Promise.resolve([]),
+    ]);
+    const currentItemCodes = new Set(currentItems.map((item) => item.itemCode));
+    const missingItems = sourceItems
+      .filter((item) => !currentItemCodes.has(item.itemCode))
+      .sort((left, right) => left.sortNo - right.sortNo)
+      .slice(0, input.limit ?? 10);
+
+    const created: AiRecommendationRecord[] = [];
+    for (const item of missingItems) {
+      created.push(
+        await this.createRecommendation({
+          projectId: input.projectId,
+          stageCode: currentVersion.stageCode,
+          disciplineCode: currentVersion.disciplineCode,
+          resourceType: "bill_version",
+          resourceId: currentVersion.id,
+          recommendationType: "bill_recommendation",
+          inputPayload: {
+            ...(input.inputPayload ?? {}),
+            sourceBillVersionId: sourceVersion.id,
+            aiProvider: {
+              provider: "rules_engine",
+              model: "bill_version_source_diff",
+            },
+          },
+          outputPayload: {
+            parentId: null,
+            itemCode: item.itemCode,
+            itemName: item.itemName,
+            quantity: item.quantity,
+            unit: item.unit,
+            sortNo: item.sortNo,
+            sourceBillItemId: item.id,
+            recommendationReason: "source_version_missing_item",
+          },
+          userId: input.userId,
+        }),
+      );
+    }
+
+    return created;
   }
 
   async generateVarianceWarnings(input: RecommendationContext & {

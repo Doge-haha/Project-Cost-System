@@ -113,6 +113,16 @@ const billVersions: BillVersionRecord[] = [
     versionStatus: "editable",
     sourceVersionId: null,
   },
+  {
+    id: "bill-version-002",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    versionNo: 2,
+    versionName: "估算版 V2",
+    versionStatus: "editable",
+    sourceVersionId: "bill-version-001",
+  },
 ];
 
 const billItems: BillItemRecord[] = [
@@ -129,6 +139,7 @@ const billItems: BillItemRecord[] = [
 ];
 
 function createRecommendationApp(input?: {
+  billVersions?: BillVersionRecord[];
   billItems?: BillItemRecord[];
   quotaLines?: QuotaLineRecord[];
 }) {
@@ -140,7 +151,9 @@ function createRecommendationApp(input?: {
       disciplines,
     ),
     projectMemberRepository: new InMemoryProjectMemberRepository(members),
-    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billVersionRepository: new InMemoryBillVersionRepository(
+      input?.billVersions ?? billVersions,
+    ),
     billItemRepository: new InMemoryBillItemRepository(input?.billItems ?? billItems),
     quotaLineRepository: new InMemoryQuotaLineRepository(input?.quotaLines ?? []),
     auditLogRepository: new InMemoryAuditLogRepository([]),
@@ -346,6 +359,65 @@ test("POST /v1/ai/bill-recommendations expires older generated recommendations f
   assert.equal(generatedResponse.statusCode, 200);
   assert.equal(generatedResponse.json().items.length, 1);
   assert.equal(generatedResponse.json().items[0].id, secondResponse.json().id);
+
+  await app.close();
+});
+
+test("POST /v1/ai/bill-recommendations generates missing item candidates for copied bill versions", async () => {
+  const app = createRecommendationApp({
+    billItems: [
+      billItems[0],
+      {
+        id: "source-bill-item-002",
+        billVersionId: "bill-version-001",
+        parentId: null,
+        itemCode: "A-002",
+        itemName: "回填土",
+        quantity: 6,
+        unit: "m3",
+        sortNo: 2,
+      },
+      {
+        ...billItems[0],
+        id: "bill-item-003",
+        billVersionId: "bill-version-002",
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/bill-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_version",
+      resourceId: "bill-version-002",
+      limit: 5,
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].resourceId, "bill-version-002");
+  assert.equal(response.json().items[0].inputPayload.aiProvider.provider, "rules_engine");
+  assert.equal(
+    response.json().items[0].inputPayload.aiProvider.model,
+    "bill_version_source_diff",
+  );
+  assert.equal(response.json().items[0].outputPayload.itemCode, "A-002");
+  assert.equal(response.json().items[0].outputPayload.itemName, "回填土");
+  assert.equal(
+    response.json().items[0].outputPayload.recommendationReason,
+    "source_version_missing_item",
+  );
+  assert.equal(response.json().provider.provider, "rules_engine");
+  assert.equal(response.json().createdCount, 1);
 
   await app.close();
 });

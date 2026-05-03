@@ -82,6 +82,14 @@ const members: ProjectMemberRecord[] = [
     ],
   },
   {
+    id: "member-owner-001",
+    projectId: "project-001",
+    userId: "owner-001",
+    displayName: "Project Owner",
+    roleCode: "project_owner",
+    scopes: [{ scopeType: "project", scopeValue: "project-001" }],
+  },
+  {
     id: "member-002",
     projectId: "project-001",
     userId: "reviewer-001",
@@ -992,6 +1000,62 @@ test("quota context changes automatically expire stale quota recommendations", a
   assert.equal(expiredResponse.statusCode, 200);
   assert.equal(expiredResponse.json().items.length, 1);
   assert.equal(expiredResponse.json().items[0].statusReason, "quota_context_changed");
+
+  await app.close();
+});
+
+test("pricing default changes automatically expire stale variance recommendations", async () => {
+  const app = createRecommendationApp({
+    billItems: [
+      {
+        ...billItems[0],
+        systemAmount: 100,
+        finalAmount: 140,
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+  const ownerToken = await createToken("owner-001", "project_owner");
+
+  const warningResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/variance-warnings",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      billVersionId: "bill-version-001",
+    },
+  });
+  assert.equal(warningResponse.statusCode, 201);
+  assert.ok(warningResponse.json().items.length > 0);
+
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/default-fee-template",
+    headers: { authorization: `Bearer ${ownerToken}` },
+    payload: {
+      defaultFeeTemplateId: null,
+    },
+  });
+  assert.equal(updateResponse.statusCode, 200);
+
+  const expiredResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/recommendations?recommendationType=variance_warning&status=expired",
+    headers: { authorization: `Bearer ${ownerToken}` },
+  });
+  assert.equal(expiredResponse.statusCode, 200);
+  assert.equal(expiredResponse.json().items.length, warningResponse.json().items.length);
+  assert.ok(
+    expiredResponse
+      .json()
+      .items.every(
+        (item: { statusReason?: string | null }) =>
+          item.statusReason === "fee_template_changed",
+      ),
+  );
 
   await app.close();
 });

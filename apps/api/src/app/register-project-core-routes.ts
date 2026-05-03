@@ -302,13 +302,20 @@ export function registerProjectCoreRoutes(
     const { projectId } = request.params as { projectId: string };
     const payload = updateProjectDefaultFeeTemplateSchema.parse(request.body);
 
-    return transactionRunner.runInTransaction(async () =>
-      projectService.updateProjectPricingDefaults({
+    return transactionRunner.runInTransaction(async () => {
+      const updated = await projectService.updateProjectPricingDefaults({
         projectId,
         userId: request.currentUser!.id,
         roleCodes: request.currentUser!.roleCodes,
         defaultFeeTemplateId: payload.defaultFeeTemplateId,
-      }),
-    );
+      });
+      await aiRecommendationService.expireStaleRecommendations({
+        projectId,
+        recommendationType: "variance_warning",
+        reason: "fee_template_changed",
+        userId: request.currentUser!.id,
+      });
+      return updated;
+    });
   });
 }

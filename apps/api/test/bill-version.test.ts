@@ -31,6 +31,14 @@ import {
   InMemoryBillWorkItemRepository,
   type BillWorkItemRecord,
 } from "../src/modules/bill/bill-work-item-repository.js";
+import {
+  InMemoryAuditLogRepository,
+  type AuditLogRepository,
+} from "../src/modules/audit/audit-log-repository.js";
+import {
+  InMemoryAiRecommendationRepository,
+  type AiRecommendationRecord,
+} from "../src/modules/ai/ai-recommendation-repository.js";
 
 const jwtSecret = "bill-version-test-secret";
 
@@ -206,7 +214,10 @@ const billWorkItems: BillWorkItemRecord[] = [
   },
 ];
 
-function createBillVersionApp() {
+function createBillVersionApp(input?: {
+  aiRecommendations?: AiRecommendationRecord[];
+  auditLogRepository?: AuditLogRepository;
+}) {
   return createApp({
     jwtSecret,
     projectRepository: new InMemoryProjectRepository(projects),
@@ -218,6 +229,11 @@ function createBillVersionApp() {
     billVersionRepository: new InMemoryBillVersionRepository(billVersions),
     billItemRepository: new InMemoryBillItemRepository(billItems),
     billWorkItemRepository: new InMemoryBillWorkItemRepository(billWorkItems),
+    auditLogRepository:
+      input?.auditLogRepository ?? new InMemoryAuditLogRepository([]),
+    aiRecommendationRepository: new InMemoryAiRecommendationRepository(
+      input?.aiRecommendations ?? [],
+    ),
   });
 }
 
@@ -680,6 +696,81 @@ test("POST /v1/projects/:id/bill-versions/:versionId/copy-from clones items and 
       },
     ],
   });
+
+  await app.close();
+});
+
+test("POST /v1/projects/:id/bill-versions/:versionId/copy-from expires stale bill recommendations", async () => {
+  const auditLogRepository = new InMemoryAuditLogRepository([]);
+  const app = createBillVersionApp({
+    auditLogRepository,
+    aiRecommendations: [
+      {
+        id: "ai-recommendation-001",
+        projectId: "project-001",
+        stageCode: "estimate",
+        disciplineCode: "building",
+        resourceType: "bill_version",
+        resourceId: "bill-version-001",
+        recommendationType: "bill_recommendation",
+        inputPayload: {},
+        outputPayload: {
+          items: [{ itemCode: "A.1.2", itemName: "余方弃置" }],
+        },
+        status: "generated",
+        createdBy: "engineer-001",
+        handledBy: null,
+        handledAt: null,
+        statusReason: null,
+        createdAt: "2026-04-20T10:00:00.000Z",
+        updatedAt: "2026-04-20T10:00:00.000Z",
+      },
+    ],
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+
+  const copyResponse = await app.inject({
+    method: "POST",
+    url: "/v1/projects/project-001/bill-versions/bill-version-001/copy-from",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+  assert.equal(copyResponse.statusCode, 201);
+
+  const expiredResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/bill-recommendations?status=expired",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(expiredResponse.statusCode, 200);
+  assert.equal(expiredResponse.json().items.length, 1);
+  assert.equal(expiredResponse.json().items[0].id, "ai-recommendation-001");
+  assert.equal(
+    expiredResponse.json().items[0].statusReason,
+    "bill_version_copied",
+  );
+
+  const auditLogs = await auditLogRepository.listByProjectId("project-001");
+  assert.ok(
+    auditLogs.some(
+      (log) =>
+        log.resourceType === "ai_recommendation" &&
+        log.resourceId === "ai-recommendation-001" &&
+        log.action === "expired" &&
+        log.afterPayload?.reason === "bill_version_copied",
+    ),
+  );
 
   await app.close();
 });

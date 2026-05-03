@@ -44,6 +44,7 @@ export function registerBillRoutes(
   registerBillVersionRoutes(app, {
     transactionRunner: input.transactionRunner,
     billVersionService: input.billVersionService,
+    aiRecommendationService: input.aiRecommendationService,
   });
 
   registerBillItemRoutes(app, {

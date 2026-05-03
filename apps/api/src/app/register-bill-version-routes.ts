@@ -7,15 +7,17 @@ import {
   unlockBillVersionSchema,
   type BillVersionService,
 } from "../modules/bill/bill-version-service.js";
+import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 
 export function registerBillVersionRoutes(
   app: FastifyInstance,
   input: {
     transactionRunner: TransactionRunner;
     billVersionService: BillVersionService;
+    aiRecommendationService: AiRecommendationService;
   },
 ) {
-  const { transactionRunner, billVersionService } = input;
+  const { transactionRunner, billVersionService, aiRecommendationService } = input;
 
   app.get("/v1/projects/:projectId/bill-versions", async (request) => {
     const { projectId } = request.params as { projectId: string };
@@ -57,13 +59,24 @@ export function registerBillVersionRoutes(
         billVersionId: string;
       };
 
-      const created = await transactionRunner.runInTransaction(async () =>
-        billVersionService.copyFromVersion({
+      const created = await transactionRunner.runInTransaction(async () => {
+        const copied = await billVersionService.copyFromVersion({
           projectId,
           sourceBillVersionId: billVersionId,
           userId: request.currentUser!.id,
-        }),
-      );
+        });
+        await aiRecommendationService.expireStaleRecommendations({
+          projectId,
+          stageCode: copied.stageCode,
+          disciplineCode: copied.disciplineCode,
+          recommendationType: "bill_recommendation",
+          resourceType: "bill_version",
+          resourceId: billVersionId,
+          reason: "bill_version_copied",
+          userId: request.currentUser!.id,
+        });
+        return copied;
+      });
 
       reply.status(201);
       return created;

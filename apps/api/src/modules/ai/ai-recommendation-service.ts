@@ -169,11 +169,12 @@ export class AiRecommendationService {
         input,
       );
       if (recommendations.length > 0) {
+        const provider = readAiProvider(recommendations[0].inputPayload);
         return {
           recommendations,
           provider: {
-            provider: "rules_engine",
-            model: "bill_version_source_diff",
+            provider: provider.provider,
+            model: provider.model,
           },
           telemetry: { durationMs: 0, retryCount: 0 },
           createdCount: recommendations.length,
@@ -427,6 +428,42 @@ export class AiRecommendationService {
     const currentVersion = sourceChain[0] ?? null;
     const sourceVersion = sourceChain[1] ?? null;
     if (!currentVersion || !sourceVersion) {
+      if (currentVersion) {
+        const emptyItems =
+          (await this.dependencies.billItemRepository?.listByBillVersionId(
+            currentVersion.id,
+          )) ?? [];
+        if (emptyItems.length === 0) {
+          return [
+            await this.createRecommendation({
+              projectId: input.projectId,
+              stageCode: currentVersion.stageCode,
+              disciplineCode: currentVersion.disciplineCode,
+              resourceType: "bill_version",
+              resourceId: currentVersion.id,
+              recommendationType: "bill_recommendation",
+              inputPayload: {
+                ...(input.inputPayload ?? {}),
+                sourceBillVersionId: null,
+                aiProvider: {
+                  provider: "rules_engine",
+                  model: "bill_version_missing_items",
+                },
+              },
+              outputPayload: {
+                parentId: null,
+                itemCode: "AI-MISSING-001",
+                itemName: "待补充清单项",
+                quantity: 1,
+                unit: "项",
+                sortNo: 1,
+                recommendationReason: "empty_bill_version_missing_item",
+              },
+              userId: input.userId,
+            }),
+          ];
+        }
+      }
       return [];
     }
 

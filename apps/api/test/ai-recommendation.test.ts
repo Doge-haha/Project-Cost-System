@@ -123,6 +123,16 @@ const billVersions: BillVersionRecord[] = [
     versionStatus: "editable",
     sourceVersionId: "bill-version-001",
   },
+  {
+    id: "bill-version-003",
+    projectId: "project-001",
+    stageCode: "estimate",
+    disciplineCode: "building",
+    versionNo: 3,
+    versionName: "空白估算版",
+    versionStatus: "editable",
+    sourceVersionId: null,
+  },
 ];
 
 const billItems: BillItemRecord[] = [
@@ -418,6 +428,40 @@ test("POST /v1/ai/bill-recommendations generates missing item candidates for cop
   );
   assert.equal(response.json().provider.provider, "rules_engine");
   assert.equal(response.json().createdCount, 1);
+
+  await app.close();
+});
+
+test("POST /v1/ai/bill-recommendations suggests a starter item for empty bill versions", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/bill-recommendations",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_version",
+      resourceId: "bill-version-003",
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].resourceId, "bill-version-003");
+  assert.equal(
+    response.json().items[0].outputPayload.recommendationReason,
+    "empty_bill_version_missing_item",
+  );
+  assert.equal(response.json().items[0].outputPayload.itemCode, "AI-MISSING-001");
+  assert.equal(response.json().items[0].outputPayload.itemName, "待补充清单项");
+  assert.equal(response.json().items[0].outputPayload.unit, "项");
+  assert.equal(response.json().provider.model, "bill_version_missing_items");
 
   await app.close();
 });

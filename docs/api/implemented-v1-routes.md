@@ -11,9 +11,9 @@
 
 摘要：
 
-- 路由总数：99
+- 路由总数：101
 - 分组总数：15
-- 方法分布：GET 43 / POST 40 / PUT 12 / DELETE 4
+- 方法分布：GET 45 / POST 40 / PUT 12 / DELETE 4
 - 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
@@ -26,6 +26,7 @@
 - `POST /v1/projects`
 - `GET /v1/projects/:projectId`
 - `GET /v1/projects/:projectId/ai/bill-recommendations`
+- `GET /v1/projects/:projectId/ai/provider-telemetry`
 - `GET /v1/projects/:projectId/ai/quota-recommendations`
 - `GET /v1/projects/:projectId/ai/recommendation-context`
 - `GET /v1/projects/:projectId/ai/recommendations`
@@ -142,6 +143,7 @@
 - `POST /v1/ai/recommendations/:recommendationId/ignore`
 - `POST /v1/ai/recommendations/:recommendationId/rollback`
 - `POST /v1/ai/recommendations/expire-stale`
+- `GET /v1/ai/recommendations/rollback-blocked-reasons`
 - `POST /v1/ai/variance-warnings`
 
 ## AI Runtime / Knowledge

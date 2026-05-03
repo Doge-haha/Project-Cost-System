@@ -5,6 +5,7 @@ import { AppError } from "../shared/app-error.js";
 import { buildImportFailureContextResource } from "./import-failure-context.js";
 import { resourceEnvelope } from "./responders.js";
 import {
+  aiProviderTelemetryQuerySchema,
   aiRecommendationContextQuerySchema,
   importFailureContextQuerySchema,
   billVersionContextQuerySchema,
@@ -443,6 +444,23 @@ export function registerResourceRoutes(
         projectId: query.projectId,
         stageCode: query.stageCode ?? null,
         disciplineCode: query.disciplineCode ?? null,
+      },
+      data,
+    });
+  });
+
+  app.get("/v1/resources/ai-provider-telemetry", async (request) => {
+    const query = aiProviderTelemetryQuerySchema.parse(request.query);
+    const data = await apiClient.fetchAiProviderTelemetry(
+      query,
+      request.bearerToken!,
+    );
+
+    return resourceEnvelope({
+      resourceType: "ai_provider_telemetry",
+      scope: {
+        projectId: query.projectId,
+        limit: query.limit ?? null,
       },
       data,
     });

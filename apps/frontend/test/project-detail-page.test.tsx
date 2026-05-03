@@ -217,6 +217,20 @@ describe("ProjectDetailPage", () => {
         });
       }
 
+      if (url.pathname === "/v1/projects/project-001/ai/provider-telemetry") {
+        return createJsonResponse({
+          totalCount: 3,
+          successCount: 1,
+          failureCount: 2,
+          averageDurationMs: 10667,
+          p95DurationMs: 16000,
+          maxRetryCount: 2,
+          consecutiveFailureCount: 2,
+          groups: [],
+          alerts: ["运维告警：Provider 已连续失败 2 次。"],
+        });
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -330,6 +344,14 @@ describe("ProjectDetailPage", () => {
       "href",
       "/projects/project-001/jobs?jobId=job-001&status=failed&failureReason=missing_field&failureResourceType=bill_item&failureAction=create",
     );
+    expect(screen.getByRole("link", { name: /Provider 诊断/ })).toHaveAttribute(
+      "href",
+      "/projects/project-001/ai-recommendations",
+    );
+    expect(
+      screen.getByText("最近 Provider 任务 3 个 · 成功 1 · 失败 2 · P95 16000ms · 连续失败 2"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("运维告警：Provider 已连续失败 2 次。")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "复制异步任务处理链接" }));
     await waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(

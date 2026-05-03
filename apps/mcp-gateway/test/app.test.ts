@@ -238,6 +238,13 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         description: "Project and stage scoped variance warning thresholds",
         parameters: ["projectId", "stageCode?", "disciplineCode?"],
       },
+      {
+        name: "ai-provider-telemetry",
+        uri: "/v1/resources/ai-provider-telemetry",
+        mode: "read",
+        description: "AI provider job health, latency, retry, and failure telemetry",
+        parameters: ["projectId", "limit?"],
+      },
     ],
     tools: [
       {
@@ -2245,6 +2252,68 @@ test("GET /v1/resources/variance-warning-thresholds proxies threshold config", a
       token,
       projectId: "project-001",
       stageCode: "estimate",
+    },
+  ]);
+
+  await app.close();
+});
+
+test("GET /v1/resources/ai-provider-telemetry proxies provider telemetry", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchAiProviderTelemetry: async (query, bearerToken) => {
+        requests.push({
+          token: bearerToken,
+          ...query,
+        });
+        return {
+          totalCount: 3,
+          successCount: 1,
+          failureCount: 2,
+          p95DurationMs: 16000,
+          alerts: ["运维告警：Provider 已连续失败 2 次。"],
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/ai-provider-telemetry?projectId=project-001&limit=20",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "ai_provider_telemetry",
+    scope: {
+      projectId: "project-001",
+      limit: 20,
+    },
+    data: {
+      totalCount: 3,
+      successCount: 1,
+      failureCount: 2,
+      p95DurationMs: 16000,
+      alerts: ["运维告警：Provider 已连续失败 2 次。"],
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      token,
+      projectId: "project-001",
+      limit: 20,
     },
   ]);
 

@@ -345,6 +345,43 @@ export type AiProviderHealthResponse = {
   failureSummary?: Record<string, unknown>;
 };
 
+export type AiProviderTelemetryGroup = {
+  provider: string;
+  model?: string | null;
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
+  averageDurationMs: number | null;
+  p95DurationMs: number | null;
+  maxRetryCount: number | null;
+  consecutiveFailureCount: number;
+};
+
+export type AiProviderTelemetrySummary = {
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
+  averageDurationMs: number | null;
+  p95DurationMs: number | null;
+  maxRetryCount: number | null;
+  consecutiveFailureCount: number;
+  groups: AiProviderTelemetryGroup[];
+  alerts: string[];
+};
+
+export type AiRecommendationRollbackBlockedReason =
+  | "resource_missing"
+  | "resource_modified"
+  | "resource_has_children"
+  | "resource_has_quota_lines";
+
+export type AiRecommendationRollbackBlockedReasonListResponse = {
+  items: Array<{
+    reason: AiRecommendationRollbackBlockedReason;
+    label: string;
+  }>;
+};
+
 export type VarianceWarningThreshold = {
   id: string;
   projectId: string;

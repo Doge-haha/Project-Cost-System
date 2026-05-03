@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 
 import type { ApiDatabase } from "../../infrastructure/database/database-client.js";
 import { backgroundJobs } from "../../infrastructure/database/schema.js";
-import { desc, eq } from "drizzle-orm";
+import { eq, sql, type SQL } from "drizzle-orm";
 
 export type {
   BackgroundJobPayload,
@@ -140,93 +140,81 @@ export class DbBackgroundJobRepository implements BackgroundJobRepository {
     completedTo?: string;
     limit?: number;
   }): Promise<BackgroundJobRecord[]> {
-    const records = await this.db.query.backgroundJobs.findMany({
-      orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
-      limit: input?.limit,
-    });
+    const filters = [
+      input?.projectId ? sql`project_id = ${input.projectId}` : undefined,
+      input?.requestedBy ? sql`requested_by = ${input.requestedBy}` : undefined,
+      input?.jobType ? sql`job_type = ${input.jobType}` : undefined,
+      input?.status ? sql`status = ${input.status}` : undefined,
+      input?.createdFrom
+        ? sql`created_at >= ${new Date(input.createdFrom)}`
+        : undefined,
+      input?.createdTo ? sql`created_at <= ${new Date(input.createdTo)}` : undefined,
+      input?.completedFrom
+        ? sql`completed_at >= ${new Date(input.completedFrom)}`
+        : undefined,
+      input?.completedTo
+        ? sql`completed_at <= ${new Date(input.completedTo)}`
+        : undefined,
+    ].filter((filter): filter is SQL => filter !== undefined);
+    const whereClause =
+      filters.length > 0 ? sql`where ${sql.join(filters, sql` and `)}` : sql``;
+    const limitClause =
+      input?.limit === undefined ? sql`` : sql`limit ${input.limit}`;
+    const records = await this.db.execute(sql`
+      select
+        id,
+        job_type as "jobType",
+        status,
+        requested_by as "requestedBy",
+        project_id as "projectId",
+        payload,
+        result,
+        error_message as "errorMessage",
+        created_at as "createdAt",
+        completed_at as "completedAt"
+      from background_job
+      ${whereClause}
+      order by created_at desc, id desc
+      ${limitClause}
+    `);
 
-    return records
-      .map((record) => ({
-        id: record.id,
-        jobType: record.jobType as BackgroundJobType,
-        status: record.status as BackgroundJobStatus,
-        requestedBy: record.requestedBy,
-        projectId: record.projectId ?? null,
-        payload: record.payload as BackgroundJobPayload,
-        result:
-          record.result && typeof record.result === "object"
-            ? (record.result as Record<string, unknown>)
-            : null,
-        errorMessage: record.errorMessage ?? null,
-        createdAt: record.createdAt.toISOString(),
-        completedAt: record.completedAt?.toISOString() ?? null,
-      }))
-      .filter((job) => {
-        if (input?.projectId && job.projectId !== input.projectId) {
-          return false;
-        }
-        if (input?.requestedBy && job.requestedBy !== input.requestedBy) {
-          return false;
-        }
-        if (input?.jobType && job.jobType !== input.jobType) {
-          return false;
-        }
-        if (input?.status && job.status !== input.status) {
-          return false;
-        }
-        if (input?.createdFrom && job.createdAt < input.createdFrom) {
-          return false;
-        }
-        if (input?.createdTo && job.createdAt > input.createdTo) {
-          return false;
-        }
-        if (
-          input?.completedFrom &&
-          (!job.completedAt || job.completedAt < input.completedFrom)
-        ) {
-          return false;
-        }
-        if (
-          input?.completedTo &&
-          (!job.completedAt || job.completedAt > input.completedTo)
-        ) {
-          return false;
-        }
-        return true;
-      });
+    return records.rows.map((record) =>
+      mapDbBackgroundJobRecord(record as unknown as DbBackgroundJobRow),
+    );
   }
 
   async findById(jobId: string): Promise<BackgroundJobRecord | null> {
-    const record = await this.db.query.backgroundJobs.findFirst({
-      where: (table, { eq }) => eq(table.id, jobId),
-    });
+    const records = await this.db.execute(sql`
+      select
+        id,
+        job_type as "jobType",
+        status,
+        requested_by as "requestedBy",
+        project_id as "projectId",
+        payload,
+        result,
+        error_message as "errorMessage",
+        created_at as "createdAt",
+        completed_at as "completedAt"
+      from background_job
+      where id = ${jobId}
+      limit 1
+    `);
+    const [record] = records.rows;
 
     if (!record) {
       return null;
     }
 
-    return {
-      id: record.id,
-      jobType: record.jobType as BackgroundJobType,
-      status: record.status as BackgroundJobStatus,
-      requestedBy: record.requestedBy,
-      projectId: record.projectId ?? null,
-      payload: record.payload as BackgroundJobPayload,
-      result:
-        record.result && typeof record.result === "object"
-          ? (record.result as Record<string, unknown>)
-          : null,
-      errorMessage: record.errorMessage ?? null,
-      createdAt: record.createdAt.toISOString(),
-      completedAt: record.completedAt?.toISOString() ?? null,
-    };
+    return mapDbBackgroundJobRecord(record as unknown as DbBackgroundJobRow);
   }
 
   async create(input: Omit<BackgroundJobRecord, "id">): Promise<BackgroundJobRecord> {
-    const [created] = await this.db
+    const id = randomUUID();
+    await this.db
       .insert(backgroundJobs)
       .values({
-        id: randomUUID(),
+        id,
         jobType: input.jobType,
         status: input.status,
         requestedBy: input.requestedBy,
@@ -236,31 +224,20 @@ export class DbBackgroundJobRepository implements BackgroundJobRepository {
         errorMessage: input.errorMessage ?? null,
         createdAt: new Date(input.createdAt),
         completedAt: input.completedAt ? new Date(input.completedAt) : null,
-      })
-      .returning();
+      });
 
-    return {
-      id: created.id,
-      jobType: created.jobType as BackgroundJobType,
-      status: created.status as BackgroundJobStatus,
-      requestedBy: created.requestedBy,
-      projectId: created.projectId ?? null,
-      payload: created.payload as BackgroundJobPayload,
-      result:
-        created.result && typeof created.result === "object"
-          ? (created.result as Record<string, unknown>)
-          : null,
-      errorMessage: created.errorMessage ?? null,
-      createdAt: created.createdAt.toISOString(),
-      completedAt: created.completedAt?.toISOString() ?? null,
-    };
+    const created = await this.findById(id);
+    if (!created) {
+      throw new Error("Background job not found");
+    }
+    return created;
   }
 
   async update(
     jobId: string,
     input: Partial<Omit<BackgroundJobRecord, "id" | "jobType" | "requestedBy">>,
   ): Promise<BackgroundJobRecord> {
-    const [updated] = await this.db
+    await this.db
       .update(backgroundJobs)
       .set({
         status: input.status,
@@ -278,27 +255,100 @@ export class DbBackgroundJobRepository implements BackgroundJobRepository {
               ? new Date(input.completedAt)
               : null,
       })
-      .where(eq(backgroundJobs.id, jobId))
-      .returning();
+      .where(eq(backgroundJobs.id, jobId));
 
+    const updated = await this.findById(jobId);
     if (!updated) {
       throw new Error("Background job not found");
     }
 
-    return {
-      id: updated.id,
-      jobType: updated.jobType as BackgroundJobType,
-      status: updated.status as BackgroundJobStatus,
-      requestedBy: updated.requestedBy,
-      projectId: updated.projectId ?? null,
-      payload: updated.payload as BackgroundJobPayload,
-      result:
-        updated.result && typeof updated.result === "object"
-          ? (updated.result as Record<string, unknown>)
-          : null,
-      errorMessage: updated.errorMessage ?? null,
-      createdAt: updated.createdAt.toISOString(),
-      completedAt: updated.completedAt?.toISOString() ?? null,
-    };
+    return updated;
   }
+}
+
+type DbBackgroundJobRow = Record<string, unknown>;
+
+function mapDbBackgroundJobRecord(record: DbBackgroundJobRow): BackgroundJobRecord {
+  const result = readObjectField(record, "result", "result");
+
+  return {
+    id: readStringField(record, "id", "id"),
+    jobType: readStringField(record, "jobType", "job_type") as BackgroundJobType,
+    status: readStringField(record, "status", "status") as BackgroundJobStatus,
+    requestedBy: readStringField(record, "requestedBy", "requested_by"),
+    projectId: readNullableStringField(record, "projectId", "project_id"),
+    payload: readField(record, "payload", "payload") as BackgroundJobPayload,
+    result,
+    errorMessage: readNullableStringField(record, "errorMessage", "error_message"),
+    createdAt: readDateField(record, "createdAt", "created_at").toISOString(),
+    completedAt:
+      readNullableDateField(record, "completedAt", "completed_at")?.toISOString() ??
+      null,
+  };
+}
+
+function readField(
+  record: DbBackgroundJobRow,
+  camelKey: string,
+  snakeKey: string,
+): unknown {
+  return record[camelKey] ?? record[snakeKey];
+}
+
+function readStringField(
+  record: DbBackgroundJobRow,
+  camelKey: string,
+  snakeKey: string,
+): string {
+  const value = readField(record, camelKey, snakeKey);
+  if (typeof value !== "string") {
+    throw new Error(`Background job field ${camelKey} is missing`);
+  }
+  return value;
+}
+
+function readNullableStringField(
+  record: DbBackgroundJobRow,
+  camelKey: string,
+  snakeKey: string,
+): string | null {
+  const value = readField(record, camelKey, snakeKey);
+  return typeof value === "string" ? value : null;
+}
+
+function readObjectField(
+  record: DbBackgroundJobRow,
+  camelKey: string,
+  snakeKey: string,
+): Record<string, unknown> | null {
+  const value = readField(record, camelKey, snakeKey);
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readDateField(
+  record: DbBackgroundJobRow,
+  camelKey: string,
+  snakeKey: string,
+): Date {
+  const value = readField(record, camelKey, snakeKey);
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Background job field ${camelKey} is missing`);
+  }
+  return date;
+}
+
+function readNullableDateField(
+  record: DbBackgroundJobRow,
+  camelKey: string,
+  snakeKey: string,
+): Date | null {
+  const value = readField(record, camelKey, snakeKey);
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
 }

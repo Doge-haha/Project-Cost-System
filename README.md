@@ -15,6 +15,7 @@
 优先参考文档：
 
 - [项目文档总览](./docs/architecture/project-document-index.md)
+- [当前工作上下文](./docs/context/current-working-context.md)
 - [后端技术栈重决策](./docs/architecture/backend-tech-stack-redecision.md)
 - [后端重构方案](./docs/architecture/backend-architecture-redesign.md)
 - [AI 原生架构复盘](./docs/architecture/ai-native-architecture-review.md)

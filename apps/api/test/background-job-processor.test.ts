@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { BackgroundJobProcessor } from "../src/modules/jobs/background-job-processor.js";
 import {
+  DbBackgroundJobRepository,
   InMemoryBackgroundJobRepository,
   type BackgroundJobRecord,
 } from "../src/modules/jobs/background-job-repository.js";
@@ -17,6 +18,7 @@ import { InMemoryProjectDisciplineRepository } from "../src/modules/project/proj
 import { InMemoryProjectMemberRepository } from "../src/modules/project/project-member-repository.js";
 import { InMemoryProjectRepository } from "../src/modules/project/project-repository.js";
 import { InMemoryProjectStageRepository } from "../src/modules/project/project-stage-repository.js";
+import { createPgMemDatabase } from "./helpers/pg-mem.js";
 
 function createBackgroundJobService(seed: BackgroundJobRecord[]) {
   const projectRepository = new InMemoryProjectRepository([]);
@@ -297,4 +299,110 @@ test("BackgroundJobService rejects failing jobs that already reached a terminal 
       code: "BACKGROUND_JOB_NOT_PROCESSING",
     },
   );
+});
+
+test("DbBackgroundJobRepository applies filters before limit", async () => {
+  const runtime = await createPgMemDatabase();
+  try {
+    await runtime.pool.query(
+      "insert into project (id, code, name, status) values ('project-001', 'PRJ-001', '项目一', 'draft'), ('project-002', 'PRJ-002', '项目二', 'draft')",
+    );
+    await runtime.pool.query(`
+      insert into background_job
+        (id, job_type, status, requested_by, project_id, payload, result, error_message, created_at, completed_at)
+      values
+        ('job-other-newer', 'ai_recommendation', 'completed', 'engineer-002', 'project-002', '{"projectId":"project-002"}', null, null, '2026-04-20T12:00:00.000Z', '2026-04-20T12:00:01.000Z'),
+        ('job-target', 'ai_recommendation', 'failed', 'engineer-001', 'project-001', '{"projectId":"project-001"}', null, 'provider failed', '2026-04-20T11:00:00.000Z', '2026-04-20T11:00:01.000Z'),
+        ('job-target-other-type', 'project_recalculate', 'completed', 'engineer-001', 'project-001', '{"projectId":"project-001"}', null, null, '2026-04-20T10:00:00.000Z', '2026-04-20T10:00:01.000Z')
+    `);
+    const repository = new DbBackgroundJobRepository(runtime.db);
+
+    const records = await repository.list({
+      projectId: "project-001",
+      jobType: "ai_recommendation",
+      limit: 1,
+    });
+
+    assert.deepEqual(
+      records.map((record) => record.id),
+      ["job-target"],
+    );
+  } finally {
+    await runtime.close();
+  }
+});
+
+test("DbBackgroundJobRepository creates, finds, updates, and filters jobs", async () => {
+  const runtime = await createPgMemDatabase();
+  try {
+    await runtime.pool.query(
+      "insert into project (id, code, name, status) values ('project-001', 'PRJ-001', '项目一', 'draft')",
+    );
+    const repository = new DbBackgroundJobRepository(runtime.db);
+
+    const created = await repository.create({
+      jobType: "report_export",
+      status: "queued",
+      requestedBy: "owner-001",
+      projectId: "project-001",
+      payload: {
+        projectId: "project-001",
+        reportType: "summary",
+      },
+      result: null,
+      errorMessage: null,
+      createdAt: "2026-04-20T08:00:00.000Z",
+      completedAt: null,
+    });
+    const found = await repository.findById(created.id);
+    const updated = await repository.update(created.id, {
+      status: "completed",
+      result: {
+        exported: true,
+        path: "/tmp/report.xlsx",
+      },
+      completedAt: "2026-04-20T08:00:03.000Z",
+    });
+    const completed = await repository.list({
+      requestedBy: "owner-001",
+      status: "completed",
+      completedFrom: "2026-04-20T08:00:00.000Z",
+      completedTo: "2026-04-20T08:00:05.000Z",
+    });
+    const cleared = await repository.update(created.id, {
+      status: "failed",
+      result: null,
+      errorMessage: null,
+      completedAt: null,
+    });
+
+    assert.equal(found?.id, created.id);
+    assert.equal(found?.status, "queued");
+    assert.equal(updated.status, "completed");
+    assert.equal(updated.projectId, "project-001");
+    assert.equal(updated.requestedBy, "owner-001");
+    assert.equal(updated.createdAt, "2026-04-20T08:00:00.000Z");
+    assert.deepEqual(updated.payload, {
+      projectId: "project-001",
+      reportType: "summary",
+    });
+    assert.deepEqual(updated.result, {
+      exported: true,
+      path: "/tmp/report.xlsx",
+    });
+    assert.deepEqual(
+      completed.map((job) => job.id),
+      [created.id],
+    );
+    assert.equal(cleared.status, "failed");
+    assert.equal(cleared.result, null);
+    assert.equal(cleared.errorMessage, null);
+    assert.equal(cleared.completedAt, null);
+    assert.equal(await repository.findById("missing-job"), null);
+    await assert.rejects(() => repository.update("missing-job", { status: "failed" }), {
+      message: "Background job not found",
+    });
+  } finally {
+    await runtime.close();
+  }
 });

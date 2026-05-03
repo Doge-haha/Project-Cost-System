@@ -13,13 +13,14 @@
 
 如果你是第一次进入项目，最推荐的阅读顺序是：
 
-1. [设计文档_v1.0_优化中.md](/Users/huahaha/Documents/New%20project/设计文档_v1.0_优化中.md)
-2. [data-model.md](/Users/huahaha/Documents/New%20project/docs/architecture/data-model.md)
-3. [state-machines.md](/Users/huahaha/Documents/New%20project/docs/architecture/state-machines.md)
-4. [permission-matrix.md](/Users/huahaha/Documents/New%20project/docs/architecture/permission-matrix.md)
-5. [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml)
-6. [master-delivery-roadmap.md](/Users/huahaha/Documents/New%20project/docs/architecture/master-delivery-roadmap.md)
-7. [jira-import-preflight-checklist.md](/Users/huahaha/Documents/New%20project/docs/architecture/jira-import-preflight-checklist.md)
+1. [current-working-context.md](../context/current-working-context.md)
+2. [设计文档_v1.0_优化中.md](/Users/huahaha/Documents/New%20project/设计文档_v1.0_优化中.md)
+3. [data-model.md](/Users/huahaha/Documents/New%20project/docs/architecture/data-model.md)
+4. [state-machines.md](/Users/huahaha/Documents/New%20project/docs/architecture/state-machines.md)
+5. [permission-matrix.md](/Users/huahaha/Documents/New%20project/docs/architecture/permission-matrix.md)
+6. [openapi-v1.yaml](/Users/huahaha/Documents/New%20project/docs/api/openapi-v1.yaml)
+7. [master-delivery-roadmap.md](/Users/huahaha/Documents/New%20project/docs/architecture/master-delivery-roadmap.md)
+8. [jira-import-preflight-checklist.md](/Users/huahaha/Documents/New%20project/docs/architecture/jira-import-preflight-checklist.md)
 
 ## 2. 产品与业务设计层
 

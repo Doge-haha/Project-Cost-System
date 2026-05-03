@@ -104,6 +104,44 @@ test("GatewayApiClient.updateProcessDocumentStatus puts to the document status e
   });
 });
 
+test("GatewayApiClient.fetchAiProviderTelemetry gets provider telemetry", async () => {
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const client = new GatewayApiClient({
+    apiBaseUrl: "https://api.example.com",
+    fetchImpl: async (input, init) => {
+      requests.push({
+        url: typeof input === "string" ? input : input.toString(),
+        init: init ?? {},
+      });
+      return jsonResponse({
+        totalCount: 3,
+        failureCount: 2,
+      });
+    },
+  });
+
+  const result = await client.fetchAiProviderTelemetry(
+    {
+      projectId: "project-001",
+      limit: 20,
+    },
+    "access-token",
+  );
+
+  assert.deepEqual(result, {
+    totalCount: 3,
+    failureCount: 2,
+  });
+  assert.equal(
+    requests[0].url,
+    "https://api.example.com/v1/projects/project-001/ai/provider-telemetry?limit=20",
+  );
+  assert.equal(requests[0].init.method, "GET");
+  assert.deepEqual(requests[0].init.headers, {
+    authorization: "Bearer access-token",
+  });
+});
+
 test("GatewayApiClient workflow methods surface upstream structured errors", async () => {
   const processDocumentClient = new GatewayApiClient({
     apiBaseUrl: "https://api.example.com",

@@ -15,6 +15,30 @@ import type {
   BackgroundJobType,
 } from "./background-job-repository.js";
 
+export type AiProviderTelemetryGroup = {
+  provider: string;
+  model: string | null;
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
+  averageDurationMs: number | null;
+  p95DurationMs: number | null;
+  maxRetryCount: number | null;
+  consecutiveFailureCount: number;
+};
+
+export type AiProviderTelemetrySummary = {
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
+  averageDurationMs: number | null;
+  p95DurationMs: number | null;
+  maxRetryCount: number | null;
+  consecutiveFailureCount: number;
+  groups: AiProviderTelemetryGroup[];
+  alerts: string[];
+};
+
 export class BackgroundJobService {
   private readonly auditLogService: AuditLogService;
 
@@ -45,13 +69,16 @@ export class BackgroundJobService {
     completedTo?: string;
     limit?: number;
     userId: string;
+    roleCodes?: string[];
   }): Promise<BackgroundJobRecord[]> {
     if (input.projectId) {
       const project = await this.projectRepository.findById(input.projectId);
       if (!project) {
         throw new AppError(404, "PROJECT_NOT_FOUND", "Project not found");
       }
-      await this.assertProjectVisible(input.projectId, input.userId);
+      if (!(input.roleCodes ?? []).includes("system_admin")) {
+        await this.assertProjectVisible(input.projectId, input.userId);
+      }
     }
 
     return this.backgroundJobRepository.list({
@@ -65,6 +92,23 @@ export class BackgroundJobService {
       completedTo: input.completedTo,
       limit: input.limit,
     });
+  }
+
+  async summarizeAiProviderTelemetry(input: {
+    projectId: string;
+    userId: string;
+    roleCodes?: string[];
+    limit?: number;
+  }): Promise<AiProviderTelemetrySummary> {
+    const jobs = await this.listBackgroundJobs({
+      projectId: input.projectId,
+      jobType: "ai_recommendation",
+      limit: input.limit ?? 100,
+      userId: input.userId,
+      roleCodes: input.roleCodes,
+    });
+
+    return summarizeAiProviderJobs(jobs);
   }
 
   async getBackgroundJob(input: {
@@ -567,4 +611,155 @@ export class BackgroundJobService {
       );
     }
   }
+}
+
+function summarizeAiProviderJobs(
+  jobs: BackgroundJobRecord[],
+): AiProviderTelemetrySummary {
+  const durations = jobs
+    .map((job) => readProviderDurationMs(job))
+    .filter((value): value is number => value !== null);
+  const retryCounts = jobs
+    .map((job) => readProviderRetryCount(job))
+    .filter((value): value is number => value !== null);
+  const successCount = jobs.filter((job) => job.status === "completed").length;
+  const failureCount = jobs.filter((job) => job.status === "failed").length;
+  const consecutiveFailureCount = countConsecutiveFailures(jobs);
+  const averageDurationMs = averageDuration(durations);
+  const p95DurationMs = percentile(durations, 0.95);
+  const maxRetryCount = retryCounts.length > 0 ? Math.max(...retryCounts) : null;
+  const groups = summarizeAiProviderGroups(jobs);
+  const alerts = [
+    failureCount > 0 ? `运维告警：最近 ${failureCount} 个 Provider 任务失败。` : null,
+    consecutiveFailureCount >= 2
+      ? `运维告警：Provider 已连续失败 ${consecutiveFailureCount} 次。`
+      : null,
+    p95DurationMs !== null && p95DurationMs > 10000
+      ? `运维告警：Provider P95 耗时 ${p95DurationMs}ms，已超过 10000ms。`
+      : null,
+    maxRetryCount !== null && maxRetryCount > 0
+      ? `运维提示：最近最大重试次数 ${maxRetryCount}。`
+      : null,
+  ].filter((item): item is string => item !== null);
+
+  return {
+    totalCount: jobs.length,
+    successCount,
+    failureCount,
+    averageDurationMs,
+    p95DurationMs,
+    maxRetryCount,
+    consecutiveFailureCount,
+    groups,
+    alerts,
+  };
+}
+
+function summarizeAiProviderGroups(
+  jobs: BackgroundJobRecord[],
+): AiProviderTelemetryGroup[] {
+  const grouped = new Map<string, BackgroundJobRecord[]>();
+  for (const job of jobs) {
+    const identity = readProviderIdentity(job);
+    const key = `${identity.provider}\u0000${identity.model ?? ""}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), job]);
+  }
+
+  return Array.from(grouped.values()).map((groupJobs) => {
+    const identity = readProviderIdentity(groupJobs[0]);
+    const durations = groupJobs
+      .map((job) => readProviderDurationMs(job))
+      .filter((value): value is number => value !== null);
+    const retryCounts = groupJobs
+      .map((job) => readProviderRetryCount(job))
+      .filter((value): value is number => value !== null);
+
+    return {
+      provider: identity.provider,
+      model: identity.model,
+      totalCount: groupJobs.length,
+      successCount: groupJobs.filter((job) => job.status === "completed").length,
+      failureCount: groupJobs.filter((job) => job.status === "failed").length,
+      averageDurationMs: averageDuration(durations),
+      p95DurationMs: percentile(durations, 0.95),
+      maxRetryCount: retryCounts.length > 0 ? Math.max(...retryCounts) : null,
+      consecutiveFailureCount: countConsecutiveFailures(groupJobs),
+    };
+  });
+}
+
+function readProviderIdentity(job: BackgroundJobRecord): {
+  provider: string;
+  model: string | null;
+} {
+  const result = readObject(job.result);
+  const provider = readObject(result?.provider);
+  const failureSummary = readObject(result?.providerFailureSummary);
+  const payload = readObject(job.payload);
+
+  return {
+    provider:
+      readString(provider?.provider) ??
+      readString(failureSummary?.provider) ??
+      readString(payload?.provider) ??
+      "openai_compatible",
+    model:
+      readString(provider?.model) ??
+      readString(failureSummary?.model) ??
+      readString(payload?.model),
+  };
+}
+
+function readProviderDurationMs(job: BackgroundJobRecord): number | null {
+  const result = readObject(job.result);
+  const telemetry = readObject(result?.telemetry);
+  const failureSummary = readObject(result?.providerFailureSummary);
+  const value = telemetry?.durationMs ?? failureSummary?.durationMs;
+  return typeof value === "number" ? Math.round(value) : null;
+}
+
+function readProviderRetryCount(job: BackgroundJobRecord): number | null {
+  const result = readObject(job.result);
+  const telemetry = readObject(result?.telemetry);
+  const failureSummary = readObject(result?.providerFailureSummary);
+  const value =
+    telemetry?.retryCount ?? telemetry?.attemptCount ?? failureSummary?.retryCount;
+  return typeof value === "number" ? Math.round(value) : null;
+}
+
+function countConsecutiveFailures(jobs: BackgroundJobRecord[]) {
+  let count = 0;
+  for (const job of jobs) {
+    if (job.status !== "failed") {
+      break;
+    }
+    count += 1;
+  }
+  return count;
+}
+
+function averageDuration(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function percentile(values: number[], rate: number): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  const sorted = [...values].sort((left, right) => left - right);
+  const index = Math.min(sorted.length - 1, Math.ceil(sorted.length * rate) - 1);
+  return sorted[index];
+}
+
+function readObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

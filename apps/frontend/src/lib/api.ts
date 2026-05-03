@@ -8,6 +8,8 @@ import type {
   AiRecommendationStatus,
   AiRecommendationType,
   AiProviderHealthResponse,
+  AiProviderTelemetrySummary,
+  AiRecommendationRollbackBlockedReasonListResponse,
   BackgroundJob,
   BackgroundJobListResponse,
   BillItem,
@@ -507,6 +509,19 @@ export const apiClient = {
       provider: query?.provider,
       model: query?.model,
     });
+  },
+  getAiProviderTelemetrySummary(projectId: string, query?: { limit?: number }) {
+    return request<AiProviderTelemetrySummary>(
+      `/v1/projects/${projectId}/ai/provider-telemetry`,
+      {
+        limit: query?.limit,
+      },
+    );
+  },
+  listAiRollbackBlockedReasons() {
+    return request<AiRecommendationRollbackBlockedReasonListResponse>(
+      "/v1/ai/recommendations/rollback-blocked-reasons",
+    );
   },
   listVarianceWarningThresholds(
     projectId: string,

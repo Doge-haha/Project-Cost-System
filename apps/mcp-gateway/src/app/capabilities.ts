@@ -152,6 +152,13 @@ export const RESOURCE_DEFINITIONS = [
     description: "Project and stage scoped variance warning thresholds",
     parameters: ["projectId", "stageCode?", "disciplineCode?"],
   },
+  {
+    name: "ai-provider-telemetry",
+    uri: "/v1/resources/ai-provider-telemetry",
+    mode: "read",
+    description: "AI provider job health, latency, retry, and failure telemetry",
+    parameters: ["projectId", "limit?"],
+  },
 ] as const;
 
 export const TOOL_DEFINITIONS = [

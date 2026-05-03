@@ -564,6 +564,7 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - `import-failure-context`
 - `ai-recommendation-context`
 - `variance-warning-thresholds`
+- `ai-provider-telemetry`
 
 已落地 tools：
 

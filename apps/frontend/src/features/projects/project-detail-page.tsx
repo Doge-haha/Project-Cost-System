@@ -4,6 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { apiClient, ApiError } from "../../lib/api";
 import type {
   AuditLogRecord,
+  AiProviderTelemetrySummary,
   BillVersion,
   ProjectWorkspace,
   SummaryResponse,
@@ -54,6 +55,19 @@ import { formatProjectDateTime } from "./project-date-utils";
 type ProjectDetailState = {
   workspace: ProjectWorkspace;
   recentActivity: AuditLogRecord[];
+  providerTelemetry: AiProviderTelemetrySummary | null;
+};
+
+const emptyProviderTelemetrySummary: AiProviderTelemetrySummary = {
+  totalCount: 0,
+  successCount: 0,
+  failureCount: 0,
+  averageDurationMs: null,
+  p95DurationMs: null,
+  maxRetryCount: null,
+  consecutiveFailureCount: 0,
+  groups: [],
+  alerts: [],
 };
 
 export function ProjectDetailPage() {
@@ -160,13 +174,17 @@ export function ProjectDetailPage() {
     setError(null);
 
     try {
-      const [workspace, recentActivity] = await Promise.all([
+      const [workspace, recentActivity, providerTelemetry] = await Promise.all([
         apiClient.getProjectWorkspace(projectId),
         apiClient.listProjectAuditLogs(projectId, { limit: 8 }),
+        apiClient
+          .getAiProviderTelemetrySummary(projectId, { limit: 20 })
+          .catch(() => emptyProviderTelemetrySummary),
       ]);
       setState({
         workspace,
         recentActivity: recentActivity.items,
+        providerTelemetry,
       });
       setSelectedBillVersionId((current) =>
         current ?? pickInitialBillVersionId(workspace.billVersions),
@@ -450,6 +468,7 @@ export function ProjectDetailPage() {
     permissionSummary.canEditProject ? "可编辑授权范围" : "仅可查看授权范围",
   ];
   const importLatestTask = workspace.importStatus.latestTask;
+  const providerTelemetry = state.providerTelemetry;
   const refreshNotice = buildProjectDetailRefreshNotice({
     refreshSource,
     refreshItemName,
@@ -994,9 +1013,26 @@ export function ProjectDetailPage() {
                 </p>
               </Link>
               <Link className="project-link" to={navigation.aiRecommendationsPath}>
-                <h3>查看 AI 推荐</h3>
+                <h3>Provider 诊断</h3>
                 <p className="page-description">
-                  处理清单推荐、定额推荐和偏差预警
+                  最近 Provider 任务 {providerTelemetry?.totalCount ?? 0} 个 · 成功{" "}
+                  {providerTelemetry?.successCount ?? 0} · 失败{" "}
+                  {providerTelemetry?.failureCount ?? 0}
+                  {providerTelemetry?.p95DurationMs === null ||
+                  providerTelemetry?.p95DurationMs === undefined
+                    ? ""
+                    : ` · P95 ${providerTelemetry.p95DurationMs}ms`}
+                  {providerTelemetry?.consecutiveFailureCount
+                    ? ` · 连续失败 ${providerTelemetry.consecutiveFailureCount}`
+                    : ""}
+                </p>
+                {providerTelemetry?.alerts.slice(0, 2).map((alert) => (
+                  <p className="recommendation-expired" key={alert}>
+                    {alert}
+                  </p>
+                ))}
+                <p className="page-description">
+                  进入 AI 推荐页检查 Provider 连通性并处理清单推荐、定额推荐和偏差预警
                 </p>
               </Link>
             </div>

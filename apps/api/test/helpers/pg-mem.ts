@@ -27,17 +27,23 @@ export async function createPgMemDatabase() {
     query: unknown,
     ...args: unknown[]
   ) {
+    const shouldNormalize = typeof query === "string";
     return Promise.resolve(
       originalPoolQuery.call(this, stripUnsupportedTypes(query), ...args),
-    ).then((result: any) => normalizeResultRows(result));
+    ).then((result: any) =>
+      shouldNormalize ? normalizeResultRows(result) : result,
+    );
   };
   adapter.Client.prototype.query = function (
     query: unknown,
     ...args: unknown[]
   ) {
+    const shouldNormalize = typeof query === "string";
     return Promise.resolve(
       originalClientQuery.call(this, stripUnsupportedTypes(query), ...args),
-    ).then((result: any) => normalizeResultRows(result));
+    ).then((result: any) =>
+      shouldNormalize ? normalizeResultRows(result) : result,
+    );
   };
   const pool = new adapter.Pool();
 
@@ -56,19 +62,7 @@ export async function createPgMemDatabase() {
 
     for (const statement of statements) {
       memoryDb.public.none(statement);
-    }
   }
-
-  const db = drizzle(pool, { schema });
-
-  return {
-    memoryDb,
-    pool,
-    db,
-    async close() {
-      await pool.end();
-    },
-  };
 }
 
 function normalizeResultRows<T extends { rows?: unknown[] }>(result: T): T {
@@ -93,4 +87,16 @@ function normalizeResultRows<T extends { rows?: unknown[] }>(result: T): T {
 
 function toCamelCaseKey(value: string): string {
   return value.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+}
+
+  const db = drizzle(pool, { schema });
+
+  return {
+    memoryDb,
+    pool,
+    db,
+    async close() {
+      await pool.end();
+    },
+  };
 }

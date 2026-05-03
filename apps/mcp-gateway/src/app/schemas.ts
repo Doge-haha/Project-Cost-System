@@ -125,6 +125,11 @@ export const varianceWarningThresholdsQuerySchema = z.object({
   disciplineCode: z.string().min(1).optional(),
 });
 
+export const aiProviderTelemetryQuerySchema = z.object({
+  projectId: z.string().min(1),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
 export const exportSummaryReportToolSchema = z.object({
   projectId: z.string().min(1),
   reportType: z.enum(["summary", "variance"]),

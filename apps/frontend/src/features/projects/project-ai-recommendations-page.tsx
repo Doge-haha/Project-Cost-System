@@ -8,6 +8,7 @@ import type {
   AiRecommendationStatus,
   AiRecommendationType,
   AiProviderHealthResponse,
+  AiProviderTelemetrySummary,
   BackgroundJob,
   ProjectWorkspace,
   VarianceWarningThreshold,
@@ -80,6 +81,18 @@ const defaultThresholdForm: ThresholdForm = {
   thresholdRate: "",
 };
 
+const emptyProviderTelemetrySummary: AiProviderTelemetrySummary = {
+  totalCount: 0,
+  successCount: 0,
+  failureCount: 0,
+  averageDurationMs: null,
+  p95DurationMs: null,
+  maxRetryCount: null,
+  consecutiveFailureCount: 0,
+  groups: [],
+  alerts: [],
+};
+
 const defaultAsyncJobForm: AsyncJobForm = {
   recommendationType: "bill_recommendation",
   resourceType: "bill_version",
@@ -128,6 +141,8 @@ export function ProjectAiRecommendationsPage() {
   const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
   const [batchExpiring, setBatchExpiring] = useState(false);
   const [recommendationJobs, setRecommendationJobs] = useState<BackgroundJob[]>([]);
+  const [providerTelemetrySummary, setProviderTelemetrySummary] =
+    useState<AiProviderTelemetrySummary>(emptyProviderTelemetrySummary);
   const [asyncJobForm, setAsyncJobForm] =
     useState<AsyncJobForm>(defaultAsyncJobForm);
   const [jobSubmitting, setJobSubmitting] = useState(false);
@@ -146,10 +161,6 @@ export function ProjectAiRecommendationsPage() {
   const recommendationGroups = useMemo(
     () => groupRecommendationsByResourceType(state?.recommendations.items ?? []),
     [state?.recommendations.items],
-  );
-  const providerTelemetrySummary = useMemo(
-    () => summarizeProviderTelemetry(recommendationJobs),
-    [recommendationJobs],
   );
   const canHandleRecommendations =
     state?.workspace.currentUser.permissionSummary.canEditProject ?? false;
@@ -180,7 +191,7 @@ export function ProjectAiRecommendationsPage() {
           resourceId: activeQuery.resourceId,
           stageCode: activeQuery.stageCode,
           disciplineCode: activeQuery.disciplineCode,
-          limit: Number(activeQuery.limit),
+          limit: readOptionalPositiveInteger(activeQuery.limit),
         }),
       ]);
 
@@ -193,8 +204,16 @@ export function ProjectAiRecommendationsPage() {
           jobType: "ai_recommendation",
         });
         setRecommendationJobs(jobs.items);
+        try {
+          setProviderTelemetrySummary(
+            await apiClient.getAiProviderTelemetrySummary(projectId),
+          );
+        } catch {
+          setProviderTelemetrySummary(emptyProviderTelemetrySummary);
+        }
       } catch {
         setRecommendationJobs([]);
+        setProviderTelemetrySummary(emptyProviderTelemetrySummary);
       }
     } catch (fetchError) {
       setError(
@@ -375,7 +394,7 @@ export function ProjectAiRecommendationsPage() {
         billVersionId: asyncJobForm.billVersionId || undefined,
         stageCode: asyncJobForm.stageCode || undefined,
         disciplineCode: asyncJobForm.disciplineCode || undefined,
-        limit: Number(asyncJobForm.limit),
+        limit: readOptionalPositiveInteger(asyncJobForm.limit),
       });
       setRecommendationJobs((current) => [response.job, ...current]);
       setJobMessage(`已提交异步推荐任务 ${response.job.id}。`);
@@ -971,10 +990,23 @@ export function ProjectAiRecommendationsPage() {
             {providerTelemetrySummary.averageDurationMs === null
               ? ""
               : ` · 平均耗时 ${providerTelemetrySummary.averageDurationMs}ms`}
+            {providerTelemetrySummary.p95DurationMs === null
+              ? ""
+              : ` · P95 ${providerTelemetrySummary.p95DurationMs}ms`}
             {providerTelemetrySummary.maxRetryCount === null
               ? ""
               : ` · 最大重试 ${providerTelemetrySummary.maxRetryCount}`}
+            {providerTelemetrySummary.consecutiveFailureCount > 0
+              ? ` · 连续失败 ${providerTelemetrySummary.consecutiveFailureCount}`
+              : ""}
           </p>
+          {providerTelemetrySummary.groups.slice(0, 3).map((group) => (
+            <p className="page-description" key={`${group.provider}:${group.model ?? "-"}`}>
+              {group.provider} / {group.model ?? "-"} · 成功 {group.successCount} · 失败{" "}
+              {group.failureCount}
+              {group.p95DurationMs === null ? "" : ` · P95 ${group.p95DurationMs}ms`}
+            </p>
+          ))}
           {providerTelemetrySummary.alerts.map((alert) => (
             <p className="recommendation-expired" key={alert}>
               {alert}
@@ -1352,6 +1384,15 @@ function readFilters(searchParams: URLSearchParams): RecommendationFilters {
   };
 }
 
+function readOptionalPositiveInteger(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
 function updateRecommendationState(
   current: RecommendationState | null,
   updated: AiRecommendation,
@@ -1543,57 +1584,6 @@ function formatJobStatus(status: BackgroundJob["status"]) {
     failed: "失败",
   };
   return labels[status] ?? status;
-}
-
-function summarizeProviderTelemetry(jobs: BackgroundJob[]) {
-  const providerJobs = jobs.filter((job) => job.jobType === "ai_recommendation");
-  const durations = providerJobs
-    .map((job) => readProviderDurationMs(job))
-    .filter((value): value is number => value !== null);
-  const retryCounts = providerJobs
-    .map((job) => readProviderRetryCount(job))
-    .filter((value): value is number => value !== null);
-  const failureCount = providerJobs.filter((job) => job.status === "failed").length;
-  const successCount = providerJobs.filter((job) => job.status === "completed").length;
-  const averageDurationMs =
-    durations.length === 0
-      ? null
-      : Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length);
-  const maxRetryCount =
-    retryCounts.length === 0 ? null : Math.max(...retryCounts);
-  const alerts = [
-    failureCount > 0 ? `运维告警：最近 ${failureCount} 个 Provider 任务失败。` : null,
-    averageDurationMs !== null && averageDurationMs > 10000
-      ? `运维告警：Provider 平均耗时 ${averageDurationMs}ms，已超过 10000ms。`
-      : null,
-    maxRetryCount !== null && maxRetryCount > 0
-      ? `运维提示：最近最大重试次数 ${maxRetryCount}。`
-      : null,
-  ].filter((item): item is string => item !== null);
-
-  return {
-    totalCount: providerJobs.length,
-    successCount,
-    failureCount,
-    averageDurationMs,
-    maxRetryCount,
-    alerts,
-  };
-}
-
-function readProviderDurationMs(job: BackgroundJob) {
-  const telemetry = readObjectFromUnknown(job.result?.telemetry);
-  const failureSummary = readObjectFromUnknown(job.result?.providerFailureSummary);
-  const value = telemetry?.durationMs ?? failureSummary?.durationMs;
-  return typeof value === "number" ? Math.round(value) : null;
-}
-
-function readProviderRetryCount(job: BackgroundJob) {
-  const telemetry = readObjectFromUnknown(job.result?.telemetry);
-  const failureSummary = readObjectFromUnknown(job.result?.providerFailureSummary);
-  const value =
-    telemetry?.retryCount ?? telemetry?.attemptCount ?? failureSummary?.retryCount;
-  return typeof value === "number" ? Math.round(value) : null;
 }
 
 function formatProviderHealth(health: AiProviderHealthResponse) {

@@ -562,6 +562,63 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("任务生成 · 挖土方")).toBeInTheDocument();
   });
 
+  test("omits async job limit when the input is cleared", async () => {
+    let submittedBody: Record<string, unknown> | null = null;
+
+    fetchMock.mockImplementation(async (input, init) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(
+          createWorkspaceWithBillVersion("bill-version-001", "估算版 V1"),
+        );
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(createRecommendationListResponse([]));
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/jobs") {
+        return createJsonResponse({
+          items: [],
+          summary: {
+            totalCount: 0,
+            statusCounts: { queued: 0, processing: 0, completed: 0, failed: 0 },
+            jobTypeCounts: {},
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/ai/recommendation-jobs") {
+        submittedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return createJsonResponse({
+          job: createAiRecommendationJob("queued"),
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "生成推荐" })).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText("生成数量"), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "生成推荐" }));
+
+    await waitFor(() => {
+      expect(submittedBody).not.toBeNull();
+    });
+    expect(submittedBody).not.toHaveProperty("limit");
+  });
+
   test("shows provider diagnostics and telemetry alerts", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));
@@ -608,6 +665,36 @@ describe("ProjectAiRecommendationsPage", () => {
         });
       }
 
+      if (url.pathname === "/v1/projects/project-001/ai/provider-telemetry") {
+        return createJsonResponse({
+          totalCount: 2,
+          successCount: 1,
+          failureCount: 1,
+          averageDurationMs: 10000,
+          p95DurationMs: 12000,
+          maxRetryCount: 2,
+          consecutiveFailureCount: 0,
+          groups: [
+            {
+              provider: "openai_compatible",
+              model: "cost-model-v1",
+              totalCount: 2,
+              successCount: 1,
+              failureCount: 1,
+              averageDurationMs: 10000,
+              p95DurationMs: 12000,
+              maxRetryCount: 2,
+              consecutiveFailureCount: 0,
+            },
+          ],
+          alerts: [
+            "运维告警：最近 1 个 Provider 任务失败。",
+            "运维告警：Provider P95 耗时 12000ms，已超过 10000ms。",
+            "运维提示：最近最大重试次数 2。",
+          ],
+        });
+      }
+
       if (url.pathname === "/v1/ai/provider-health") {
         return createJsonResponse({
           provider: "openai_compatible",
@@ -628,10 +715,13 @@ describe("ProjectAiRecommendationsPage", () => {
     });
 
     expect(
-      screen.getByText("最近任务 2 个 · 成功 1 个 · 失败 1 个 · 平均耗时 10000ms · 最大重试 2"),
+      screen.getByText("最近任务 2 个 · 成功 1 个 · 失败 1 个 · 平均耗时 10000ms · P95 12000ms · 最大重试 2"),
     ).toBeInTheDocument();
     expect(
       screen.getByText("运维告警：最近 1 个 Provider 任务失败。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("运维告警：Provider P95 耗时 12000ms，已超过 10000ms。"),
     ).toBeInTheDocument();
     expect(screen.getByText("运维提示：最近最大重试次数 2。")).toBeInTheDocument();
 

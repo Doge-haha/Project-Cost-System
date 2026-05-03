@@ -4,6 +4,10 @@ import { z } from "zod";
 import type { AiRecommendationService } from "../modules/ai/ai-recommendation-service.js";
 import type { BackgroundJobService } from "../modules/jobs/background-job-service.js";
 import type { AiRecommendationType } from "../modules/ai/ai-recommendation-repository.js";
+import {
+  AI_RECOMMENDATION_ROLLBACK_BLOCKED_REASON_LABELS,
+  AI_RECOMMENDATION_ROLLBACK_BLOCKED_REASONS,
+} from "../modules/ai/ai-constants.js";
 import type { TransactionRunner } from "../shared/tx/transaction.js";
 
 const recommendationTypeSchema = z.enum([
@@ -240,6 +244,31 @@ export function registerAiRecommendationRoutes(
       }),
     );
   });
+
+  app.get("/v1/projects/:projectId/ai/provider-telemetry", async (request) => {
+    const { projectId } = request.params as { projectId: string };
+    const query = z
+      .object({
+        limit: z.coerce.number().int().positive().max(100).optional(),
+      })
+      .parse(request.query);
+
+    return transactionRunner.runInTransaction(() =>
+      backgroundJobService.summarizeAiProviderTelemetry({
+        projectId,
+        limit: query.limit,
+        userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
+      }),
+    );
+  });
+
+  app.get("/v1/ai/recommendations/rollback-blocked-reasons", async () => ({
+    items: AI_RECOMMENDATION_ROLLBACK_BLOCKED_REASONS.map((reason) => ({
+      reason,
+      label: AI_RECOMMENDATION_ROLLBACK_BLOCKED_REASON_LABELS[reason],
+    })),
+  }));
 
   app.get("/v1/projects/:projectId/ai/variance-warning-thresholds", async (request) => {
     const { projectId } = request.params as { projectId: string };

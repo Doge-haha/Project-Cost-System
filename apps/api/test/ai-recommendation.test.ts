@@ -342,6 +342,62 @@ test("POST /v1/ai/bill-recommendations expires older generated recommendations f
   await app.close();
 });
 
+test("GET /v1/projects/:id/ai/recommendations filters by type and resource", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const billResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/bill-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_version",
+      resourceId: "bill-version-001",
+      outputPayload: {
+        itemCode: "A-002",
+        itemName: "回填土",
+      },
+    },
+  });
+  assert.equal(billResponse.statusCode, 201);
+
+  const quotaResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+      outputPayload: {
+        quotaName: "挖土方",
+      },
+    },
+  });
+  assert.equal(quotaResponse.statusCode, 201);
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/recommendations?recommendationType=quota_recommendation&resourceType=bill_item&resourceId=bill-item-001&limit=1",
+    headers: { authorization: `Bearer ${token}` },
+  });
+
+  assert.equal(listResponse.statusCode, 200);
+  assert.equal(listResponse.json().summary.totalCount, 1);
+  assert.equal(listResponse.json().summary.typeCounts.quota_recommendation, 1);
+  assert.deepEqual(
+    listResponse.json().items.map((item: any) => item.id),
+    [quotaResponse.json().id],
+  );
+
+  await app.close();
+});
+
 test("POST /v1/ai/variance-warnings generates threshold-based warnings from summary details", async () => {
   const app = createRecommendationApp({
     billItems: [
@@ -632,6 +688,161 @@ test("GET /v1/ai/provider-health returns provider config status", async () => {
   assert.equal(response.statusCode, 200);
   assert.equal(response.json().healthy, true);
   assert.equal(response.json().configured, true);
+
+  await app.close();
+});
+
+test("GET /v1/projects/:id/ai/provider-telemetry aggregates provider job metrics", async () => {
+  const app = createApp({
+    jwtSecret,
+    projectRepository: new InMemoryProjectRepository(projects),
+    projectStageRepository: new InMemoryProjectStageRepository(stages),
+    projectDisciplineRepository: new InMemoryProjectDisciplineRepository(
+      disciplines,
+    ),
+    projectMemberRepository: new InMemoryProjectMemberRepository(members),
+    billVersionRepository: new InMemoryBillVersionRepository(billVersions),
+    billItemRepository: new InMemoryBillItemRepository(billItems),
+    quotaLineRepository: new InMemoryQuotaLineRepository([]),
+    auditLogRepository: new InMemoryAuditLogRepository([]),
+    aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
+    backgroundJobRepository: new InMemoryBackgroundJobRepository([
+      {
+        id: "background-job-003",
+        jobType: "ai_recommendation",
+        status: "completed",
+        requestedBy: "engineer-001",
+        projectId: "project-001",
+        payload: {
+          projectId: "project-001",
+          recommendationType: "bill_recommendation",
+          provider: "openai_compatible",
+          model: "cost-model-v1",
+        },
+        result: {
+          provider: { provider: "openai_compatible", model: "cost-model-v1" },
+          telemetry: { durationMs: 4000, retryCount: 1 },
+        },
+        errorMessage: null,
+        createdAt: "2026-04-20T09:00:00.000Z",
+        completedAt: "2026-04-20T09:00:04.000Z",
+      },
+      {
+        id: "background-job-002",
+        jobType: "ai_recommendation",
+        status: "failed",
+        requestedBy: "engineer-001",
+        projectId: "project-001",
+        payload: {
+          projectId: "project-001",
+          recommendationType: "bill_recommendation",
+          provider: "openai_compatible",
+          model: "cost-model-v1",
+        },
+        result: {
+          providerFailureSummary: {
+            provider: "openai_compatible",
+            model: "cost-model-v1",
+            durationMs: 12000,
+            retryCount: 2,
+          },
+        },
+        errorMessage: "AI provider failed",
+        createdAt: "2026-04-20T10:00:00.000Z",
+        completedAt: "2026-04-20T10:00:12.000Z",
+      },
+      {
+        id: "background-job-001",
+        jobType: "ai_recommendation",
+        status: "failed",
+        requestedBy: "engineer-001",
+        projectId: "project-001",
+        payload: {
+          projectId: "project-001",
+          recommendationType: "bill_recommendation",
+          provider: "deepseek",
+          model: "deepseek-chat",
+        },
+        result: {
+          providerFailureSummary: {
+            provider: "deepseek",
+            model: "deepseek-chat",
+            durationMs: 16000,
+            retryCount: 0,
+          },
+        },
+        errorMessage: "AI provider failed",
+        createdAt: "2026-04-20T11:00:00.000Z",
+        completedAt: "2026-04-20T11:00:16.000Z",
+      },
+    ]),
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/provider-telemetry",
+    headers: {
+      authorization: `Bearer ${await createToken("engineer-001", "cost_engineer")}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().totalCount, 3);
+  assert.equal(response.json().successCount, 1);
+  assert.equal(response.json().failureCount, 2);
+  assert.equal(response.json().averageDurationMs, 10667);
+  assert.equal(response.json().p95DurationMs, 16000);
+  assert.equal(response.json().maxRetryCount, 2);
+  assert.equal(response.json().consecutiveFailureCount, 2);
+  assert.equal(response.json().groups.length, 2);
+  assert.ok(
+    response.json().alerts.includes("运维告警：Provider 已连续失败 2 次。"),
+  );
+  assert.ok(
+    response.json().alerts.includes(
+      "运维告警：Provider P95 耗时 16000ms，已超过 10000ms。",
+    ),
+  );
+
+  const forbiddenResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/provider-telemetry",
+    headers: {
+      authorization: `Bearer ${await createToken("outsider-001", "cost_engineer")}`,
+    },
+  });
+  assert.equal(forbiddenResponse.statusCode, 403);
+
+  const adminResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/provider-telemetry?limit=2",
+    headers: {
+      authorization: `Bearer ${await createToken("admin-001", "system_admin")}`,
+    },
+  });
+  assert.equal(adminResponse.statusCode, 200);
+  assert.equal(adminResponse.json().totalCount, 2);
+
+  await app.close();
+});
+
+test("GET /v1/ai/recommendations/rollback-blocked-reasons documents enum values", async () => {
+  const app = createRecommendationApp();
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/ai/recommendations/rollback-blocked-reasons",
+    headers: {
+      authorization: `Bearer ${await createToken("engineer-001", "cost_engineer")}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json().items, [
+    { reason: "resource_missing", label: "业务资源已缺失" },
+    { reason: "resource_modified", label: "业务资源已被修改" },
+    { reason: "resource_has_children", label: "清单下存在子清单" },
+    { reason: "resource_has_quota_lines", label: "清单下存在定额行" },
+  ]);
 
   await app.close();
 });

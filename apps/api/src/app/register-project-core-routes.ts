@@ -273,6 +273,14 @@ export function registerProjectCoreRoutes(
           userId: request.currentUser!.id,
         });
       }
+      if ("defaultFeeTemplateId" in payload) {
+        await aiRecommendationService.expireStaleRecommendations({
+          projectId,
+          recommendationType: "variance_warning",
+          reason: "fee_template_changed",
+          userId: request.currentUser!.id,
+        });
+      }
       return updated;
     });
   });

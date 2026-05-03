@@ -1060,6 +1060,62 @@ test("pricing default changes automatically expire stale variance recommendation
   await app.close();
 });
 
+test("combined pricing default changes expire stale variance recommendations when fee template changes", async () => {
+  const app = createRecommendationApp({
+    billItems: [
+      {
+        ...billItems[0],
+        systemAmount: 100,
+        finalAmount: 140,
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+  const ownerToken = await createToken("owner-001", "project_owner");
+
+  const warningResponse = await app.inject({
+    method: "POST",
+    url: "/v1/ai/variance-warnings",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      billVersionId: "bill-version-001",
+    },
+  });
+  assert.equal(warningResponse.statusCode, 201);
+  assert.ok(warningResponse.json().items.length > 0);
+
+  const updateResponse = await app.inject({
+    method: "PUT",
+    url: "/v1/projects/project-001/default-pricing-config",
+    headers: { authorization: `Bearer ${ownerToken}` },
+    payload: {
+      defaultFeeTemplateId: null,
+    },
+  });
+  assert.equal(updateResponse.statusCode, 200);
+
+  const expiredResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001/ai/recommendations?recommendationType=variance_warning&status=expired",
+    headers: { authorization: `Bearer ${ownerToken}` },
+  });
+  assert.equal(expiredResponse.statusCode, 200);
+  assert.equal(expiredResponse.json().items.length, warningResponse.json().items.length);
+  assert.ok(
+    expiredResponse
+      .json()
+      .items.every(
+        (item: { statusReason?: string | null }) =>
+          item.statusReason === "fee_template_changed",
+      ),
+  );
+
+  await app.close();
+});
+
 test("POST /v1/ai/recommendations/:id/accept creates a formal bill item for bill recommendations", async () => {
   const app = createRecommendationApp();
   const token = await createToken("engineer-001", "cost_engineer");

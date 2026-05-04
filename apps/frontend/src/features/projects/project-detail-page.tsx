@@ -3,8 +3,11 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { apiClient, ApiError } from "../../lib/api";
 import type {
+  ApiHealthResponse,
   AuditLogRecord,
+  AiProviderHealthResponse,
   AiProviderTelemetrySummary,
+  BackgroundJobListResponse,
   BillVersion,
   ProjectWorkspace,
   SummaryResponse,
@@ -58,6 +61,15 @@ type ProjectDetailState = {
   providerTelemetry: AiProviderTelemetrySummary | null;
 };
 
+type RuntimeDiagnosticsState = {
+  apiHealth: ApiHealthResponse | null;
+  providerHealth: AiProviderHealthResponse | null;
+  jobsSummary: BackgroundJobListResponse["summary"] | null;
+  providerTelemetry: AiProviderTelemetrySummary | null;
+  loading: boolean;
+  message: string | null;
+};
+
 const emptyProviderTelemetrySummary: AiProviderTelemetrySummary = {
   totalCount: 0,
   successCount: 0,
@@ -108,6 +120,15 @@ export function ProjectDetailPage() {
   const [selectedBillVersionId, setSelectedBillVersionId] = useState<string | null>(
     null,
   );
+  const [runtimeDiagnostics, setRuntimeDiagnostics] =
+    useState<RuntimeDiagnosticsState>({
+      apiHealth: null,
+      providerHealth: null,
+      jobsSummary: null,
+      providerTelemetry: null,
+      loading: false,
+      message: null,
+    });
 
   const selectedBillVersion = useMemo(
     () =>
@@ -411,6 +432,46 @@ export function ProjectDetailPage() {
     }
   }
 
+  async function refreshRuntimeDiagnostics() {
+    if (!projectId) {
+      return;
+    }
+
+    setRuntimeDiagnostics((current) => ({
+      ...current,
+      loading: true,
+      message: null,
+    }));
+
+    try {
+      const [apiHealth, providerHealth, jobs, providerTelemetry] =
+        await Promise.all([
+          apiClient.getApiHealth(),
+          apiClient.getAiProviderHealth(),
+          apiClient.listBackgroundJobs(projectId),
+          apiClient.getAiProviderTelemetrySummary(projectId, { limit: 20 }),
+        ]);
+
+      setRuntimeDiagnostics({
+        apiHealth,
+        providerHealth,
+        jobsSummary: jobs.summary,
+        providerTelemetry,
+        loading: false,
+        message: "运行诊断已刷新。",
+      });
+    } catch (diagnosticsError) {
+      setRuntimeDiagnostics((current) => ({
+        ...current,
+        loading: false,
+        message:
+          diagnosticsError instanceof ApiError
+            ? formatRuntimeDiagnosticsError(diagnosticsError)
+            : "运行诊断刷新失败。",
+      }));
+    }
+  }
+
   if (loading) {
     return <LoadingState title="正在加载项目详情" />;
   }
@@ -550,6 +611,61 @@ export function ProjectDetailPage() {
       </section>
 
       <section className="detail-grid">
+        <article className="panel">
+          <h3>运行诊断</h3>
+          <p className="page-description">
+            API{" "}
+            {runtimeDiagnostics.apiHealth
+              ? formatApiHealth(runtimeDiagnostics.apiHealth)
+              : "未刷新"}{" "}
+            · Provider{" "}
+            {runtimeDiagnostics.providerHealth
+              ? formatProviderHealth(runtimeDiagnostics.providerHealth)
+              : "未刷新"}
+          </p>
+          {runtimeDiagnostics.jobsSummary ? (
+            <p className="page-description">
+              Worker 任务 {runtimeDiagnostics.jobsSummary.totalCount} 个 · 失败{" "}
+              {runtimeDiagnostics.jobsSummary.statusCounts.failed ?? 0} · 报表导出{" "}
+              {runtimeDiagnostics.jobsSummary.jobTypeCounts.report_export ?? 0} · 项目重算{" "}
+              {runtimeDiagnostics.jobsSummary.jobTypeCounts.project_recalculate ?? 0} · AI 推荐{" "}
+              {runtimeDiagnostics.jobsSummary.jobTypeCounts.ai_recommendation ?? 0}
+            </p>
+          ) : null}
+          {runtimeDiagnostics.providerTelemetry ? (
+            <p className="page-description">
+              Provider 任务 {runtimeDiagnostics.providerTelemetry.totalCount} 个 · 失败{" "}
+              {runtimeDiagnostics.providerTelemetry.failureCount} · 连续失败{" "}
+              {runtimeDiagnostics.providerTelemetry.consecutiveFailureCount}
+            </p>
+          ) : null}
+          {runtimeDiagnostics.providerTelemetry?.alerts.slice(0, 2).map((alert) => (
+            <p className="recommendation-expired" key={alert}>
+              {alert}
+            </p>
+          ))}
+          {runtimeDiagnostics.message ? (
+            <p className="page-description">{runtimeDiagnostics.message}</p>
+          ) : null}
+          <div className="version-card-actions">
+            <button
+              className="connection-button secondary"
+              disabled={runtimeDiagnostics.loading}
+              onClick={() => {
+                void refreshRuntimeDiagnostics();
+              }}
+              type="button"
+            >
+              {runtimeDiagnostics.loading ? "刷新中" : "刷新运行诊断"}
+            </button>
+            <Link className="breadcrumbs-link" to={`/projects/${projectId}/jobs`}>
+              查看任务状态
+            </Link>
+            <Link className="breadcrumbs-link" to={`/projects/${projectId}/ai-recommendations`}>
+              查看 Provider 诊断
+            </Link>
+          </div>
+        </article>
         <article
           className={
             refreshItemKind === "review" ? "panel panel-focus" : "panel"
@@ -1046,4 +1162,23 @@ export function ProjectDetailPage() {
       </section>
     </div>
   );
+}
+
+function formatApiHealth(health: ApiHealthResponse) {
+  const service = health.service ?? "@saas-pricing/api";
+  const status = health.status ?? (health.ok ? "up" : "down");
+  return `${service} · ${status}`;
+}
+
+function formatProviderHealth(health: AiProviderHealthResponse) {
+  const configured = health.configured ? "已配置" : "未配置";
+  const status = health.healthy ? "健康" : "异常";
+  return `${configured} · ${status}${health.message ? ` · ${health.message}` : ""}`;
+}
+
+function formatRuntimeDiagnosticsError(error: ApiError) {
+  if (!error.details || typeof error.details !== "object") {
+    return error.message;
+  }
+  return `${error.message}。原始错误：${JSON.stringify(error.details)}`;
 }

@@ -244,3 +244,86 @@ test("runWorkerJob preserves AI recommendation provider failure summary", async 
     manualActionRequired: true,
   });
 });
+
+test("runWorkerJob pressure sample covers project recalculation and AI recommendation recovery signals", async () => {
+  const projectJobs = Array.from({ length: 8 }, (_, index) => ({
+    id: `project-recalculate-${index + 1}`,
+    jobType: "project_recalculate" as const,
+    status: "queued" as const,
+    requestedBy: "user-001",
+    projectId: "project-001",
+    payload: {
+      projectId: "project-001",
+      disciplineCode: index % 2 === 0 ? "building" : "install",
+    },
+    createdAt: "2026-04-17T00:00:00.000Z",
+  }));
+  const aiJobs = Array.from({ length: 6 }, (_, index) => ({
+    id: `ai-recommendation-${index + 1}`,
+    jobType: "ai_recommendation" as const,
+    status: "queued" as const,
+    requestedBy: "user-001",
+    projectId: "project-001",
+    payload: {
+      projectId: "project-001",
+      recommendationType: "bill_recommendation" as const,
+      resourceType: "bill_version",
+      resourceId: `bill-version-${index + 1}`,
+    },
+    createdAt: "2026-04-17T00:00:00.000Z",
+  }));
+
+  const projectResults = [];
+  for (const job of projectJobs) {
+    projectResults.push(
+      await runWorkerJob(job, {
+        fetchSummary: async () => ({ totalFinalAmount: 0 }),
+        fetchVariance: async () => ({ items: [] }),
+        recalculateProject: async (input) => ({
+          projectId: input.projectId,
+          disciplineCode: input.disciplineCode ?? null,
+          recalculatedCount: 3,
+        }),
+        aiRuntimeClient: { processEventBatch: async () => ({}) } as never,
+      }),
+    );
+  }
+
+  const aiResults = [];
+  for (const [index, job] of aiJobs.entries()) {
+    aiResults.push(
+      await runWorkerJob(job, {
+        fetchSummary: async () => ({ totalFinalAmount: 0 }),
+        fetchVariance: async () => ({ items: [] }),
+        recalculateProject: async () => ({ versions: [] }),
+        generateAiRecommendations: async () => {
+          if (index % 3 === 0) {
+            throw new Error("AI provider response is invalid");
+          }
+          return {
+            createdCount: 1,
+            recommendationIds: [`recommendation-${index + 1}`],
+          };
+        },
+        aiRuntimeClient: { processEventBatch: async () => ({}) } as never,
+      }),
+    );
+  }
+
+  assert.equal(
+    projectResults.filter((result) => result.status === "completed").length,
+    8,
+  );
+  assert.equal(
+    aiResults.filter((result) => result.status === "completed").length,
+    4,
+  );
+  assert.equal(aiResults.filter((result) => result.status === "failed").length, 2);
+  for (const failed of aiResults.filter((result) => result.status === "failed")) {
+    assert.equal(failed.errorMessage, "AI provider response is invalid");
+    assert.deepEqual(failed.result?.providerFailureSummary, {
+      message: "AI provider response is invalid",
+      manualActionRequired: true,
+    });
+  }
+});

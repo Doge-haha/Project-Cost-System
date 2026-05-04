@@ -23,6 +23,7 @@ import {
   projectSummaryQuerySchema,
   reportExportStatusQuerySchema,
   reviewSummaryQuerySchema,
+  runtimeDiagnosticsQuerySchema,
   skillDefinitionsQuerySchema,
   stageContextQuerySchema,
   summaryDetailsQuerySchema,
@@ -471,6 +472,48 @@ export function registerResourceRoutes(
         limit: query.limit ?? null,
       },
       data,
+    });
+  });
+
+  app.get("/v1/resources/runtime-diagnostics", async (request) => {
+    const query = runtimeDiagnosticsQuerySchema.parse(request.query);
+    const [apiHealth, aiProviderHealth, jobsSummary, aiProviderTelemetry] =
+      await Promise.all([
+        apiClient.fetchApiHealth(),
+        apiClient.fetchAiProviderHealth(request.bearerToken!),
+        apiClient.fetchJobsSummary(
+          {
+            projectId: query.projectId,
+            limit: query.limit ?? 20,
+          },
+          request.bearerToken!,
+        ),
+        apiClient.fetchAiProviderTelemetry(
+          {
+            projectId: query.projectId,
+            limit: query.limit ?? 20,
+          },
+          request.bearerToken!,
+        ),
+      ]);
+
+    return resourceEnvelope({
+      resourceType: "runtime_diagnostics",
+      scope: {
+        projectId: query.projectId,
+        limit: query.limit ?? 20,
+      },
+      data: {
+        gateway: {
+          ok: true,
+          service: "@saas-pricing/mcp-gateway",
+          status: "up",
+        },
+        api: apiHealth,
+        aiProvider: aiProviderHealth,
+        workerJobs: jobsSummary,
+        aiProviderTelemetry,
+      },
     });
   });
 }

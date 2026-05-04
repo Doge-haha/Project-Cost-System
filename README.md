@@ -10,7 +10,7 @@
 - `docs`：设计、架构、实施、排期和导入文档
 - `deploy`：部署相关脚本与配置
 
-当前仓库已经完成 AI-first 技术栈重决策，正在按新的执行基线重建后端骨架。
+当前仓库已经完成 AI-first 技术栈重决策、V1 主链实现、I5 AI/MCP/知识/记忆闭环，正在进入 I6 生产硬化与试运行准备。
 
 优先参考文档：
 
@@ -19,16 +19,18 @@
 - [后端技术栈重决策](./docs/architecture/backend-tech-stack-redecision.md)
 - [后端重构方案](./docs/architecture/backend-architecture-redesign.md)
 - [AI 原生架构复盘](./docs/architecture/ai-native-architecture-review.md)
+- [I6 生产硬化计划](./docs/architecture/iteration-6-production-hardening-plan.md)
+- [试运行运维手册](./docs/architecture/production-readiness-runbook.md)
 - [API 契约文档](./docs/api/README.md)
 - [OpenSpec 规范化索引](./openspec/changes/doc-normalize-v1-to-openspec/index.md)
 
 推荐启动顺序：
 
-1. 先看 [后端技术栈重决策](./docs/architecture/backend-tech-stack-redecision.md)
-2. 再看 [后端重构方案](./docs/architecture/backend-architecture-redesign.md)
-3. 在 `apps/api` 重建主业务后端
-4. 在 `apps/ai-runtime` 落知识、记忆、检索和 agent runtime
-5. 在 `apps/mcp-gateway` 对外暴露 MCP resource/tool/context
+1. 先看 [当前工作上下文](./docs/context/current-working-context.md)
+2. 再看 [I6 生产硬化计划](./docs/architecture/iteration-6-production-hardening-plan.md)
+3. 跑整仓准入命令和 API 文档生成
+4. 复跑 database mode smoke
+5. 处理报表导出压测、运行时健康检查和试运行文档
 
 ## 当前仓库状态
 
@@ -36,7 +38,7 @@
 - `apps/worker` 已具备轮询执行后台任务和调用 `apps/ai-runtime` CLI 的能力
 - `apps/mcp-gateway` 承担面向 AI Agent 的 resource/tool/context 聚合
 - `apps/frontend` 已具备项目列表、项目详情、清单、汇总、审核、过程单据、任务状态和工作台待办页面
-- 当前仓库已完成 Sprint 1 底座、API 契约生成、MCP Gateway 主能力联调和后台 worker 基础闭环，本地开发建议优先走 `database mode`
+- 当前仓库已完成 Sprint 1 底座、I1-I5 主线能力、API 契约生成、MCP Gateway 主能力联调和后台 worker 基础闭环，本地开发建议优先走 `database mode`
 
 ## 本地环境
 

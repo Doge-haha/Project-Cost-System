@@ -139,6 +139,11 @@ export const aiProviderTelemetryQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
+export const runtimeDiagnosticsQuerySchema = z.object({
+  projectId: z.string().min(1),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
 export const exportSummaryReportToolSchema = z.object({
   projectId: z.string().min(1),
   reportType: z.enum(["summary", "variance", "stage_bill"]),

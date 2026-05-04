@@ -82,6 +82,11 @@ export type AiProviderTelemetryQuery = {
   limit?: number;
 };
 
+export type RuntimeDiagnosticsQuery = {
+  projectId: string;
+  limit?: number;
+};
+
 export type KnowledgeEntriesQuery = {
   projectId: string;
   sourceJobId?: string;
@@ -193,6 +198,66 @@ export class GatewayApiClient {
 
   constructor(private readonly dependencies: Dependencies) {
     this.fetchImpl = dependencies.fetchImpl ?? fetch;
+  }
+
+  async fetchApiHealth(): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(`${this.dependencies.apiBaseUrl}/health`, {
+      method: "GET",
+    });
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to load API health",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async fetchAiProviderHealth(bearerToken: string): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/ai/provider-health`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+        },
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to load AI provider health",
+      );
+    }
+
+    return payload as Record<string, unknown>;
   }
 
   async fetchProjectSummary(

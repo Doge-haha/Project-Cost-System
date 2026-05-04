@@ -735,6 +735,81 @@ describe("ProjectAiRecommendationsPage", () => {
     ).toBeInTheDocument();
   });
 
+  test("keeps structured provider health errors visible", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse(createRecommendationListResponse([]));
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      if (url.pathname === "/v1/jobs") {
+        return createJsonResponse({
+          items: [],
+          summary: {
+            totalCount: 0,
+            statusCounts: { queued: 0, processing: 0, completed: 0, failed: 0 },
+            jobTypeCounts: { ai_recommendation: 0 },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/provider-telemetry") {
+        return createJsonResponse({
+          totalCount: 0,
+          successCount: 0,
+          failureCount: 0,
+          averageDurationMs: null,
+          p95DurationMs: null,
+          maxRetryCount: null,
+          consecutiveFailureCount: 0,
+          groups: [],
+          alerts: [],
+        });
+      }
+
+      if (url.pathname === "/v1/ai/provider-health") {
+        return createErrorResponse(502, {
+          error: {
+            code: "AI_PROVIDER_REQUEST_FAILED",
+            message: "AI provider request failed",
+            details: {
+              provider: "openai_compatible",
+              model: "cost-model-v1",
+              reason: "timeout",
+            },
+          },
+        });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Provider 诊断" })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "检查 Provider" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'AI provider request failed。原始错误：{"provider":"openai_compatible","model":"cost-model-v1","reason":"timeout"}',
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   test("confirms rollback before calling rollback API", async () => {
     fetchMock.mockImplementation(async (input, init) => {
       const url = new URL(String(input));

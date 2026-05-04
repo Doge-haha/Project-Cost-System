@@ -430,7 +430,7 @@ export function ProjectAiRecommendationsPage() {
         loading: false,
         message:
           healthError instanceof ApiError
-            ? healthError.message
+            ? formatProviderDiagnosticsApiError(healthError)
             : "Provider 健康检查失败。",
       });
     }
@@ -1594,6 +1594,15 @@ function formatProviderHealth(health: AiProviderHealthResponse) {
   return `${provider} / ${model} · ${configured} · ${status}${
     health.message ? ` · ${health.message}` : ""
   }`;
+}
+
+function formatProviderDiagnosticsApiError(error: ApiError) {
+  const details = readObjectFromUnknown(error.details);
+  if (!details) {
+    return error.message;
+  }
+
+  return `${error.message}。原始错误：${JSON.stringify(details)}`;
 }
 
 function formatRollbackApiError(error: ApiError) {

@@ -1,6 +1,7 @@
 import { getRuntimeConfig } from "./config";
 import type {
   AuditLogListResponse,
+  ApiHealthResponse,
   AiRecommendation,
   ExpireStaleAiRecommendationResponse,
   AiRecommendationInputContext,
@@ -202,6 +203,9 @@ function normalizeBillVersion(
 }
 
 export const apiClient = {
+  getApiHealth() {
+    return request<ApiHealthResponse>("/health");
+  },
   listProjects() {
     return request<{ items: ProjectListItem[] }>("/v1/projects");
   },

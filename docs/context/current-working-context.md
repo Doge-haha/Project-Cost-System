@@ -1,6 +1,6 @@
 # Current Working Context
 
-Date: 2026-05-04
+Date: 2026-05-05
 
 ## Project
 
@@ -10,8 +10,9 @@ Date: 2026-05-04
 
 ## Active Change Set
 
-- Git status before this ledger update: `main` ahead of `origin/main` by 9 commits.
-- I5 implementation is committed locally through `d91504d Reserve MCP context modules`.
+- Git status before this ledger update: `main` ahead of `origin/main` by 12 commits.
+- I5 implementation and post-I5 I4/reporting/status closure are committed locally through `385e159 Align project stage status flow`.
+- Current uncommitted work syncs global status docs and adds the I6 production hardening plan.
 - Push is intentionally not awaited in this workflow.
 
 ## Completed Work
@@ -36,7 +37,17 @@ Date: 2026-05-04
 - Added knowledge/memory extraction persistence, MCP context memory hints, knowledge relation support, skill definition API, and MCP `skill-definitions` resource.
 - Added MCP module boundary placeholders for `mcp-capability`, `mcp-context-builder`, and `mcp-permission-guard`.
 - Marked Iteration 5 task breakdown complete and synchronized AI/MCP checklist status.
+- Added stage status flow alignment after bill-version review and project status changes.
+- Added stage bill report export support.
+- Synchronized I4 implementation status.
+- Synchronized backend implementation checklist with the actual I1-I5 completed baseline.
+- Added I6 production hardening plan and updated roadmap/document index/README routing to post-I5 work.
+- Added MCP Gateway `runtime-diagnostics` resource for API health, Provider health/telemetry, Worker job summary, and Gateway status.
+- Added I6 frontend/MCP regression matrices and production readiness runbook.
+- Added report export repeated-job pressure sample and Provider diagnostics structured-error fallback coverage.
+- Added Worker pressure sample for repeated `project_recalculate` and `ai_recommendation` jobs with provider failure summaries.
 - Regenerated API route and OpenAPI docs.
+- Added project detail page runtime diagnostics panel for API health, Provider health/telemetry, and Worker task summary with links to task status and Provider diagnostics.
 
 ## Validation
 
@@ -45,7 +56,19 @@ Latest validation passed:
 ```bash
 npm run typecheck
 npm run test
+npm run docs:api
+npm run docs:openspec
+npm run dev:smoke:live-db
+npm --workspace @saas-pricing/mcp-gateway run typecheck
+npm --workspace @saas-pricing/mcp-gateway test -- test/api-client.test.ts test/app.test.ts
+npm --workspace @saas-pricing/api test -- test/report-export-task.test.ts
+npm --workspace @saas-pricing/worker test -- test/job-runner.test.ts
+npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-page.test.tsx
+npm --workspace saas-pricing-frontend test -- test/project-detail-page.test.tsx
+npm run test:workspace
 ```
+
+Database smoke initially blocked because Docker daemon was not running at `/Users/huahaha/.docker/run/docker.sock`; after Docker started, the same command passed.
 
 Targeted validation also passed for:
 
@@ -60,11 +83,13 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 
 ## Graph Review
 
-- Latest `code-review-graph` context: 2235 nodes, 29468 edges across 272 files.
-- I5 closure risk is low; remaining graph warnings are mostly coarse function-level coverage signals.
+- Latest `code-review-graph` context: 2249 nodes, 29801 edges across 272 files.
+- I6 closure review risk is moderate; remaining graph warnings are mostly coarse function-level coverage signals after targeted page and gateway coverage.
 
 ## Next Tasks
 
-- Treat I5 as complete.
-- Next mainline target should move to post-I5 closure: global checklist truth sync, full regression, and then I6/production hardening planning.
+- Treat I1-I5 as complete unless new regression evidence appears.
+- Continue I6 production hardening:
+  1. publish/merge handoff when requested
+  2. post-merge deployment rehearsal or trial-run checklist execution
 - Do not spend more cycles waiting on push unless explicitly asked.

@@ -209,6 +209,13 @@ export type BackgroundJobListResponse = {
   };
 };
 
+export type ApiHealthResponse = {
+  ok: boolean;
+  service?: string;
+  status?: string;
+  checkedAt?: string;
+};
+
 export type ImportTask = {
   id: string;
   projectId: string;

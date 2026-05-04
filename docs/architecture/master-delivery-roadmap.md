@@ -1,10 +1,10 @@
 # 新点 SaaS 造价系统总研发排期表
 
-> 基于 [iteration-1-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-1-task-breakdown.md)、[iteration-2-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-2-task-breakdown.md)、[iteration-3-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-3-task-breakdown.md)、[iteration-4-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-4-task-breakdown.md) 与 [iteration-5-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-5-task-breakdown.md) 整理。
+> 基于 [iteration-1-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-1-task-breakdown.md)、[iteration-2-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-2-task-breakdown.md)、[iteration-3-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-3-task-breakdown.md)、[iteration-4-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-4-task-breakdown.md)、[iteration-5-task-breakdown.md](/Users/huahaha/Documents/New%20project/docs/architecture/iteration-5-task-breakdown.md) 与 [iteration-6-production-hardening-plan.md](./iteration-6-production-hardening-plan.md) 整理。
 
 ## 1. 文档目标
 
-本文档不是再写一遍需求，而是把已经拆好的 5 个迭代任务单收拢成一份可以用于真实排期、分人、卡里程碑和控制风险的总研发路线图。
+本文档不是再写一遍需求，而是把已经拆好的 6 个迭代任务单收拢成一份可以用于真实排期、分人、卡里程碑和控制风险的总研发路线图。
 
 这份排期表主要回答 4 个问题：
 
@@ -24,6 +24,7 @@
 3. 定额与计价
 4. 汇总、审核与报表
 5. AI 推荐与预警
+6. 生产硬化与试运行准备
 
 核心原因：
 
@@ -32,6 +33,7 @@
 - 没有 `Iteration 3`，后续汇总和偏差分析没有稳定的数据口径
 - 没有 `Iteration 4`，系统就还不是一个可审核、可交付的业务系统
 - `Iteration 5` 属于放大效率的能力，不应阻塞主业务上线
+- `Iteration 6` 不扩业务范围，只负责把已完成能力收口到可试运行状态
 
 ## 3. 迭代总览
 
@@ -42,6 +44,7 @@
 | `I3` | 定额、价目、取费、计价引擎 | 1 周 | 定额页、价目绑定、取费模板、重算 | 是 |
 | `I4` | 汇总、审核流、报表、审计日志 | 1 周 | 汇总页、审核流、导出任务、审计追溯 | 是 |
 | `I5` | AI 推荐、预警与 AI 原生底座预留 | 1 周 | AI 推荐、偏差预警、确认机制、MCP/知识/记忆预留 | 是 |
+| `I6` | 生产硬化与试运行准备 | 1 周 | 回归矩阵、数据库 smoke、任务压测、健康检查、运维手册 | 是 |
 
 说明：
 
@@ -54,7 +57,7 @@
 ## 4.1 必须串行的主依赖
 
 ```text
-I1 -> I2 -> I3 -> I4 -> I5
+I1 -> I2 -> I3 -> I4 -> I5 -> I6
 ```
 
 必须串行的原因：
@@ -63,6 +66,7 @@ I1 -> I2 -> I3 -> I4 -> I5
 - `I3` 依赖 `I2` 的清单项和版本链
 - `I4` 依赖 `I3` 的计价结果和状态口径
 - `I5` 依赖 `I2/I3/I4` 的正式数据、偏差分析和审计体系
+- `I6` 依赖 `I1-I5` 功能闭环，避免在主链未稳时过早硬化
 
 ## 4.2 可局部并行的内容
 
@@ -99,6 +103,12 @@ I1 -> I2 -> I3 -> I4 -> I5
 - 偏差预警应在汇总稳定后接入
 - MCP 上下文聚合预留可与推荐服务并行
 - 知识与记忆基础表预留可与审计接入并行
+
+### I6 内部并行
+
+- 回归矩阵和上线文档可并行
+- 数据库模式 smoke 和迁移审查可并行
+- 报表导出压测和运行时健康检查聚合可并行
 
 ## 5. 里程碑定义
 
@@ -175,6 +185,20 @@ I1 -> I2 -> I3 -> I4 -> I5
 
 这意味着系统从“能用”进入“更高效率”的阶段。
 
+## 5.6 里程碑 M6：试运行就绪
+
+对应迭代：`I6`
+
+完成后系统应达到：
+
+- 发布候选具备统一准入命令
+- 数据库模式主流程可复验
+- 报表导出和后台任务具备压力样本
+- Provider、Worker、MCP Gateway 的故障来源可定位
+- 运维文档能支撑试运行
+
+这意味着系统从“开发闭环”进入“试运行准备完成”的阶段。
+
 ## 6. 建议人力配置
 
 ## 6.1 最小配置
@@ -238,6 +262,7 @@ I1 -> I2 -> I3 -> I4 -> I5
 | 第 3 周 | 完成 `I3` | 定额、价目、取费、计价 |
 | 第 4 周 | 完成 `I4` | 汇总、审核、报表、审计 |
 | 第 5 周 | 完成 `I5` + 联调 | AI 推荐、预警、全链路联调 |
+| 第 6 周 | 完成 `I6` | 生产硬化、压测、健康检查、试运行文档 |
 
 适用前提：
 
@@ -254,7 +279,7 @@ I1 -> I2 -> I3 -> I4 -> I5
 | 第 4 周 | `I3` |
 | 第 5 周 | `I4` |
 | 第 6 周 | `I5` |
-| 第 7-8 周 | 缺陷修复、性能优化、上线准备 |
+| 第 7-8 周 | `I6` + 缺陷修复、性能优化、上线准备 |
 
 适用场景：
 
@@ -298,6 +323,16 @@ I1 -> I2 -> I3 -> I4 -> I5
 
 - 在主流程稳定后叠加 AI 效率能力
 
+### 上线包 P4
+
+包含：
+
+- `I6`
+
+上线价值：
+
+- 将已完成主链推进到试运行可验收状态
+
 ## 9. 风险与缓冲
 
 ## 9.1 高风险点
@@ -317,22 +352,22 @@ I1 -> I2 -> I3 -> I4 -> I5
 
 ## 10. 当前最建议的执行方式
 
-如果你接下来是要正式组织开发，我建议按下面顺序推进：
+截至 2026-05-04，I1-I5 已完成代码侧闭环，当前路线图不再建议回到 I1 拆卡。后续最顺序的推进方式是：
 
-1. 先用这份总排期表开一次内部评审
-2. 锁定团队真实人力和周期
-3. 把 `I1` 拆成 Jira/Tapd 任务卡
-4. 进入 `I1` 开发
-5. `I1` 联调后再正式开 `I2`
+1. 按 [iteration-6-production-hardening-plan.md](./iteration-6-production-hardening-plan.md) 固化发布准入命令和回归矩阵
+2. 复跑数据库模式 smoke 与迁移脚本审查
+3. 做报表导出和后台任务压力样本
+4. 聚合 API、Worker、AI Runtime Provider、MCP Gateway 健康检查
+5. 补齐试运行运维文档
 
 ## 11. 结论
 
-现在你的文档体系已经从“设计文档”升级成了“可执行研发体系”。
+现在你的文档体系已经从“设计文档”升级成了“可执行研发体系”，并进入 post-I5 生产硬化阶段。
 
 最核心的产物有两层：
 
 - 架构与规则层：数据模型、状态机、权限矩阵、API 契约
-- 排期与执行层：5 个迭代任务单 + 这份总研发排期表
+- 排期与执行层：6 个迭代任务单 + 这份总研发排期表
 
 这意味着你现在已经可以：
 

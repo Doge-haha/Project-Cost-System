@@ -171,3 +171,151 @@ test("report export job failure marks both background job and export task as fai
   );
   assert.equal(reportTaskSuccessLog, undefined);
 });
+
+test("report export pressure sample completes repeated queued jobs and keeps task downloads ready", async () => {
+  const projectRepository = new InMemoryProjectRepository([
+    {
+      id: "project-001",
+      code: "PRJ-001",
+      name: "新点 SaaS 计价一期",
+      status: "draft",
+    },
+  ]);
+  const projectStageRepository = new InMemoryProjectStageRepository([
+    {
+      id: "stage-001",
+      projectId: "project-001",
+      stageCode: "estimate",
+      stageName: "投资估算",
+      status: "draft",
+      sequenceNo: 1,
+    },
+  ]);
+  const projectDisciplineRepository = new InMemoryProjectDisciplineRepository([
+    {
+      id: "discipline-001",
+      projectId: "project-001",
+      disciplineCode: "building",
+      disciplineName: "建筑工程",
+      defaultStandardSetCode: "js-2013-building",
+      status: "enabled",
+    },
+  ]);
+  const projectMemberRepository = new InMemoryProjectMemberRepository([
+    {
+      id: "member-001",
+      projectId: "project-001",
+      userId: "engineer-001",
+      displayName: "Cost Engineer",
+      roleCode: "cost_engineer",
+      scopes: [
+        { scopeType: "stage", scopeValue: "estimate" },
+        { scopeType: "discipline", scopeValue: "building" },
+      ],
+    },
+  ]);
+  const auditLogService = new AuditLogService(
+    new InMemoryAuditLogRepository([]),
+    projectRepository,
+    projectStageRepository,
+    projectDisciplineRepository,
+    projectMemberRepository,
+  );
+  const reportExportTaskRepository = new InMemoryReportExportTaskRepository([]);
+  const reportExportTaskService = new ReportExportTaskService(
+    reportExportTaskRepository,
+    projectRepository,
+    {
+      getSummary: async () => ({
+        totalAmount: 1200,
+        finalAmount: 1250,
+      }),
+      getSummaryDetails: async () => ({
+        items: [
+          {
+            billItemId: "bill-item-001",
+            varianceAmount: 50,
+          },
+        ],
+      }),
+    } as never,
+    auditLogService,
+  );
+  const backgroundJobRepository = new InMemoryBackgroundJobRepository([]);
+  const backgroundJobService = new BackgroundJobService(
+    backgroundJobRepository,
+    projectRepository,
+    projectStageRepository,
+    projectDisciplineRepository,
+    projectMemberRepository,
+    auditLogService,
+  );
+  const processor = new BackgroundJobProcessor(backgroundJobService, {
+    processProjectRecalculate: async () => ({
+      recalculatedCount: 0,
+    }),
+    processReportExport: async ({ payload, requestedBy }) => {
+      const completedTask = await reportExportTaskService.processReportExportTask({
+        taskId: payload.reportExportTaskId!,
+        userId: requestedBy,
+      });
+      return {
+        taskId: completedTask.id,
+        status: completedTask.status,
+        reportType: completedTask.reportType,
+      };
+    },
+  });
+  const reportTypes = ["summary", "variance", "stage_bill"] as const;
+  const jobs: Array<{ id: string; taskId: string }> = [];
+
+  for (let index = 0; index < 12; index += 1) {
+    const reportType = reportTypes[index % reportTypes.length]!;
+    const task = await reportExportTaskService.createReportExportTask({
+      projectId: "project-001",
+      reportType,
+      stageCode: "estimate",
+      disciplineCode: "building",
+      userId: "engineer-001",
+    });
+    const job = await backgroundJobService.enqueueJob({
+      jobType: "report_export",
+      requestedBy: "engineer-001",
+      projectId: "project-001",
+      payload: {
+        projectId: "project-001",
+        reportType,
+        stageCode: "estimate",
+        disciplineCode: "building",
+        reportExportTaskId: task.id,
+      },
+    });
+    jobs.push({ id: job.id, taskId: task.id });
+  }
+
+  for (const job of jobs) {
+    const processed = await processor.processJob(job.id);
+    assert.equal(processed.status, "completed");
+    assert.equal(processed.result?.taskId, job.taskId);
+  }
+
+  const completedJobs = await backgroundJobRepository.list({
+    projectId: "project-001",
+    jobType: "report_export",
+    status: "completed",
+    limit: 20,
+  });
+  assert.equal(completedJobs.length, 12);
+
+  for (const job of jobs) {
+    const taskView = await reportExportTaskService.getReportExportTask({
+      taskId: job.taskId,
+      userId: "engineer-001",
+    });
+    assert.equal(taskView.status, "completed");
+    assert.equal(taskView.isTerminal, true);
+    assert.equal(taskView.isDownloadReady, true);
+    assert.equal(taskView.hasFailed, false);
+    assert.ok(taskView.downloadContentLength);
+  }
+});

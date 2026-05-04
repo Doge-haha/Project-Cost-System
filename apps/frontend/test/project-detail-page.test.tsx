@@ -231,6 +231,46 @@ describe("ProjectDetailPage", () => {
         });
       }
 
+      if (url.pathname === "/health") {
+        return createJsonResponse({
+          ok: true,
+          service: "@saas-pricing/api",
+          status: "up",
+          checkedAt: "2026-05-05T00:00:00.000Z",
+        });
+      }
+
+      if (url.pathname === "/v1/ai/provider-health") {
+        return createJsonResponse({
+          provider: "openai_compatible",
+          model: "cost-model-v1",
+          configured: true,
+          healthy: false,
+          message: "LLM_API_KEY is required",
+        });
+      }
+
+      if (url.pathname === "/v1/jobs") {
+        return createJsonResponse({
+          items: [],
+          summary: {
+            totalCount: 6,
+            statusCounts: {
+              queued: 1,
+              processing: 0,
+              completed: 4,
+              failed: 1,
+            },
+            jobTypeCounts: {
+              report_export: 2,
+              project_recalculate: 1,
+              knowledge_extraction: 1,
+              ai_recommendation: 2,
+            },
+          },
+        });
+      }
+
       throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
     });
 
@@ -344,14 +384,34 @@ describe("ProjectDetailPage", () => {
       "href",
       "/projects/project-001/jobs?jobId=job-001&status=failed&failureReason=missing_field&failureResourceType=bill_item&failureAction=create",
     );
-    expect(screen.getByRole("link", { name: /Provider 诊断/ })).toHaveAttribute(
-      "href",
-      "/projects/project-001/ai-recommendations",
-    );
+    expect(
+      screen
+        .getAllByRole("link", { name: /Provider 诊断/ })
+        .map((link) => link.getAttribute("href")),
+    ).toContain("/projects/project-001/ai-recommendations");
     expect(
       screen.getByText("最近 Provider 任务 3 个 · 成功 1 · 失败 2 · P95 16000ms · 连续失败 2"),
     ).toBeInTheDocument();
     expect(screen.getByText("运维告警：Provider 已连续失败 2 次。")).toBeInTheDocument();
+    expect(screen.getByText("运行诊断")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "刷新运行诊断" }));
+    await waitFor(() => {
+      expect(screen.getByText("运行诊断已刷新。")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText("@saas-pricing/api · up", { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("已配置 · 异常 · LLM_API_KEY is required", { exact: false }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Worker 任务 6 个 · 失败 1 · 报表导出 2 · 项目重算 1 · AI 推荐 2"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Provider 任务 3 个 · 失败 2 · 连续失败 2")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "查看任务状态" })).toHaveAttribute(
+      "href",
+      "/projects/project-001/jobs",
+    );
     fireEvent.click(screen.getByRole("button", { name: "复制异步任务处理链接" }));
     await waitFor(() => {
       expect(clipboardWriteText).toHaveBeenCalledWith(

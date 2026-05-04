@@ -13,6 +13,61 @@ function jsonResponse(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
+test("GatewayApiClient.fetchApiHealth gets public API health", async () => {
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const client = new GatewayApiClient({
+    apiBaseUrl: "https://api.example.com",
+    fetchImpl: async (input, init) => {
+      requests.push({
+        url: typeof input === "string" ? input : input.toString(),
+        init: init ?? {},
+      });
+      return jsonResponse({
+        ok: true,
+        service: "@saas-pricing/api",
+      });
+    },
+  });
+
+  const result = await client.fetchApiHealth();
+
+  assert.deepEqual(result, {
+    ok: true,
+    service: "@saas-pricing/api",
+  });
+  assert.equal(requests[0].url, "https://api.example.com/health");
+  assert.equal(requests[0].init.method, "GET");
+});
+
+test("GatewayApiClient.fetchAiProviderHealth gets provider health with auth", async () => {
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const client = new GatewayApiClient({
+    apiBaseUrl: "https://api.example.com",
+    fetchImpl: async (input, init) => {
+      requests.push({
+        url: typeof input === "string" ? input : input.toString(),
+        init: init ?? {},
+      });
+      return jsonResponse({
+        configured: true,
+        healthy: true,
+      });
+    },
+  });
+
+  const result = await client.fetchAiProviderHealth("access-token");
+
+  assert.deepEqual(result, {
+    configured: true,
+    healthy: true,
+  });
+  assert.equal(requests[0].url, "https://api.example.com/v1/ai/provider-health");
+  assert.equal(requests[0].init.method, "GET");
+  assert.deepEqual(requests[0].init.headers, {
+    authorization: "Bearer access-token",
+  });
+});
+
 test("GatewayApiClient.decideReview posts to the selected review action endpoint", async () => {
   const requests: Array<{ url: string; init: RequestInit }> = [];
   const client = new GatewayApiClient({

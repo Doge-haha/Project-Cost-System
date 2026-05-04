@@ -169,6 +169,13 @@ export const RESOURCE_DEFINITIONS = [
     description: "AI provider job health, latency, retry, and failure telemetry",
     parameters: ["projectId", "limit?"],
   },
+  {
+    name: "runtime-diagnostics",
+    uri: "/v1/resources/runtime-diagnostics",
+    mode: "read",
+    description: "Trial-run diagnostics for API, Worker job flow, AI provider, and MCP gateway runtime",
+    parameters: ["projectId", "limit?"],
+  },
 ] as const;
 
 export const TOOL_DEFINITIONS = [

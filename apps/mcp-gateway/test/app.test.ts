@@ -260,6 +260,14 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         description: "AI provider job health, latency, retry, and failure telemetry",
         parameters: ["projectId", "limit?"],
       },
+      {
+        name: "runtime-diagnostics",
+        uri: "/v1/resources/runtime-diagnostics",
+        mode: "read",
+        description:
+          "Trial-run diagnostics for API, Worker job flow, AI provider, and MCP gateway runtime",
+        parameters: ["projectId", "limit?"],
+      },
     ],
     tools: [
       {
@@ -2562,6 +2570,154 @@ test("GET /v1/resources/ai-provider-telemetry proxies provider telemetry", async
       token,
       projectId: "project-001",
       limit: 20,
+    },
+  ]);
+
+  await app.close();
+});
+
+test("GET /v1/resources/runtime-diagnostics aggregates runtime health signals", async () => {
+  const requests: Array<Record<string, unknown>> = [];
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchApiHealth: async () => {
+        requests.push({ resource: "api-health" });
+        return {
+          ok: true,
+          service: "@saas-pricing/api",
+          status: "up",
+        };
+      },
+      fetchAiProviderHealth: async (bearerToken) => {
+        requests.push({
+          resource: "ai-provider-health",
+          token: bearerToken,
+        });
+        return {
+          configured: true,
+          healthy: true,
+          provider: "openai_compatible",
+        };
+      },
+      fetchJobsSummary: async (query, bearerToken) => {
+        requests.push({
+          resource: "jobs-summary",
+          token: bearerToken,
+          ...query,
+        });
+        return {
+          summary: {
+            jobTypeCounts: {
+              report_export: 2,
+              project_recalculate: 1,
+              knowledge_extraction: 0,
+              ai_recommendation: 1,
+            },
+            statusCounts: {
+              queued: 1,
+              processing: 0,
+              completed: 3,
+              failed: 0,
+            },
+          },
+        };
+      },
+      fetchAiProviderTelemetry: async (query, bearerToken) => {
+        requests.push({
+          resource: "ai-provider-telemetry",
+          token: bearerToken,
+          ...query,
+        });
+        return {
+          totalCount: 4,
+          failureCount: 0,
+          alerts: [],
+        };
+      },
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/runtime-diagnostics?projectId=project-001&limit=10",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "runtime_diagnostics",
+    scope: {
+      projectId: "project-001",
+      limit: 10,
+    },
+    data: {
+      gateway: {
+        ok: true,
+        service: "@saas-pricing/mcp-gateway",
+        status: "up",
+      },
+      api: {
+        ok: true,
+        service: "@saas-pricing/api",
+        status: "up",
+      },
+      aiProvider: {
+        configured: true,
+        healthy: true,
+        provider: "openai_compatible",
+      },
+      workerJobs: {
+        summary: {
+          jobTypeCounts: {
+            report_export: 2,
+            project_recalculate: 1,
+            knowledge_extraction: 0,
+            ai_recommendation: 1,
+          },
+          statusCounts: {
+            queued: 1,
+            processing: 0,
+            completed: 3,
+            failed: 0,
+          },
+        },
+      },
+      aiProviderTelemetry: {
+        totalCount: 4,
+        failureCount: 0,
+        alerts: [],
+      },
+    },
+  });
+  assert.deepEqual(requests, [
+    {
+      resource: "api-health",
+    },
+    {
+      resource: "ai-provider-health",
+      token,
+    },
+    {
+      resource: "jobs-summary",
+      token,
+      projectId: "project-001",
+      limit: 10,
+    },
+    {
+      resource: "ai-provider-telemetry",
+      token,
+      projectId: "project-001",
+      limit: 10,
     },
   ]);
 

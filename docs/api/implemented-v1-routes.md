@@ -11,9 +11,9 @@
 
 摘要：
 
-- 路由总数：101
+- 路由总数：102
 - 分组总数：15
-- 方法分布：GET 45 / POST 40 / PUT 12 / DELETE 4
+- 方法分布：GET 46 / POST 40 / PUT 12 / DELETE 4
 - 源文件：apps/api/src/app/register-ai-recommendation-routes.ts / apps/api/src/app/register-bill-item-routes.ts / apps/api/src/app/register-bill-version-routes.ts / apps/api/src/app/register-bill-work-item-routes.ts / apps/api/src/app/register-import-routes.ts / apps/api/src/app/register-job-routes.ts / apps/api/src/app/register-knowledge-routes.ts / apps/api/src/app/register-pricing-routes.ts / apps/api/src/app/register-process-document-routes.ts / apps/api/src/app/register-project-core-routes.ts / apps/api/src/app/register-quota-routes.ts / apps/api/src/app/register-recalculate-routes.ts / apps/api/src/app/register-report-routes.ts / apps/api/src/app/register-review-routes.ts / apps/api/src/app/setup-app-base.ts
 
 ## Auth
@@ -154,6 +154,7 @@
 - `GET /v1/projects/:projectId/knowledge-entries`
 - `GET /v1/projects/:projectId/knowledge-search`
 - `GET /v1/projects/:projectId/memory-entries`
+- `GET /v1/skills/definitions`
 
 ## Import Tasks
 
@@ -170,6 +171,7 @@ Gateway 已通过注入式 e2e 覆盖以下 API 主线：
 - jobs list / status / retry
 - AI runtime preview / extract jobs / extract from audit
 - knowledge entries
+- skill definitions
 - import tasks / error report / upload retry scope
 - reviews
 - review workflow decisions

@@ -153,6 +153,13 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         parameters: ["projectId", "q", "sourceType?", "stageCode?", "limit?"],
       },
       {
+        name: "skill-definitions",
+        uri: "/v1/resources/skill-definitions",
+        mode: "read",
+        description: "Reserved skill definitions for AI and MCP capability planning",
+        parameters: ["status?", "skillCode?", "limit?"],
+      },
+      {
         name: "job-status",
         uri: "/v1/resources/job-status",
         mode: "read",
@@ -1052,6 +1059,56 @@ test("GET /v1/resources/knowledge-search proxies knowledge search with scope", a
         q: "review",
         sourceType: "review_submission",
         stageCode: "estimate",
+        limit: 5,
+      },
+    },
+  });
+
+  await app.close();
+});
+
+test("GET /v1/resources/skill-definitions proxies reserved skills", async () => {
+  const app = createGatewayApp({
+    jwtSecret,
+    apiBaseUrl: "https://api.example.com",
+    apiClient: {
+      fetchSkillDefinitions: async (query) => ({
+        items: [{ id: "skill-definition-001", skillCode: "quota-recommendation" }],
+        summary: { totalCount: 1 },
+        query,
+      }),
+    } as never,
+  });
+  const token = await signAccessToken({
+    sub: "engineer-001",
+    displayName: "Cost Engineer",
+    roleCodes: ["cost_engineer"],
+  });
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/resources/skill-definitions?status=active&skillCode=quota-recommendation&limit=5",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    type: "resource",
+    resourceType: "skill_definitions",
+    scope: {
+      status: "active",
+      skillCode: "quota-recommendation",
+    },
+    data: {
+      items: [
+        { id: "skill-definition-001", skillCode: "quota-recommendation" },
+      ],
+      summary: { totalCount: 1 },
+      query: {
+        status: "active",
+        skillCode: "quota-recommendation",
         limit: 5,
       },
     },

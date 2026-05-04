@@ -860,7 +860,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       - name: createdFrom
         in: query
         description: Created time lower bound, ISO 8601.
@@ -1617,7 +1617,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       - name: stageCode
         in: query
         description: Project stage code.
@@ -1746,7 +1746,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       - name: stageCode
         in: query
         description: Project stage code.
@@ -1882,7 +1882,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       - name: stageCode
         in: query
         description: Project stage code.
@@ -2063,7 +2063,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       - name: stageCode
         in: query
         description: Project stage code.
@@ -4298,7 +4298,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       responses:
         '200':
           description: Success
@@ -4369,7 +4369,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       requestBody:
         required: true
         content:
@@ -5015,7 +5015,7 @@ paths:
         required: false
         schema:
           type: string
-          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired]
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
       responses:
         '200':
           description: Success
@@ -5713,6 +5713,65 @@ paths:
         required: false
         schema:
           type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListEnvelope'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/skills/definitions:
+    get:
+      operationId: getSkillsDefinitions
+      summary: GET /v1/skills/definitions
+      tags:
+        - Knowledge
+      security:
+        - bearerAuth: []
+      parameters:
+      - name: status
+        in: query
+        description: Status filter.
+        required: false
+        schema:
+          type: string
+          enum: [queued, processing, completed, failed, pending, approved, rejected, cancelled, draft, submitted, generated, accepted, ignored, expired, active, disabled]
+      - name: skillCode
+        in: query
+        description: Skill definition code.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Maximum number of records to return.
+        required: false
+        schema:
+          type: integer
       responses:
         '200':
           description: Success

@@ -30,6 +30,7 @@ test("createDatabaseAppOptions wires the first database-backed repositories", ()
   assert.ok(appOptions.knowledgeEntryRepository);
   assert.ok(appOptions.memoryEntryRepository);
   assert.ok(appOptions.knowledgeRelationRepository);
+  assert.ok(appOptions.skillDefinitionRepository);
   assert.ok(appOptions.auditLogRepository);
   assert.equal(typeof close, "function");
 });

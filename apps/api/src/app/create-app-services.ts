@@ -178,6 +178,7 @@ export function createAppServices(
     repositories.knowledgeEntry,
     repositories.memoryEntry,
     repositories.knowledgeRelation,
+    repositories.skillDefinition,
     repositories.project,
     repositories.projectStage,
     repositories.projectDiscipline,

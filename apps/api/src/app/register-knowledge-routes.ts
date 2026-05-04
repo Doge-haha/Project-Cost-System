@@ -100,4 +100,41 @@ export function registerKnowledgeRoutes(
       };
     });
   });
+
+  app.get("/v1/skills/definitions", async (request) => {
+    const query = z
+      .object({
+        status: z.string().min(1).optional(),
+        skillCode: z.string().min(1).optional(),
+        limit: z.coerce.number().int().positive().max(100).optional(),
+      })
+      .parse(request.query);
+
+    return transactionRunner.runInTransaction(async () => {
+      const items = await knowledgeService.listSkillDefinitions({
+        status: query.status,
+        skillCode: query.skillCode,
+        limit: query.limit,
+      });
+
+      return {
+        items,
+        summary: {
+          totalCount: items.length,
+          statusCounts: countBy(items, (item) => item.status),
+        },
+      };
+    });
+  });
+}
+
+function countBy<T>(
+  items: T[],
+  selectKey: (item: T) => string,
+): Record<string, number> {
+  return items.reduce<Record<string, number>>((accumulator, item) => {
+    const key = selectKey(item);
+    accumulator[key] = (accumulator[key] ?? 0) + 1;
+    return accumulator;
+  }, {});
 }

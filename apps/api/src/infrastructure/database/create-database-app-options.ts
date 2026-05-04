@@ -22,6 +22,7 @@ import { DbReportExportTaskRepository } from "../../modules/reports/report-expor
 import { DbKnowledgeEntryRepository } from "../../modules/knowledge/knowledge-entry-repository.js";
 import { DbMemoryEntryRepository } from "../../modules/knowledge/memory-entry-repository.js";
 import { DbKnowledgeRelationRepository } from "../../modules/knowledge/knowledge-relation-repository.js";
+import { DbSkillDefinitionRepository } from "../../modules/knowledge/skill-definition-repository.js";
 import { DbImportTaskRepository } from "../../modules/import/import-task-repository.js";
 import { DbAiRecommendationRepository } from "../../modules/ai/ai-recommendation-repository.js";
 import { DbVarianceWarningThresholdRepository } from "../../modules/ai/variance-warning-threshold-repository.js";
@@ -82,6 +83,7 @@ export function createDatabaseAppOptions(
       knowledgeEntryRepository: new DbKnowledgeEntryRepository(client.db),
       memoryEntryRepository: new DbMemoryEntryRepository(client.db),
       knowledgeRelationRepository: new DbKnowledgeRelationRepository(client.db),
+      skillDefinitionRepository: new DbSkillDefinitionRepository(client.db),
       aiRecommendationRepository: new DbAiRecommendationRepository(client.db),
       varianceWarningThresholdRepository:
         new DbVarianceWarningThresholdRepository(client.db),

@@ -21,6 +21,7 @@ import { InMemoryProcessDocumentRepository } from "../src/modules/process/proces
 import { InMemoryKnowledgeEntryRepository } from "../src/modules/knowledge/knowledge-entry-repository.js";
 import { InMemoryKnowledgeRelationRepository } from "../src/modules/knowledge/knowledge-relation-repository.js";
 import { InMemoryMemoryEntryRepository } from "../src/modules/knowledge/memory-entry-repository.js";
+import { InMemorySkillDefinitionRepository } from "../src/modules/knowledge/skill-definition-repository.js";
 import { InMemoryReportExportTaskRepository } from "../src/modules/reports/report-export-task-repository.js";
 import { InMemoryBackgroundJobRepository } from "../src/modules/jobs/background-job-repository.js";
 
@@ -53,6 +54,7 @@ function createDatabaseLikeDependencies() {
     knowledgeEntryRepository: new InMemoryKnowledgeEntryRepository([]),
     memoryEntryRepository: new InMemoryMemoryEntryRepository([]),
     knowledgeRelationRepository: new InMemoryKnowledgeRelationRepository([]),
+    skillDefinitionRepository: new InMemorySkillDefinitionRepository([]),
     reportExportTaskRepository: new InMemoryReportExportTaskRepository([]),
     backgroundJobRepository: new InMemoryBackgroundJobRepository([]),
   });

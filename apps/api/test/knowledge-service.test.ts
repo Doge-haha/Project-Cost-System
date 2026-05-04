@@ -7,6 +7,7 @@ import {
 } from "../src/modules/knowledge/knowledge-entry-repository.js";
 import { InMemoryKnowledgeRelationRepository } from "../src/modules/knowledge/knowledge-relation-repository.js";
 import { InMemoryMemoryEntryRepository } from "../src/modules/knowledge/memory-entry-repository.js";
+import { InMemorySkillDefinitionRepository } from "../src/modules/knowledge/skill-definition-repository.js";
 import { KnowledgeService } from "../src/modules/knowledge/knowledge-service.js";
 import { InMemoryProjectDisciplineRepository } from "../src/modules/project/project-discipline-repository.js";
 import { InMemoryProjectMemberRepository } from "../src/modules/project/project-member-repository.js";
@@ -186,11 +187,49 @@ test("KnowledgeService reserves knowledge relation writes and scoped reads", asy
   assert.equal(filtered[0].id, "knowledge-relation-001");
 });
 
+test("KnowledgeService reads reserved skill definitions", async () => {
+  const service = createKnowledgeService();
+
+  const active = await service.listSkillDefinitions({
+    status: "active",
+  });
+  const quota = await service.listSkillDefinitions({
+    skillCode: "quota-recommendation",
+  });
+
+  assert.equal(active.length, 1);
+  assert.equal(active[0].skillCode, "quota-recommendation");
+  assert.equal(active[0].runtimeConfig.entry, "quota");
+  assert.equal(quota.length, 1);
+});
+
 function createKnowledgeService(seed: KnowledgeEntryRecord[] = []) {
   return new KnowledgeService(
     new InMemoryKnowledgeEntryRepository(seed),
     new InMemoryMemoryEntryRepository([]),
     new InMemoryKnowledgeRelationRepository([]),
+    new InMemorySkillDefinitionRepository([
+      {
+        id: "skill-definition-001",
+        skillCode: "quota-recommendation",
+        skillName: "Quota Recommendation",
+        description: "Reserved quota recommendation skill",
+        status: "active",
+        runtimeConfig: { entry: "quota" },
+        createdAt: "2026-04-19T10:00:00.000Z",
+        updatedAt: "2026-04-19T10:00:00.000Z",
+      },
+      {
+        id: "skill-definition-002",
+        skillCode: "bill-recommendation",
+        skillName: "Bill Recommendation",
+        description: "Reserved bill recommendation skill",
+        status: "disabled",
+        runtimeConfig: { entry: "bill" },
+        createdAt: "2026-04-19T10:00:00.000Z",
+        updatedAt: "2026-04-19T10:00:00.000Z",
+      },
+    ]),
     new InMemoryProjectRepository([
       {
         id: "project-001",

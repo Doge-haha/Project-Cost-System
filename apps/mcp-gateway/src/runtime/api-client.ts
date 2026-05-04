@@ -108,6 +108,12 @@ export type KnowledgeSearchQuery = {
   limit?: number;
 };
 
+export type SkillDefinitionsQuery = {
+  status?: string;
+  skillCode?: string;
+  limit?: number;
+};
+
 export type ExtractKnowledgeInput = {
   projectId: string;
   source: string;
@@ -433,6 +439,46 @@ export class GatewayApiClient {
           "UPSTREAM_REQUEST_FAILED",
         (payload as { error?: { message?: string } }).error?.message ??
           "Failed to search knowledge entries",
+      );
+    }
+
+    return payload as Record<string, unknown>;
+  }
+
+  async fetchSkillDefinitions(
+    query: SkillDefinitionsQuery,
+    bearerToken: string,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchImpl(
+      `${this.dependencies.apiBaseUrl}/v1/skills/definitions?${this.buildQuery({
+        status: query.status,
+        skillCode: query.skillCode,
+        limit: query.limit?.toString(),
+      }).toString()}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${bearerToken}`,
+        },
+      },
+    );
+
+    const payload = (await response.json()) as
+      | Record<string, unknown>
+      | {
+          error?: {
+            code?: string;
+            message?: string;
+          };
+        };
+
+    if (!response.ok) {
+      throw new AppError(
+        response.status,
+        (payload as { error?: { code?: string } }).error?.code ??
+          "UPSTREAM_REQUEST_FAILED",
+        (payload as { error?: { message?: string } }).error?.message ??
+          "Failed to load skill definitions",
       );
     }
 

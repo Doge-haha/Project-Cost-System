@@ -79,6 +79,13 @@ export const RESOURCE_DEFINITIONS = [
     parameters: ["projectId", "q", "sourceType?", "stageCode?", "limit?"],
   },
   {
+    name: "skill-definitions",
+    uri: "/v1/resources/skill-definitions",
+    mode: "read",
+    description: "Reserved skill definitions for AI and MCP capability planning",
+    parameters: ["status?", "skillCode?", "limit?"],
+  },
+  {
     name: "job-status",
     uri: "/v1/resources/job-status",
     mode: "read",

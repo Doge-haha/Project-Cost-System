@@ -18,6 +18,7 @@ import {
   projectSummaryQuerySchema,
   reportExportStatusQuerySchema,
   reviewSummaryQuerySchema,
+  skillDefinitionsQuerySchema,
   stageContextQuerySchema,
   summaryDetailsQuerySchema,
   varianceWarningThresholdsQuerySchema,
@@ -315,6 +316,20 @@ export function registerResourceRoutes(
         q: query.q,
         sourceType: query.sourceType ?? null,
         stageCode: query.stageCode ?? null,
+      },
+      data,
+    });
+  });
+
+  app.get("/v1/resources/skill-definitions", async (request) => {
+    const query = skillDefinitionsQuerySchema.parse(request.query);
+    const data = await apiClient.fetchSkillDefinitions(query, request.bearerToken!);
+
+    return resourceEnvelope({
+      resourceType: "skill_definitions",
+      scope: {
+        status: query.status ?? null,
+        skillCode: query.skillCode ?? null,
       },
       data,
     });

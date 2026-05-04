@@ -75,6 +75,10 @@ import {
   type KnowledgeRelationRepository,
 } from "../modules/knowledge/knowledge-relation-repository.js";
 import {
+  InMemorySkillDefinitionRepository,
+  type SkillDefinitionRepository,
+} from "../modules/knowledge/skill-definition-repository.js";
+import {
   InMemoryReportExportTaskRepository,
   type ReportExportTaskRepository,
 } from "../modules/reports/report-export-task-repository.js";
@@ -115,6 +119,7 @@ export type AppRepositories = {
   knowledgeEntry: KnowledgeEntryRepository;
   memoryEntry: MemoryEntryRepository;
   knowledgeRelation: KnowledgeRelationRepository;
+  skillDefinition: SkillDefinitionRepository;
   reportExportTask: ReportExportTaskRepository;
   backgroundJob: BackgroundJobRepository;
   importTask: ImportTaskRepository;
@@ -142,6 +147,7 @@ export type CreateAppRepositoryOptions = {
   knowledgeEntryRepository?: KnowledgeEntryRepository;
   memoryEntryRepository?: MemoryEntryRepository;
   knowledgeRelationRepository?: KnowledgeRelationRepository;
+  skillDefinitionRepository?: SkillDefinitionRepository;
   reportExportTaskRepository?: ReportExportTaskRepository;
   backgroundJobRepository?: BackgroundJobRepository;
   importTaskRepository?: ImportTaskRepository;
@@ -190,6 +196,8 @@ export function createAppRepositories(
     knowledgeRelation:
       options.knowledgeRelationRepository ??
       new InMemoryKnowledgeRelationRepository([]),
+    skillDefinition:
+      options.skillDefinitionRepository ?? new InMemorySkillDefinitionRepository([]),
     reportExportTask:
       options.reportExportTaskRepository ??
       new InMemoryReportExportTaskRepository([]),

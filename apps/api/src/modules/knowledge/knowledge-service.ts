@@ -16,6 +16,10 @@ import type {
   KnowledgeRelationRecord,
   KnowledgeRelationRepository,
 } from "./knowledge-relation-repository.js";
+import type {
+  SkillDefinitionRecord,
+  SkillDefinitionRepository,
+} from "./skill-definition-repository.js";
 
 type ExtractionBatchResult = {
   runtime?: string;
@@ -74,6 +78,7 @@ export class KnowledgeService {
     private readonly knowledgeEntryRepository: KnowledgeEntryRepository,
     private readonly memoryEntryRepository: MemoryEntryRepository,
     private readonly knowledgeRelationRepository: KnowledgeRelationRepository,
+    private readonly skillDefinitionRepository: SkillDefinitionRepository,
     private readonly projectRepository: ProjectRepository,
     private readonly projectStageRepository: ProjectStageRepository,
     private readonly projectDisciplineRepository: ProjectDisciplineRepository,
@@ -235,6 +240,25 @@ export class KnowledgeService {
           return false;
         }
         if (input.relationType && relation.relationType !== input.relationType) {
+          return false;
+        }
+        return true;
+      })
+      .slice(0, input.limit ?? 50);
+  }
+
+  async listSkillDefinitions(input: {
+    status?: string;
+    skillCode?: string;
+    limit?: number;
+  } = {}): Promise<SkillDefinitionRecord[]> {
+    const definitions = await this.skillDefinitionRepository.list();
+    return definitions
+      .filter((definition) => {
+        if (input.status && definition.status !== input.status) {
+          return false;
+        }
+        if (input.skillCode && definition.skillCode !== input.skillCode) {
           return false;
         }
         return true;

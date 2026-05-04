@@ -561,6 +561,7 @@ MCP 返回要比普通 API 更强调可读性和可推理性。
 - `stage-context`
 - `bill-version-context`
 - `knowledge-search`
+- `skill-definitions`
 - `job-status`
 - `knowledge-extraction-result`
 - `knowledge-extraction-history`

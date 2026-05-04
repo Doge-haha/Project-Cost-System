@@ -55,6 +55,12 @@ export const knowledgeSearchQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).optional(),
 });
 
+export const skillDefinitionsQuerySchema = z.object({
+  status: z.string().min(1).optional(),
+  skillCode: z.string().min(1).optional(),
+  limit: z.coerce.number().int().positive().max(100).optional(),
+});
+
 export const recalculateProjectToolSchema = z.object({
   projectId: z.string().min(1),
   stageCode: z.string().min(1).optional(),

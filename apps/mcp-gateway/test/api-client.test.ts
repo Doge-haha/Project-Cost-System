@@ -184,6 +184,45 @@ test("GatewayApiClient.fetchMemoryEntries gets scoped memory entries", async () 
   });
 });
 
+test("GatewayApiClient.fetchSkillDefinitions gets reserved skills", async () => {
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+  const client = new GatewayApiClient({
+    apiBaseUrl: "https://api.example.com",
+    fetchImpl: async (input, init) => {
+      requests.push({
+        url: typeof input === "string" ? input : input.toString(),
+        init: init ?? {},
+      });
+      return jsonResponse({
+        items: [{ id: "skill-definition-001" }],
+        summary: { totalCount: 1 },
+      });
+    },
+  });
+
+  const result = await client.fetchSkillDefinitions(
+    {
+      status: "active",
+      skillCode: "quota-recommendation",
+      limit: 5,
+    },
+    "access-token",
+  );
+
+  assert.deepEqual(result, {
+    items: [{ id: "skill-definition-001" }],
+    summary: { totalCount: 1 },
+  });
+  assert.equal(
+    requests[0].url,
+    "https://api.example.com/v1/skills/definitions?status=active&skillCode=quota-recommendation&limit=5",
+  );
+  assert.equal(requests[0].init.method, "GET");
+  assert.deepEqual(requests[0].init.headers, {
+    authorization: "Bearer access-token",
+  });
+});
+
 test("GatewayApiClient workflow methods surface upstream structured errors", async () => {
   const processDocumentClient = new GatewayApiClient({
     apiBaseUrl: "https://api.example.com",

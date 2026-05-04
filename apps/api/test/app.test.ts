@@ -39,6 +39,7 @@ import {
   InMemoryBackgroundJobRepository,
   type BackgroundJobRecord,
 } from "../src/modules/jobs/background-job-repository.js";
+import { InMemorySkillDefinitionRepository } from "../src/modules/knowledge/skill-definition-repository.js";
 import {
   InMemoryReviewSubmissionRepository,
   type ReviewSubmissionRecord,
@@ -3243,6 +3244,62 @@ test("GET /v1/projects/:projectId/knowledge-entries and /memory-entries expose p
   assert.equal(knowledgeResponse.json().items[0].sourceType, "review_submission");
   assert.equal(memoryResponse.json().items[0].sourceJobId, jobId);
   assert.equal(memoryResponse.json().items[0].subjectId, "reviewer-001");
+
+  await app.close();
+});
+
+test("GET /v1/skills/definitions exposes reserved skills", async () => {
+  const app = createApp({
+    jwtSecret,
+    skillDefinitionRepository: new InMemorySkillDefinitionRepository([
+      {
+        id: "skill-definition-001",
+        skillCode: "quota-recommendation",
+        skillName: "Quota Recommendation",
+        description: "AI quota recommendation",
+        status: "active",
+        runtimeConfig: { entry: "quota" },
+        createdAt: "2026-04-19T10:00:00.000Z",
+        updatedAt: "2026-04-19T10:00:00.000Z",
+      },
+      {
+        id: "skill-definition-002",
+        skillCode: "bill-recommendation",
+        skillName: "Bill Recommendation",
+        description: "AI bill recommendation",
+        status: "disabled",
+        runtimeConfig: { entry: "bill" },
+        createdAt: "2026-04-19T10:00:00.000Z",
+        updatedAt: "2026-04-19T10:00:00.000Z",
+      },
+    ]),
+  });
+  const token = await signAccessToken(
+    {
+      sub: "user-001",
+      roleCodes: ["project_owner"],
+      displayName: "Owner User",
+    },
+    jwtSecret,
+  );
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/v1/skills/definitions?status=active",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].skillCode, "quota-recommendation");
+  assert.deepEqual(response.json().summary, {
+    totalCount: 1,
+    statusCounts: {
+      active: 1,
+    },
+  });
 
   await app.close();
 });

@@ -39,14 +39,15 @@ const currentStage: ProjectStage = {
   id: "stage-001",
   stageCode: "estimate",
   stageName: "投资估算",
-  status: "active",
+  status: "in_progress",
   sequenceNo: 1,
 };
 
 describe("project dashboard summary", () => {
   test("formats project status to user-facing text", () => {
     expect(formatProjectStatus("draft")).toBe("草稿");
-    expect(formatProjectStatus("active")).toBe("active");
+    expect(formatProjectStatus("in_progress")).toBe("进行中");
+    expect(formatProjectStatus("under_review")).toBe("审核中");
   });
 
   test("formats variance tone based on amount sign", () => {

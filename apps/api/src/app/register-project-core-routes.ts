@@ -25,7 +25,20 @@ const updateProjectDefaultFeeTemplateSchema = z.object({
 const projectStageSetupSchema = z.object({
   stageCode: z.string().min(1),
   stageName: z.string().min(1),
-  status: z.enum(["draft", "active", "submitted", "approved", "locked"]).default("draft"),
+  status: z
+    .enum([
+      "not_started",
+      "in_progress",
+      "pending_review",
+      "approved",
+      "completed",
+      "skipped",
+      "draft",
+      "active",
+      "submitted",
+      "locked",
+    ])
+    .default("not_started"),
   sequenceNo: z.coerce.number().int().positive(),
 });
 
@@ -171,7 +184,9 @@ export function registerProjectCoreRoutes(
         roleCodes: request.currentUser!.roleCodes,
         stages: payload.stages,
       });
-      const activeStage = payload.stages.find((stage) => stage.status === "active");
+      const activeStage = payload.stages.find(
+        (stage) => stage.status === "in_progress" || stage.status === "active",
+      );
       if (activeStage) {
         await aiRecommendationService.expireRecommendationsOutsideStage({
           projectId,

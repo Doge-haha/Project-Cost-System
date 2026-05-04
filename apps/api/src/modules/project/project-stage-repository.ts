@@ -10,7 +10,17 @@ export type ProjectStageRecord = {
   projectId: string;
   stageCode: string;
   stageName: string;
-  status: "draft" | "active" | "submitted" | "approved" | "locked";
+  status:
+    | "not_started"
+    | "in_progress"
+    | "pending_review"
+    | "approved"
+    | "completed"
+    | "skipped"
+    | "draft"
+    | "active"
+    | "submitted"
+    | "locked";
   sequenceNo: number;
 };
 

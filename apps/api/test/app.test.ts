@@ -955,13 +955,13 @@ test("PUT /v1/projects/:id/stages updates stage ordering and writes audit logs",
         {
           stageCode: "budget",
           stageName: "施工图预算",
-          status: "active",
+          status: "in_progress",
           sequenceNo: 1,
         },
         {
           stageCode: "estimate",
           stageName: "投资估算",
-          status: "draft",
+          status: "not_started",
           sequenceNo: 2,
         },
       ],
@@ -973,7 +973,7 @@ test("PUT /v1/projects/:id/stages updates stage ordering and writes audit logs",
     updateResponse.json().items.map((stage: { stageCode: string }) => stage.stageCode),
     ["budget", "estimate"],
   );
-  assert.equal(updateResponse.json().items[0].status, "active");
+  assert.equal(updateResponse.json().items[0].status, "in_progress");
 
   const auditResponse = await app.inject({
     method: "GET",

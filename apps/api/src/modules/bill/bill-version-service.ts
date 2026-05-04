@@ -250,7 +250,11 @@ export class BillVersionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
-      status: "submitted",
+      status: "pending_review",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: updated.projectId,
+      status: "under_review",
     });
 
     await this.auditLogService.writeAuditLog({
@@ -310,7 +314,11 @@ export class BillVersionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
-      status: "active",
+      status: "in_progress",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: updated.projectId,
+      status: "in_progress",
     });
 
     await this.auditLogService.writeAuditLog({
@@ -349,7 +357,11 @@ export class BillVersionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
-      status: "locked",
+      status: "completed",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: updated.projectId,
+      status: "in_progress",
     });
 
     await this.auditLogService.writeAuditLog({
@@ -389,7 +401,11 @@ export class BillVersionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: updated.projectId,
       stageCode: updated.stageCode,
-      status: "active",
+      status: "in_progress",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: updated.projectId,
+      status: "in_progress",
     });
 
     await this.auditLogService.writeAuditLog({

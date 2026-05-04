@@ -11,7 +11,18 @@ export type ProjectStage = {
   id: string;
   stageCode: string;
   stageName: string;
-  status: string;
+  status:
+    | "not_started"
+    | "in_progress"
+    | "pending_review"
+    | "approved"
+    | "completed"
+    | "skipped"
+    | "draft"
+    | "active"
+    | "submitted"
+    | "locked"
+    | string;
   sequenceNo: number;
 };
 

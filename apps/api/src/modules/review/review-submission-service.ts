@@ -244,7 +244,11 @@ export class ReviewSubmissionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: input.projectId,
       stageCode: version.stageCode,
-      status: "submitted",
+      status: "pending_review",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: input.projectId,
+      status: "under_review",
     });
 
     await this.auditLogService.writeAuditLog({
@@ -294,6 +298,10 @@ export class ReviewSubmissionService {
       projectId: input.projectId,
       stageCode: submission.stageCode,
       status: "approved",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: input.projectId,
+      status: "in_progress",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -349,7 +357,11 @@ export class ReviewSubmissionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: input.projectId,
       stageCode: submission.stageCode,
-      status: "active",
+      status: "in_progress",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: input.projectId,
+      status: "in_progress",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({
@@ -418,7 +430,11 @@ export class ReviewSubmissionService {
     await this.dependencies.projectStageRepository.updateStatus({
       projectId: input.projectId,
       stageCode: submission.stageCode,
-      status: "active",
+      status: "in_progress",
+    });
+    await this.dependencies.projectRepository.updateStatus({
+      projectId: input.projectId,
+      status: "in_progress",
     });
 
     const updated = await this.reviewSubmissionRepository.updateDecision({

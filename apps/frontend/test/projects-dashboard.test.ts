@@ -18,7 +18,7 @@ const projects: ProjectListItem[] = [
     id: "project-002",
     code: "PRJ-002",
     name: "新点造价项目 B",
-    status: "active",
+    status: "in_progress",
     defaultFeeTemplateId: "fee-template-001",
   },
   {
@@ -32,7 +32,8 @@ const projects: ProjectListItem[] = [
 describe("projects dashboard", () => {
   test("formatProjectLifecycle maps known statuses", () => {
     expect(formatProjectLifecycle("draft")).toBe("草稿");
-    expect(formatProjectLifecycle("active")).toBe("进行中");
+    expect(formatProjectLifecycle("in_progress")).toBe("进行中");
+    expect(formatProjectLifecycle("under_review")).toBe("审核中");
     expect(formatProjectLifecycle("archived")).toBe("已归档");
     expect(formatProjectLifecycle("paused")).toBe("paused");
   });

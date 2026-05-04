@@ -47,7 +47,7 @@ const projects: ProjectRecord[] = [
     id: "project-001",
     code: "PRJ-001",
     name: "新点 SaaS 计价一期",
-    status: "draft",
+    status: "in_progress",
   },
 ];
 
@@ -57,7 +57,7 @@ const stages: ProjectStageRecord[] = [
     projectId: "project-001",
     stageCode: "estimate",
     stageName: "投资估算",
-    status: "draft",
+    status: "not_started",
     sequenceNo: 1,
   },
   {
@@ -65,7 +65,7 @@ const stages: ProjectStageRecord[] = [
     projectId: "project-001",
     stageCode: "budget",
     stageName: "施工图预算",
-    status: "draft",
+    status: "not_started",
     sequenceNo: 2,
   },
 ];
@@ -414,7 +414,18 @@ test("POST /v1/projects/:id/bill-versions/:versionId/submit submits a valid vers
   });
 
   assert.equal(stagesResponse.statusCode, 200);
-  assert.equal(stagesResponse.json().items[0].status, "submitted");
+  assert.equal(stagesResponse.json().items[0].status, "pending_review");
+
+  const projectResponse = await app.inject({
+    method: "GET",
+    url: "/v1/projects/project-001",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(projectResponse.statusCode, 200);
+  assert.equal(projectResponse.json().status, "under_review");
 
   await app.close();
 });
@@ -504,7 +515,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/withdraw restores a submitt
   });
 
   assert.equal(stagesResponse.statusCode, 200);
-  assert.equal(stagesResponse.json().items[0].status, "active");
+  assert.equal(stagesResponse.json().items[0].status, "in_progress");
 
   await app.close();
 });
@@ -540,7 +551,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/lock locks an approved vers
   });
 
   assert.equal(stagesResponse.statusCode, 200);
-  assert.equal(stagesResponse.json().items[0].status, "locked");
+  assert.equal(stagesResponse.json().items[0].status, "completed");
 
   const auditResponse = await app.inject({
     method: "GET",
@@ -590,7 +601,7 @@ test("POST /v1/projects/:id/bill-versions/:versionId/unlock reopens a locked ver
   });
 
   assert.equal(stagesResponse.statusCode, 200);
-  assert.equal(stagesResponse.json().items[0].status, "active");
+  assert.equal(stagesResponse.json().items[0].status, "in_progress");
 
   const auditResponse = await app.inject({
     method: "GET",

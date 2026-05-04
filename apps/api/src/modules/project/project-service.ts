@@ -711,6 +711,7 @@ export class ProjectService {
     }
 
     return (
+      stages.find((stage) => stage.status === "in_progress") ??
       stages.find((stage) => stage.status === "active") ??
       stages[0] ??
       null

@@ -25,6 +25,15 @@ export function formatProjectStatus(status: string) {
   if (status === "draft") {
     return "草稿";
   }
+  if (status === "in_progress" || status === "active") {
+    return "进行中";
+  }
+  if (status === "under_review") {
+    return "审核中";
+  }
+  if (status === "archived") {
+    return "已归档";
+  }
   return status;
 }
 

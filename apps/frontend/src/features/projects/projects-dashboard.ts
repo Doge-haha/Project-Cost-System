@@ -7,6 +7,12 @@ export function formatProjectLifecycle(status: string) {
   if (status === "active") {
     return "进行中";
   }
+  if (status === "in_progress") {
+    return "进行中";
+  }
+  if (status === "under_review") {
+    return "审核中";
+  }
   if (status === "archived") {
     return "已归档";
   }
@@ -15,7 +21,9 @@ export function formatProjectLifecycle(status: string) {
 
 export function buildProjectsDashboard(projects: ProjectListItem[]) {
   const draftProjects = projects.filter((project) => project.status === "draft");
-  const activeProjects = projects.filter((project) => project.status === "active");
+  const activeProjects = projects.filter(
+    (project) => project.status === "active" || project.status === "in_progress",
+  );
   const configuredProjects = projects.filter(
     (project) => project.defaultFeeTemplateId || project.defaultPriceVersionId,
   );

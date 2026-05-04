@@ -173,6 +173,26 @@ const referenceQuotas: ReferenceQuotaRecord[] = [
     searchText: "土方工程 挖土方 010101",
     metadata: {},
   },
+  {
+    id: "reference-quota-002",
+    sourceDataset: "JS-2014-reference",
+    sourceRegion: "江苏",
+    standardSetCode: "JS-2014",
+    disciplineCode: "building",
+    sourceQuotaId: "quota-002",
+    sourceSequence: 2,
+    chapterCode: "01",
+    quotaCode: "010102",
+    quotaName: "机械挖土方",
+    unit: "m3",
+    laborFee: 0.5,
+    materialFee: 1,
+    machineFee: 8,
+    workContentSummary: "机械开挖土方",
+    resourceCompositionSummary: "人工费 0.5 / 材料费 1 / 机械费 8",
+    searchText: "土方工程 机械挖土方 010102",
+    metadata: {},
+  },
 ];
 
 function createRecommendationApp(input?: {
@@ -345,6 +365,7 @@ test("POST /v1/ai/quota-recommendations generates quota candidates for bill item
       disciplineCode: "building",
       resourceType: "bill_item",
       resourceId: "bill-item-001",
+      limit: 1,
     },
   });
 
@@ -362,6 +383,57 @@ test("POST /v1/ai/quota-recommendations generates quota candidates for bill item
     "bill_item_missing_quota",
   );
   assert.equal(response.json().provider.model, "quota_source_candidates");
+
+  await app.close();
+});
+
+test("POST /v1/ai/quota-recommendations suggests alternative quotas when one already exists", async () => {
+  const app = createRecommendationApp({
+    quotaLines: [
+      {
+        id: "quota-line-001",
+        billItemId: "bill-item-001",
+        sourceStandardSetCode: "JS-2014",
+        sourceQuotaId: "quota-001",
+        sourceSequence: 1,
+        chapterCode: "01",
+        quotaCode: "010101",
+        quotaName: "挖土方",
+        unit: "m3",
+        quantity: 10,
+        laborFee: 1,
+        materialFee: 2,
+        machineFee: 3,
+        contentFactor: 1,
+        sourceMode: "manual",
+      },
+    ],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].outputPayload.sourceQuotaId, "quota-002");
+  assert.equal(response.json().items[0].outputPayload.quotaCode, "010102");
+  assert.equal(response.json().items[0].outputPayload.quotaName, "机械挖土方");
+  assert.equal(
+    response.json().items[0].outputPayload.recommendationReason,
+    "bill_item_alternative_quota",
+  );
+  assert.equal(response.json().items[0].inputPayload.existingQuotaLineCount, 1);
 
   await app.close();
 });

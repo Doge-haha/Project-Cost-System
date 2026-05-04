@@ -46,5 +46,6 @@ test("Iteration 5 AI and knowledge constants stay stable", () => {
   assert.deepEqual(KNOWLEDGE_AUDIT_ACTIONS, {
     createKnowledgeEntry: "knowledge_entry.create",
     createMemoryEntry: "memory_entry.create",
+    createKnowledgeRelation: "knowledge_relation.create",
   });
 });

@@ -19,6 +19,7 @@ import { InMemoryReviewSubmissionRepository } from "../src/modules/review/review
 import { InMemoryAuditLogRepository } from "../src/modules/audit/audit-log-repository.js";
 import { InMemoryProcessDocumentRepository } from "../src/modules/process/process-document-repository.js";
 import { InMemoryKnowledgeEntryRepository } from "../src/modules/knowledge/knowledge-entry-repository.js";
+import { InMemoryKnowledgeRelationRepository } from "../src/modules/knowledge/knowledge-relation-repository.js";
 import { InMemoryMemoryEntryRepository } from "../src/modules/knowledge/memory-entry-repository.js";
 import { InMemoryReportExportTaskRepository } from "../src/modules/reports/report-export-task-repository.js";
 import { InMemoryBackgroundJobRepository } from "../src/modules/jobs/background-job-repository.js";
@@ -51,6 +52,7 @@ function createDatabaseLikeDependencies() {
     processDocumentRepository: new InMemoryProcessDocumentRepository([]),
     knowledgeEntryRepository: new InMemoryKnowledgeEntryRepository([]),
     memoryEntryRepository: new InMemoryMemoryEntryRepository([]),
+    knowledgeRelationRepository: new InMemoryKnowledgeRelationRepository([]),
     reportExportTaskRepository: new InMemoryReportExportTaskRepository([]),
     backgroundJobRepository: new InMemoryBackgroundJobRepository([]),
   });

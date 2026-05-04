@@ -12,6 +12,10 @@ import type {
   MemoryEntryRecord,
   MemoryEntryRepository,
 } from "./memory-entry-repository.js";
+import type {
+  KnowledgeRelationRecord,
+  KnowledgeRelationRepository,
+} from "./knowledge-relation-repository.js";
 
 type ExtractionBatchResult = {
   runtime?: string;
@@ -62,12 +66,14 @@ export const MEMORY_ENTRY_SCOPES = [
 export const KNOWLEDGE_AUDIT_ACTIONS = {
   createKnowledgeEntry: "knowledge_entry.create",
   createMemoryEntry: "memory_entry.create",
+  createKnowledgeRelation: "knowledge_relation.create",
 } as const;
 
 export class KnowledgeService {
   constructor(
     private readonly knowledgeEntryRepository: KnowledgeEntryRepository,
     private readonly memoryEntryRepository: MemoryEntryRepository,
+    private readonly knowledgeRelationRepository: KnowledgeRelationRepository,
     private readonly projectRepository: ProjectRepository,
     private readonly projectStageRepository: ProjectStageRepository,
     private readonly projectDisciplineRepository: ProjectDisciplineRepository,
@@ -198,6 +204,63 @@ export class KnowledgeService {
         return haystacks.some((value) => value.includes(normalizedQuery));
       })
       .slice(0, input.limit ?? 20);
+  }
+
+  async listKnowledgeRelations(input: {
+    projectId: string;
+    fromType?: string;
+    fromId?: string;
+    toType?: string;
+    toId?: string;
+    relationType?: string;
+    limit?: number;
+    userId: string;
+  }): Promise<KnowledgeRelationRecord[]> {
+    await this.assertProjectVisible(input.projectId, input.userId);
+    const relations = await this.knowledgeRelationRepository.listByProjectId(
+      input.projectId,
+    );
+    return relations
+      .filter((relation) => {
+        if (input.fromType && relation.fromType !== input.fromType) {
+          return false;
+        }
+        if (input.fromId && relation.fromId !== input.fromId) {
+          return false;
+        }
+        if (input.toType && relation.toType !== input.toType) {
+          return false;
+        }
+        if (input.toId && relation.toId !== input.toId) {
+          return false;
+        }
+        if (input.relationType && relation.relationType !== input.relationType) {
+          return false;
+        }
+        return true;
+      })
+      .slice(0, input.limit ?? 50);
+  }
+
+  async persistKnowledgeRelation(input: {
+    projectId: string;
+    fromType: string;
+    fromId: string;
+    toType: string;
+    toId: string;
+    relationType: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<KnowledgeRelationRecord> {
+    return this.knowledgeRelationRepository.create({
+      projectId: input.projectId,
+      fromType: input.fromType,
+      fromId: input.fromId,
+      toType: input.toType,
+      toId: input.toId,
+      relationType: input.relationType,
+      metadata: input.metadata ?? {},
+      createdAt: new Date().toISOString(),
+    });
   }
 
   async persistExtractionResult(input: {

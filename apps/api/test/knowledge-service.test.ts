@@ -5,6 +5,7 @@ import {
   InMemoryKnowledgeEntryRepository,
   type KnowledgeEntryRecord,
 } from "../src/modules/knowledge/knowledge-entry-repository.js";
+import { InMemoryKnowledgeRelationRepository } from "../src/modules/knowledge/knowledge-relation-repository.js";
 import { InMemoryMemoryEntryRepository } from "../src/modules/knowledge/memory-entry-repository.js";
 import { KnowledgeService } from "../src/modules/knowledge/knowledge-service.js";
 import { InMemoryProjectDisciplineRepository } from "../src/modules/project/project-discipline-repository.js";
@@ -148,10 +149,48 @@ test("KnowledgeService keeps reserved metadata fields authoritative", async () =
   assert.equal(organizationPreference.metadata.preferenceKey, "quota_standard");
 });
 
+test("KnowledgeService reserves knowledge relation writes and scoped reads", async () => {
+  const service = createKnowledgeService();
+
+  const relation = await service.persistKnowledgeRelation({
+    projectId: "project-001",
+    fromType: "knowledge_entry",
+    fromId: "knowledge-entry-001",
+    toType: "memory_entry",
+    toId: "memory-entry-001",
+    relationType: "derived_memory",
+    metadata: { confidence: 0.9 },
+  });
+  await service.persistKnowledgeRelation({
+    projectId: "project-001",
+    fromType: "knowledge_entry",
+    fromId: "knowledge-entry-002",
+    toType: "memory_entry",
+    toId: "memory-entry-002",
+    relationType: "similar_case",
+  });
+
+  assert.equal(relation.projectId, "project-001");
+  assert.equal(relation.fromType, "knowledge_entry");
+  assert.equal(relation.toType, "memory_entry");
+  assert.equal(relation.relationType, "derived_memory");
+  assert.equal(relation.metadata.confidence, 0.9);
+
+  const filtered = await service.listKnowledgeRelations({
+    projectId: "project-001",
+    relationType: "derived_memory",
+    userId: "user-001",
+  });
+
+  assert.equal(filtered.length, 1);
+  assert.equal(filtered[0].id, "knowledge-relation-001");
+});
+
 function createKnowledgeService(seed: KnowledgeEntryRecord[] = []) {
   return new KnowledgeService(
     new InMemoryKnowledgeEntryRepository(seed),
     new InMemoryMemoryEntryRepository([]),
+    new InMemoryKnowledgeRelationRepository([]),
     new InMemoryProjectRepository([
       {
         id: "project-001",

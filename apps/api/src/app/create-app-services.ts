@@ -177,6 +177,7 @@ export function createAppServices(
   const knowledgeService = new KnowledgeService(
     repositories.knowledgeEntry,
     repositories.memoryEntry,
+    repositories.knowledgeRelation,
     repositories.project,
     repositories.projectStage,
     repositories.projectDiscipline,

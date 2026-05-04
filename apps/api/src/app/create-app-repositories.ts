@@ -71,6 +71,10 @@ import {
   type MemoryEntryRepository,
 } from "../modules/knowledge/memory-entry-repository.js";
 import {
+  InMemoryKnowledgeRelationRepository,
+  type KnowledgeRelationRepository,
+} from "../modules/knowledge/knowledge-relation-repository.js";
+import {
   InMemoryReportExportTaskRepository,
   type ReportExportTaskRepository,
 } from "../modules/reports/report-export-task-repository.js";
@@ -110,6 +114,7 @@ export type AppRepositories = {
   processDocument: ProcessDocumentRepository;
   knowledgeEntry: KnowledgeEntryRepository;
   memoryEntry: MemoryEntryRepository;
+  knowledgeRelation: KnowledgeRelationRepository;
   reportExportTask: ReportExportTaskRepository;
   backgroundJob: BackgroundJobRepository;
   importTask: ImportTaskRepository;
@@ -136,6 +141,7 @@ export type CreateAppRepositoryOptions = {
   processDocumentRepository?: ProcessDocumentRepository;
   knowledgeEntryRepository?: KnowledgeEntryRepository;
   memoryEntryRepository?: MemoryEntryRepository;
+  knowledgeRelationRepository?: KnowledgeRelationRepository;
   reportExportTaskRepository?: ReportExportTaskRepository;
   backgroundJobRepository?: BackgroundJobRepository;
   importTaskRepository?: ImportTaskRepository;
@@ -181,6 +187,9 @@ export function createAppRepositories(
       options.knowledgeEntryRepository ?? new InMemoryKnowledgeEntryRepository([]),
     memoryEntry:
       options.memoryEntryRepository ?? new InMemoryMemoryEntryRepository([]),
+    knowledgeRelation:
+      options.knowledgeRelationRepository ??
+      new InMemoryKnowledgeRelationRepository([]),
     reportExportTask:
       options.reportExportTaskRepository ??
       new InMemoryReportExportTaskRepository([]),

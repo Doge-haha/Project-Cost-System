@@ -1675,6 +1675,22 @@ function formatAcceptedChangeAction(value: unknown) {
 }
 
 function formatRecommendationPayload(payload: Record<string, unknown>) {
+  const prompt = typeof payload.prompt === "string" ? payload.prompt : null;
+  const promptType =
+    typeof payload.promptType === "string" ? payload.promptType : null;
+  const billItemCode =
+    typeof payload.billItemCode === "string" ? payload.billItemCode : null;
+  const billItemName =
+    typeof payload.billItemName === "string" ? payload.billItemName : null;
+  if (promptType === "missing_quota" && prompt) {
+    return [
+      billItemCode || billItemName
+        ? `缺失定额提示 · ${[billItemCode, billItemName].filter(Boolean).join(" ")}`
+        : "缺失定额提示",
+      prompt,
+    ].join(" · ");
+  }
+
   const reason = typeof payload.reason === "string" ? payload.reason : null;
   const itemName = typeof payload.itemName === "string" ? payload.itemName : null;
   const quotaName = typeof payload.quotaName === "string" ? payload.quotaName : null;

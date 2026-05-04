@@ -1051,6 +1051,63 @@ describe("ProjectAiRecommendationsPage", () => {
     expect(screen.getByText("版本 price-v1 → price-v2")).toBeInTheDocument();
   });
 
+  test("renders missing quota prompt copy on quota recommendations", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      const url = new URL(String(input));
+
+      if (url.pathname === "/v1/projects/project-001/workspace") {
+        return createJsonResponse(createWorkspace());
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/recommendations") {
+        return createJsonResponse({
+          items: [
+            createRecommendation({
+              outputPayload: {
+                billItemCode: "A-001",
+                billItemName: "土方工程",
+                promptType: "missing_quota",
+                recommendationReason: "bill_item_missing_quota_prompt",
+                prompt:
+                  "A-001 土方工程 没有匹配到候选定额，请补充定额库、调整清单名称关键字，或人工选择适用定额。",
+              },
+            }),
+          ],
+          summary: {
+            totalCount: 1,
+            statusCounts: {
+              generated: 1,
+              accepted: 0,
+              ignored: 0,
+              expired: 0,
+            },
+            typeCounts: {
+              bill_recommendation: 0,
+              quota_recommendation: 1,
+              variance_warning: 0,
+            },
+          },
+        });
+      }
+
+      if (url.pathname === "/v1/projects/project-001/ai/variance-warning-thresholds") {
+        return createJsonResponse({ items: [] });
+      }
+
+      throw new Error(`Unhandled fetch: ${url.pathname}${url.search}`);
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "缺失定额提示 · A-001 土方工程 · A-001 土方工程 没有匹配到候选定额，请补充定额库、调整清单名称关键字，或人工选择适用定额。",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   test("hides generated recommendation actions for read-only users", async () => {
     fetchMock.mockImplementation(async (input) => {
       const url = new URL(String(input));

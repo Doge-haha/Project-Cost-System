@@ -30,18 +30,21 @@ export const projectContextQuerySchema = projectSummaryQuerySchema.extend({
   jobsRequestedBy: z.string().min(1).optional(),
   jobsStatus: z.enum(["queued", "processing", "completed", "failed"]).optional(),
   jobsLimit: z.coerce.number().int().positive().max(100).optional(),
+  memoryLimit: z.coerce.number().int().positive().max(100).optional(),
   jobId: z.string().min(1).optional(),
 });
 
 export const stageContextQuerySchema = projectSummaryQuerySchema.extend({
   stageCode: z.string().min(1),
   knowledgeLimit: z.coerce.number().int().positive().max(100).optional(),
+  memoryLimit: z.coerce.number().int().positive().max(100).optional(),
 });
 
 export const billVersionContextQuerySchema = projectSummaryQuerySchema.extend({
   billVersionId: z.string().min(1),
   detailsLimit: z.coerce.number().int().positive().max(100).optional(),
   knowledgeLimit: z.coerce.number().int().positive().max(100).optional(),
+  memoryLimit: z.coerce.number().int().positive().max(100).optional(),
 });
 
 export const knowledgeSearchQuerySchema = z.object({

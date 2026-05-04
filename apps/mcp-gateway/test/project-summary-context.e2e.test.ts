@@ -17,6 +17,10 @@ import {
   InMemoryKnowledgeEntryRepository,
   type KnowledgeEntryRecord,
 } from "../../api/src/modules/knowledge/knowledge-entry-repository.js";
+import {
+  InMemoryMemoryEntryRepository,
+  type MemoryEntryRecord,
+} from "../../api/src/modules/knowledge/memory-entry-repository.js";
 import { createGatewayTestApp } from "./helpers/http-gateway-harness.js";
 import {
   createGatewayTestApiApp,
@@ -130,6 +134,23 @@ const seededKnowledgeEntries: KnowledgeEntryRecord[] = [
   },
 ];
 
+const seededMemoryEntries: MemoryEntryRecord[] = [
+  {
+    id: "memory-entry-001",
+    projectId: "project-001",
+    stageCode: "estimate",
+    sourceJobId: "background-job-001",
+    memoryKey: "project-001:project:pricing_variance",
+    subjectType: "project",
+    subjectId: "project-001",
+    content: "土方工程估算阶段偏差需要复核。",
+    metadata: {
+      billItemId: "bill-item-001",
+    },
+    createdAt: "2026-04-24T10:03:00.000Z",
+  },
+];
+
 test("project summary, summary details and context stay aligned over HTTP", async () => {
   const apiApp = createGatewayTestApiApp({
     appOptions: {
@@ -141,6 +162,7 @@ test("project summary, summary details and context stay aligned over HTTP", asyn
       knowledgeEntryRepository: new InMemoryKnowledgeEntryRepository(
         seededKnowledgeEntries,
       ),
+      memoryEntryRepository: new InMemoryMemoryEntryRepository(seededMemoryEntries),
     },
   });
 
@@ -289,6 +311,16 @@ test("project summary, summary details and context stay aligned over HTTP", asyn
           },
         },
         latestKnowledgeEntries: seededKnowledgeEntries,
+        latestMemorySummary: {
+          totalCount: 1,
+          subjectTypeCounts: {
+            project: 1,
+          },
+          stageCounts: {
+            estimate: 1,
+          },
+        },
+        latestMemoryEntries: seededMemoryEntries,
       },
     });
   } finally {

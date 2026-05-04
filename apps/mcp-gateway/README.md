@@ -58,6 +58,10 @@ npm --workspace @saas-pricing/mcp-gateway run typecheck
 - `extract-knowledge-from-audit`
 - `retry-import-failure-scope`
 - `configure-variance-warning-threshold`
+
+`project-context`、`stage-context`、`bill-version-context` 会同时聚合最新
+`knowledge-entries` 与 `memory-entries`，并继续通过 API 应用层读取，继承项目、
+阶段和专业权限裁剪。
 - `generate-ai-recommendations`
 - `expire-stale-ai-recommendations`
 - `decide-review`

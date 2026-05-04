@@ -86,6 +86,7 @@ export function registerResourceRoutes(
       jobStatus,
       latestKnowledgeExtractionJobs,
       latestKnowledgeEntries,
+      latestMemoryEntries,
     ] = await Promise.all([
       apiClient.fetchProjectSummary(query, request.bearerToken!),
       apiClient.fetchJobsSummary(
@@ -120,6 +121,13 @@ export function registerResourceRoutes(
         },
         request.bearerToken!,
       ),
+      apiClient.fetchMemoryEntries(
+        {
+          projectId: query.projectId,
+          limit: query.memoryLimit ?? 3,
+        },
+        request.bearerToken!,
+      ),
     ]);
 
     return resourceEnvelope({
@@ -148,13 +156,22 @@ export function registerResourceRoutes(
           Array.isArray(latestKnowledgeEntries.items)
             ? latestKnowledgeEntries.items
             : [],
+        latestMemorySummary:
+          typeof latestMemoryEntries.summary === "object" &&
+          latestMemoryEntries.summary !== null
+            ? latestMemoryEntries.summary
+            : null,
+        latestMemoryEntries:
+          Array.isArray(latestMemoryEntries.items)
+            ? latestMemoryEntries.items
+            : [],
       },
     });
   });
 
   app.get("/v1/resources/stage-context", async (request) => {
     const query = stageContextQuerySchema.parse(request.query);
-    const [projectSummary, latestKnowledgeEntries] = await Promise.all([
+    const [projectSummary, latestKnowledgeEntries, latestMemoryEntries] = await Promise.all([
       apiClient.fetchProjectSummary(
         {
           projectId: query.projectId,
@@ -168,6 +185,14 @@ export function registerResourceRoutes(
           projectId: query.projectId,
           stageCode: query.stageCode,
           limit: query.knowledgeLimit ?? 5,
+        },
+        request.bearerToken!,
+      ),
+      apiClient.fetchMemoryEntries(
+        {
+          projectId: query.projectId,
+          stageCode: query.stageCode,
+          limit: query.memoryLimit ?? 5,
         },
         request.bearerToken!,
       ),
@@ -191,13 +216,22 @@ export function registerResourceRoutes(
           Array.isArray(latestKnowledgeEntries.items)
             ? latestKnowledgeEntries.items
             : [],
+        latestMemorySummary:
+          typeof latestMemoryEntries.summary === "object" &&
+          latestMemoryEntries.summary !== null
+            ? latestMemoryEntries.summary
+            : null,
+        latestMemoryEntries:
+          Array.isArray(latestMemoryEntries.items)
+            ? latestMemoryEntries.items
+            : [],
       },
     });
   });
 
   app.get("/v1/resources/bill-version-context", async (request) => {
     const query = billVersionContextQuerySchema.parse(request.query);
-    const [projectSummary, summaryDetails, latestKnowledgeEntries] =
+    const [projectSummary, summaryDetails, latestKnowledgeEntries, latestMemoryEntries] =
       await Promise.all([
         apiClient.fetchProjectSummary(query, request.bearerToken!),
         apiClient.fetchSummaryDetails(
@@ -215,6 +249,14 @@ export function registerResourceRoutes(
             projectId: query.projectId,
             stageCode: query.stageCode,
             limit: query.knowledgeLimit ?? 5,
+          },
+          request.bearerToken!,
+        ),
+        apiClient.fetchMemoryEntries(
+          {
+            projectId: query.projectId,
+            stageCode: query.stageCode,
+            limit: query.memoryLimit ?? 5,
           },
           request.bearerToken!,
         ),
@@ -239,6 +281,15 @@ export function registerResourceRoutes(
         latestKnowledgeEntries:
           Array.isArray(latestKnowledgeEntries.items)
             ? latestKnowledgeEntries.items
+            : [],
+        latestMemorySummary:
+          typeof latestMemoryEntries.summary === "object" &&
+          latestMemoryEntries.summary !== null
+            ? latestMemoryEntries.summary
+            : null,
+        latestMemoryEntries:
+          Array.isArray(latestMemoryEntries.items)
+            ? latestMemoryEntries.items
             : [],
       },
     });

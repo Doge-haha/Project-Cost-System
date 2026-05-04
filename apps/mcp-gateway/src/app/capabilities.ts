@@ -30,7 +30,7 @@ export const RESOURCE_DEFINITIONS = [
     name: "project-context",
     uri: "/v1/resources/project-context",
     mode: "read",
-    description: "Combined project summary, jobs summary, knowledge summary, and optional job snapshot",
+    description: "Combined project summary, jobs summary, knowledge and memory summaries, and optional job snapshot",
     parameters: [
       "projectId",
       "billVersionId?",
@@ -39,6 +39,7 @@ export const RESOURCE_DEFINITIONS = [
       "jobsRequestedBy?",
       "jobsStatus?",
       "jobsLimit?",
+      "memoryLimit?",
       "jobId?",
     ],
   },
@@ -46,19 +47,20 @@ export const RESOURCE_DEFINITIONS = [
     name: "stage-context",
     uri: "/v1/resources/stage-context",
     mode: "read",
-    description: "Stage-scoped project summary and latest knowledge context",
+    description: "Stage-scoped project summary with latest knowledge and memory context",
     parameters: [
       "projectId",
       "stageCode",
       "disciplineCode?",
       "knowledgeLimit?",
+      "memoryLimit?",
     ],
   },
   {
     name: "bill-version-context",
     uri: "/v1/resources/bill-version-context",
     mode: "read",
-    description: "Bill-version-scoped summary, variance details, and latest knowledge context",
+    description: "Bill-version-scoped summary, variance details, and latest knowledge and memory context",
     parameters: [
       "projectId",
       "billVersionId",
@@ -66,6 +68,7 @@ export const RESOURCE_DEFINITIONS = [
       "disciplineCode?",
       "detailsLimit?",
       "knowledgeLimit?",
+      "memoryLimit?",
     ],
   },
   {

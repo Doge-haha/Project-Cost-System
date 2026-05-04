@@ -103,6 +103,8 @@ flowchart LR
 - 默认定额集和价目配置
 - 当前主要风险摘要
 - 最近关键操作摘要
+- 最新知识条目摘要
+- 最新系统记忆摘要
 
 建议资源 URI 形式：
 
@@ -122,6 +124,7 @@ flowchart LR
 - 当前主清单版本
 - 待审核对象数量
 - 当前阶段异常提示
+- 当前阶段最新知识与记忆提示
 
 建议 URI：
 
@@ -140,6 +143,7 @@ flowchart LR
 - 校验错误摘要
 - 差异摘要
 - 关联过程单据摘要
+- 当前版本所在阶段的最新知识与记忆提示
 
 URI：
 
@@ -399,7 +403,9 @@ AI 不适合一次请求里自己去追 20 个接口拼上下文。
     "feeTemplate": {}
   },
   "recentRisks": [],
-  "recentAuditSummary": []
+  "recentAuditSummary": [],
+  "latestKnowledgeEntries": [],
+  "latestMemoryEntries": []
 }
 ```
 

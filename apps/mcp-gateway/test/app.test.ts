@@ -102,7 +102,7 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         uri: "/v1/resources/project-context",
         mode: "read",
         description:
-          "Combined project summary, jobs summary, knowledge summary, and optional job snapshot",
+          "Combined project summary, jobs summary, knowledge and memory summaries, and optional job snapshot",
         parameters: [
           "projectId",
           "billVersionId?",
@@ -111,6 +111,7 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
           "jobsRequestedBy?",
           "jobsStatus?",
           "jobsLimit?",
+          "memoryLimit?",
           "jobId?",
         ],
       },
@@ -118,12 +119,13 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         name: "stage-context",
         uri: "/v1/resources/stage-context",
         mode: "read",
-        description: "Stage-scoped project summary and latest knowledge context",
+        description: "Stage-scoped project summary with latest knowledge and memory context",
         parameters: [
           "projectId",
           "stageCode",
           "disciplineCode?",
           "knowledgeLimit?",
+          "memoryLimit?",
         ],
       },
       {
@@ -131,7 +133,7 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         uri: "/v1/resources/bill-version-context",
         mode: "read",
         description:
-          "Bill-version-scoped summary, variance details, and latest knowledge context",
+          "Bill-version-scoped summary, variance details, and latest knowledge and memory context",
         parameters: [
           "projectId",
           "billVersionId",
@@ -139,6 +141,7 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
           "disciplineCode?",
           "detailsLimit?",
           "knowledgeLimit?",
+          "memoryLimit?",
         ],
       },
       {
@@ -623,6 +626,23 @@ test("GET /v1/resources/project-context aggregates project and job summaries", a
           },
         },
       }),
+      fetchMemoryEntries: async () => ({
+        items: [
+          {
+            id: "memory-entry-001",
+            memoryKey: "project-001:project:quota_standard",
+          },
+        ],
+        summary: {
+          totalCount: 1,
+          subjectTypeCounts: {
+            project: 1,
+          },
+          stageCounts: {
+            estimate: 1,
+          },
+        },
+      }),
     } as never,
   });
   const token = await signAccessToken({
@@ -683,6 +703,21 @@ test("GET /v1/resources/project-context aggregates project and job summaries", a
           title: "review_reject",
         },
       ],
+      latestMemorySummary: {
+        totalCount: 1,
+        subjectTypeCounts: {
+          project: 1,
+        },
+        stageCounts: {
+          estimate: 1,
+        },
+      },
+      latestMemoryEntries: [
+        {
+          id: "memory-entry-001",
+          memoryKey: "project-001:project:quota_standard",
+        },
+      ],
     },
   });
 
@@ -721,6 +756,14 @@ test("GET /v1/resources/project-context includes optional job status snapshot", 
           totalCount: 0,
           sourceTypeCounts: {},
           sourceActionCounts: {},
+          stageCounts: {},
+        },
+      }),
+      fetchMemoryEntries: async () => ({
+        items: [],
+        summary: {
+          totalCount: 0,
+          subjectTypeCounts: {},
           stageCounts: {},
         },
       }),
@@ -772,6 +815,12 @@ test("GET /v1/resources/project-context includes optional job status snapshot", 
         stageCounts: {},
       },
       latestKnowledgeEntries: [],
+      latestMemorySummary: {
+        totalCount: 0,
+        subjectTypeCounts: {},
+        stageCounts: {},
+      },
+      latestMemoryEntries: [],
     },
   });
 
@@ -799,6 +848,13 @@ test("GET /v1/resources/stage-context aggregates stage summary and knowledge", a
           summary: { totalCount: 1 },
         };
       },
+      fetchMemoryEntries: async (query) => {
+        requests.push({ resource: "memory", ...query });
+        return {
+          items: [{ id: "memory-entry-001", memoryKey: "estimate:preference" }],
+          summary: { totalCount: 1, subjectTypeCounts: { project: 1 } },
+        };
+      },
     } as never,
   });
   const token = await signAccessToken({
@@ -809,7 +865,7 @@ test("GET /v1/resources/stage-context aggregates stage summary and knowledge", a
 
   const response = await app.inject({
     method: "GET",
-    url: "/v1/resources/stage-context?projectId=project-001&stageCode=estimate&disciplineCode=building&knowledgeLimit=2",
+    url: "/v1/resources/stage-context?projectId=project-001&stageCode=estimate&disciplineCode=building&knowledgeLimit=2&memoryLimit=4",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -834,6 +890,15 @@ test("GET /v1/resources/stage-context aggregates stage summary and knowledge", a
         totalCount: 1,
       },
       latestKnowledgeEntries: [{ id: "knowledge-entry-001", title: "stage-risk" }],
+      latestMemorySummary: {
+        totalCount: 1,
+        subjectTypeCounts: {
+          project: 1,
+        },
+      },
+      latestMemoryEntries: [
+        { id: "memory-entry-001", memoryKey: "estimate:preference" },
+      ],
     },
   });
   assert.deepEqual(requests, [
@@ -848,6 +913,12 @@ test("GET /v1/resources/stage-context aggregates stage summary and knowledge", a
       projectId: "project-001",
       stageCode: "estimate",
       limit: 2,
+    },
+    {
+      resource: "memory",
+      projectId: "project-001",
+      stageCode: "estimate",
+      limit: 4,
     },
   ]);
 
@@ -872,6 +943,11 @@ test("GET /v1/resources/bill-version-context aggregates version summary details 
         items: [{ id: "knowledge-entry-001", title: "version-review" }],
         summary: { totalCount: 1 },
       }),
+      fetchMemoryEntries: async (query) => ({
+        items: [{ id: "memory-entry-001", memoryKey: "version-context" }],
+        summary: { totalCount: 1 },
+        query,
+      }),
     } as never,
   });
   const token = await signAccessToken({
@@ -882,7 +958,7 @@ test("GET /v1/resources/bill-version-context aggregates version summary details 
 
   const response = await app.inject({
     method: "GET",
-    url: "/v1/resources/bill-version-context?projectId=project-001&billVersionId=bill-version-001&stageCode=estimate&disciplineCode=building&detailsLimit=3&knowledgeLimit=2",
+    url: "/v1/resources/bill-version-context?projectId=project-001&billVersionId=bill-version-001&stageCode=estimate&disciplineCode=building&detailsLimit=3&knowledgeLimit=2&memoryLimit=4",
     headers: {
       authorization: `Bearer ${token}`,
     },
@@ -919,6 +995,12 @@ test("GET /v1/resources/bill-version-context aggregates version summary details 
       },
       latestKnowledgeEntries: [
         { id: "knowledge-entry-001", title: "version-review" },
+      ],
+      latestMemorySummary: {
+        totalCount: 1,
+      },
+      latestMemoryEntries: [
+        { id: "memory-entry-001", memoryKey: "version-context" },
       ],
     },
   });

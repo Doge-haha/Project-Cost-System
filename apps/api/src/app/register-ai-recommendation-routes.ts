@@ -40,6 +40,8 @@ const generateBillRecommendationsSchema = createRecommendationSchema
     limit: z.number().int().positive().max(100).optional(),
   });
 
+const generateQuotaRecommendationsSchema = generateBillRecommendationsSchema;
+
 const generateVarianceWarningsSchema = z.object({
   projectId: z.string().min(1),
   stageCode: z.string().min(1).optional(),
@@ -139,14 +141,43 @@ export function registerAiRecommendationRoutes(
   });
 
   app.post("/v1/ai/quota-recommendations", async (request, reply) =>
-    createRecommendation({
-      request,
-      reply,
-      transactionRunner,
-      aiRecommendationService,
-      recommendationType: "quota_recommendation",
-    }),
-  );
+  {
+    const payload = generateQuotaRecommendationsSchema.parse(request.body);
+    if (payload.outputPayload) {
+      return createRecommendation({
+        request,
+        reply,
+        transactionRunner,
+        aiRecommendationService,
+        recommendationType: "quota_recommendation",
+      });
+    }
+
+    const result = await transactionRunner.runInTransaction(() =>
+      aiRecommendationService.generateProviderRecommendations({
+        projectId: payload.projectId,
+        stageCode: payload.stageCode,
+        disciplineCode: payload.disciplineCode,
+        recommendationType: "quota_recommendation",
+        resourceType: payload.resourceType,
+        resourceId: payload.resourceId,
+        inputPayload: payload.inputPayload,
+        limit: payload.limit,
+        userId: request.currentUser!.id,
+      }),
+    );
+
+    reply.code(201);
+    return {
+      items: result.recommendations,
+      summary: aiRecommendationService.summarizeRecommendations(
+        result.recommendations,
+      ),
+      provider: result.provider,
+      telemetry: result.telemetry,
+      createdCount: result.createdCount,
+    };
+  });
 
   app.post("/v1/ai/variance-warnings", async (request, reply) => {
     const payload = generateVarianceWarningsSchema.parse(request.body);

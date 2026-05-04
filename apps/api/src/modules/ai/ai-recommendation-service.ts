@@ -12,7 +12,10 @@ import type { ProjectMemberRepository } from "../project/project-member-reposito
 import type { ProjectRepository } from "../project/project-repository.js";
 import type { ProjectStageRepository } from "../project/project-stage-repository.js";
 import type { QuotaLineRepository } from "../quota/quota-line-repository.js";
-import type { QuotaLineService } from "../quota/quota-line-service.js";
+import type {
+  QuotaLineService,
+  QuotaSourceCandidateRecord,
+} from "../quota/quota-line-service.js";
 import type { SummaryService } from "../reports/summary-service.js";
 import type {
   AiRecommendationRecord,
@@ -166,6 +169,24 @@ export class AiRecommendationService {
 
     if (input.recommendationType === "bill_recommendation") {
       const recommendations = await this.generateBillRecommendationCandidates(
+        input,
+      );
+      if (recommendations.length > 0) {
+        const provider = readAiProvider(recommendations[0].inputPayload);
+        return {
+          recommendations,
+          provider: {
+            provider: provider.provider,
+            model: provider.model,
+          },
+          telemetry: { durationMs: 0, retryCount: 0 },
+          createdCount: recommendations.length,
+        };
+      }
+    }
+
+    if (input.recommendationType === "quota_recommendation") {
+      const recommendations = await this.generateQuotaRecommendationCandidates(
         input,
       );
       if (recommendations.length > 0) {
@@ -517,6 +538,105 @@ export class AiRecommendationService {
             sourceBillItemId: item.id,
             recommendationReason: "source_version_missing_item",
           },
+          userId: input.userId,
+        }),
+      );
+    }
+
+    return created;
+  }
+
+  private async generateQuotaRecommendationCandidates(
+    input: RecommendationContext & {
+      resourceType?: string;
+      resourceId?: string;
+      limit?: number;
+      inputPayload?: Record<string, unknown>;
+    },
+  ): Promise<AiRecommendationRecord[]> {
+    if (
+      input.resourceType !== "bill_item" ||
+      !input.resourceId ||
+      !this.dependencies.quotaLineService
+    ) {
+      return [];
+    }
+
+    const billItem = await this.dependencies.billItemRepository?.findById(
+      input.resourceId,
+    );
+    if (!billItem) {
+      return [];
+    }
+
+    const billVersion = await this.dependencies.billVersionRepository?.findById(
+      billItem.billVersionId,
+    );
+    if (!billVersion) {
+      return [];
+    }
+
+    await this.assertProjectAccess(
+      {
+        projectId: input.projectId,
+        stageCode: billVersion.stageCode,
+        disciplineCode: billVersion.disciplineCode,
+        userId: input.userId,
+      },
+      "edit",
+    );
+
+    const [existingQuotaLines, candidates] = await Promise.all([
+      this.dependencies.quotaLineRepository?.listByBillItemId(billItem.id) ??
+        Promise.resolve([]),
+      this.dependencies.quotaLineService.listQuotaSourceCandidates({
+        projectId: input.projectId,
+        userId: input.userId,
+        disciplineCode: billVersion.disciplineCode,
+        keyword: billItem.itemName,
+      }),
+    ]);
+    const existingSources = new Set(
+      existingQuotaLines.map((line) =>
+        [line.sourceStandardSetCode, line.sourceQuotaId].join(":"),
+      ),
+    );
+    const freshCandidates = candidates
+      .filter(
+        (candidate) =>
+          !existingSources.has(
+            [candidate.sourceStandardSetCode, candidate.sourceQuotaId].join(":"),
+          ),
+      )
+      .slice(0, input.limit ?? 10);
+
+    const created: AiRecommendationRecord[] = [];
+    for (const candidate of freshCandidates) {
+      created.push(
+        await this.createRecommendation({
+          projectId: input.projectId,
+          stageCode: billVersion.stageCode,
+          disciplineCode: billVersion.disciplineCode,
+          resourceType: "bill_item",
+          resourceId: billItem.id,
+          recommendationType: "quota_recommendation",
+          inputPayload: {
+            ...(input.inputPayload ?? {}),
+            billVersionId: billVersion.id,
+            existingQuotaLineCount: existingQuotaLines.length,
+            aiProvider: {
+              provider: "rules_engine",
+              model: "quota_source_candidates",
+            },
+          },
+          outputPayload: buildQuotaRecommendationPayload(
+            billVersion.id,
+            billItem.quantity,
+            candidate,
+            existingQuotaLines.length === 0
+              ? "bill_item_missing_quota"
+              : "bill_item_alternative_quota",
+          ),
           userId: input.userId,
         }),
       );
@@ -1879,6 +1999,35 @@ function valuesEquivalent(left: unknown, right: unknown) {
     return Math.abs(left - right) < 0.000001;
   }
   return left === right;
+}
+
+function buildQuotaRecommendationPayload(
+  billVersionId: string,
+  billItemQuantity: number,
+  candidate: QuotaSourceCandidateRecord,
+  recommendationReason: string,
+): Record<string, unknown> {
+  return {
+    billVersionId,
+    sourceStandardSetCode: candidate.sourceStandardSetCode,
+    sourceQuotaId: candidate.sourceQuotaId,
+    sourceSequence: candidate.sourceSequence ?? null,
+    chapterCode: candidate.chapterCode,
+    quotaCode: candidate.quotaCode,
+    quotaName: candidate.quotaName,
+    unit: candidate.unit,
+    quantity: billItemQuantity,
+    laborFee: candidate.laborFee ?? null,
+    materialFee: candidate.materialFee ?? null,
+    machineFee: candidate.machineFee ?? null,
+    contentFactor: 1,
+    sourceMode: candidate.sourceMode,
+    sourceDataset: candidate.sourceDataset,
+    sourceRegion: candidate.sourceRegion ?? null,
+    matchReason: candidate.matchReason ?? null,
+    matchScore: candidate.matchScore ?? null,
+    recommendationReason,
+  };
 }
 
 function throwRollbackBlocked(change: AcceptedChange, reason: string): never {

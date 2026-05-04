@@ -33,6 +33,10 @@ import {
   InMemoryQuotaLineRepository,
   type QuotaLineRecord,
 } from "../src/modules/quota/quota-line-repository.js";
+import {
+  InMemoryReferenceQuotaRepository,
+  type ReferenceQuotaRecord,
+} from "../src/modules/quota/reference-quota-repository.js";
 import { InMemoryBackgroundJobRepository } from "../src/modules/jobs/background-job-repository.js";
 import { AiRuntimePreviewService } from "../src/modules/ai/ai-runtime-preview-service.js";
 
@@ -148,10 +152,34 @@ const billItems: BillItemRecord[] = [
   },
 ];
 
+const referenceQuotas: ReferenceQuotaRecord[] = [
+  {
+    id: "reference-quota-001",
+    sourceDataset: "JS-2014-reference",
+    sourceRegion: "江苏",
+    standardSetCode: "JS-2014",
+    disciplineCode: "building",
+    sourceQuotaId: "quota-001",
+    sourceSequence: 1,
+    chapterCode: "01",
+    quotaCode: "010101",
+    quotaName: "挖土方",
+    unit: "m3",
+    laborFee: 1,
+    materialFee: 2,
+    machineFee: 3,
+    workContentSummary: "土方开挖",
+    resourceCompositionSummary: "人工费 1 / 材料费 2 / 机械费 3",
+    searchText: "土方工程 挖土方 010101",
+    metadata: {},
+  },
+];
+
 function createRecommendationApp(input?: {
   billVersions?: BillVersionRecord[];
   billItems?: BillItemRecord[];
   quotaLines?: QuotaLineRecord[];
+  referenceQuotas?: ReferenceQuotaRecord[];
 }) {
   return createApp({
     jwtSecret,
@@ -166,6 +194,9 @@ function createRecommendationApp(input?: {
     ),
     billItemRepository: new InMemoryBillItemRepository(input?.billItems ?? billItems),
     quotaLineRepository: new InMemoryQuotaLineRepository(input?.quotaLines ?? []),
+    referenceQuotaRepository: new InMemoryReferenceQuotaRepository(
+      input?.referenceQuotas ?? referenceQuotas,
+    ),
     auditLogRepository: new InMemoryAuditLogRepository([]),
     aiRecommendationRepository: new InMemoryAiRecommendationRepository([]),
     backgroundJobRepository: new InMemoryBackgroundJobRepository([]),
@@ -296,6 +327,41 @@ test("POST /v1/ai/quota-recommendations preserves provided AI provider metadata"
   assert.deepEqual(response.json().inputPayload.aiRequestSummary.payloadKeys, [
     "candidateCount",
   ]);
+
+  await app.close();
+});
+
+test("POST /v1/ai/quota-recommendations generates quota candidates for bill items", async () => {
+  const app = createRecommendationApp();
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].resourceType, "bill_item");
+  assert.equal(response.json().items[0].resourceId, "bill-item-001");
+  assert.equal(response.json().items[0].outputPayload.billVersionId, "bill-version-001");
+  assert.equal(response.json().items[0].outputPayload.sourceQuotaId, "quota-001");
+  assert.equal(response.json().items[0].outputPayload.quotaCode, "010101");
+  assert.equal(response.json().items[0].outputPayload.quotaName, "挖土方");
+  assert.equal(response.json().items[0].outputPayload.quantity, 10);
+  assert.equal(
+    response.json().items[0].outputPayload.recommendationReason,
+    "bill_item_missing_quota",
+  );
+  assert.equal(response.json().provider.model, "quota_source_candidates");
 
   await app.close();
 });

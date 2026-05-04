@@ -438,6 +438,42 @@ test("POST /v1/ai/quota-recommendations suggests alternative quotas when one alr
   await app.close();
 });
 
+test("POST /v1/ai/quota-recommendations returns a missing quota prompt when no candidate matches", async () => {
+  const app = createRecommendationApp({
+    referenceQuotas: [],
+  });
+  const token = await createToken("engineer-001", "cost_engineer");
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/ai/quota-recommendations",
+    headers: { authorization: `Bearer ${token}` },
+    payload: {
+      projectId: "project-001",
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_item",
+      resourceId: "bill-item-001",
+    },
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(response.json().items.length, 1);
+  assert.equal(response.json().items[0].outputPayload.billVersionId, "bill-version-001");
+  assert.equal(
+    response.json().items[0].outputPayload.recommendationReason,
+    "bill_item_missing_quota_prompt",
+  );
+  assert.equal(response.json().items[0].outputPayload.promptType, "missing_quota");
+  assert.match(
+    response.json().items[0].outputPayload.prompt,
+    /土方工程.*没有匹配到候选定额/,
+  );
+  assert.equal(response.json().provider.model, "quota_missing_prompt");
+
+  await app.close();
+});
+
 test("POST /v1/ai/bill-recommendations expires older generated recommendations for the same resource", async () => {
   const app = createRecommendationApp();
   const token = await createToken("engineer-001", "cost_engineer");

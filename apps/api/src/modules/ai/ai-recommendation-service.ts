@@ -610,6 +610,34 @@ export class AiRecommendationService {
       )
       .slice(0, input.limit ?? 10);
 
+    if (freshCandidates.length === 0 && existingQuotaLines.length === 0) {
+      return [
+        await this.createRecommendation({
+          projectId: input.projectId,
+          stageCode: billVersion.stageCode,
+          disciplineCode: billVersion.disciplineCode,
+          resourceType: "bill_item",
+          resourceId: billItem.id,
+          recommendationType: "quota_recommendation",
+          inputPayload: {
+            ...(input.inputPayload ?? {}),
+            billVersionId: billVersion.id,
+            existingQuotaLineCount: 0,
+            aiProvider: {
+              provider: "rules_engine",
+              model: "quota_missing_prompt",
+            },
+          },
+          outputPayload: buildMissingQuotaPromptPayload(
+            billVersion.id,
+            billItem.itemCode,
+            billItem.itemName,
+          ),
+          userId: input.userId,
+        }),
+      ];
+    }
+
     const created: AiRecommendationRecord[] = [];
     for (const candidate of freshCandidates) {
       created.push(
@@ -2027,6 +2055,21 @@ function buildQuotaRecommendationPayload(
     matchReason: candidate.matchReason ?? null,
     matchScore: candidate.matchScore ?? null,
     recommendationReason,
+  };
+}
+
+function buildMissingQuotaPromptPayload(
+  billVersionId: string,
+  billItemCode: string,
+  billItemName: string,
+): Record<string, unknown> {
+  return {
+    billVersionId,
+    billItemCode,
+    billItemName,
+    promptType: "missing_quota",
+    recommendationReason: "bill_item_missing_quota_prompt",
+    prompt: `${billItemCode} ${billItemName} 没有匹配到候选定额，请补充定额库、调整清单名称关键字，或人工选择适用定额。`,
   };
 }
 

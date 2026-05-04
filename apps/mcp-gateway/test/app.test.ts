@@ -279,7 +279,8 @@ test("GET /v1/capabilities exposes resource and tool definitions", async () => {
         name: "export-summary-report",
         uri: "/v1/tools/export-summary-report",
         mode: "invoke",
-        description: "Queue an export task for summary or variance report output",
+        description:
+          "Queue an export task for summary, variance, or stage bill report output",
         parameters: ["projectId", "reportType", "stageCode?", "disciplineCode?"],
       },
       {
@@ -2598,7 +2599,7 @@ test("POST /v1/tools/export-summary-report returns async job and report task ref
     },
     payload: {
       projectId: "project-001",
-      reportType: "summary",
+      reportType: "stage_bill",
     },
   });
 
@@ -2609,7 +2610,7 @@ test("POST /v1/tools/export-summary-report returns async job and report task ref
     mode: "accepted",
     target: {
       projectId: "project-001",
-      reportType: "summary",
+      reportType: "stage_bill",
     },
     result: {
       job: {

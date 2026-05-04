@@ -56,7 +56,13 @@ function formatExportStatus(status: ReportExportTask["status"]) {
 }
 
 function formatReportType(reportType: ReportExportTask["reportType"]) {
-  return reportType === "variance" ? "偏差明细" : "汇总";
+  if (reportType === "variance") {
+    return "偏差明细";
+  }
+  if (reportType === "stage_bill") {
+    return "阶段清单";
+  }
+  return "汇总";
 }
 
 function formatPayloadText(value: unknown) {
@@ -679,6 +685,16 @@ export function SummaryPage() {
               type="button"
             >
               {exportingReportType === "variance" ? "创建中" : "导出偏差"}
+            </button>
+            <button
+              className="connection-button secondary"
+              disabled={exportingReportType !== null}
+              onClick={() => {
+                void createExportTask("stage_bill");
+              }}
+              type="button"
+            >
+              {exportingReportType === "stage_bill" ? "创建中" : "导出阶段清单"}
             </button>
           </div>
         </div>

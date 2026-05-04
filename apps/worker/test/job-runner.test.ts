@@ -71,6 +71,49 @@ test("runWorkerJob processes report_export variance jobs", async () => {
   });
 });
 
+test("runWorkerJob processes report_export stage bill jobs", async () => {
+  const result = await runWorkerJob(
+    {
+      id: "job-005",
+      jobType: "report_export",
+      status: "queued",
+      requestedBy: "user-001",
+      projectId: "project-001",
+      payload: {
+        projectId: "project-001",
+        reportType: "stage_bill",
+        stageCode: "estimate",
+      },
+      createdAt: "2026-04-17T00:00:00.000Z",
+    },
+    {
+      fetchSummary: async (input) => ({
+        projectId: input.projectId,
+        stageCode: input.stageCode ?? null,
+      }),
+      fetchVariance: async (input) => ({
+        limit: input.limit ?? null,
+        items: [{ itemId: "bill-item-001" }],
+      }),
+      recalculateProject: async () => ({ versions: [] }),
+      aiRuntimeClient: { processEventBatch: async () => ({}) } as never,
+    },
+  );
+
+  assert.equal(result.status, "completed");
+  assert.deepEqual(result.result, {
+    template: "stage_bill",
+    summary: {
+      projectId: "project-001",
+      stageCode: "estimate",
+    },
+    details: {
+      limit: 100,
+      items: [{ itemId: "bill-item-001" }],
+    },
+  });
+});
+
 test("runWorkerJob processes project_recalculate jobs", async () => {
   const result = await runWorkerJob(
     {

@@ -15,7 +15,7 @@ export type BackgroundJobStatus =
 
 export type ReportExportJobPayload = {
   projectId: string;
-  reportType: "summary" | "variance";
+  reportType: "summary" | "variance" | "stage_bill";
   reportExportTaskId?: string | null;
   stageCode?: string | null;
   disciplineCode?: string | null;

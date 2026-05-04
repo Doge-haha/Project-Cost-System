@@ -141,7 +141,7 @@ export const aiProviderTelemetryQuerySchema = z.object({
 
 export const exportSummaryReportToolSchema = z.object({
   projectId: z.string().min(1),
-  reportType: z.enum(["summary", "variance"]),
+  reportType: z.enum(["summary", "variance", "stage_bill"]),
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
 });

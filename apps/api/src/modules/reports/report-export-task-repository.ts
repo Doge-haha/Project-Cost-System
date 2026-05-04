@@ -11,7 +11,7 @@ export type ReportExportTaskStatus =
   | "completed"
   | "failed";
 
-export type ReportExportTaskType = "summary" | "variance";
+export type ReportExportTaskType = "summary" | "variance" | "stage_bill";
 
 export type ReportExportTaskRecord = {
   id: string;

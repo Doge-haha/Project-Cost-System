@@ -944,7 +944,7 @@ export const apiClient = {
   },
   createReportExportTask(input: {
     projectId: string;
-    reportType: "summary" | "variance";
+    reportType: "summary" | "variance" | "stage_bill";
     stageCode?: string;
     disciplineCode?: string;
   }) {

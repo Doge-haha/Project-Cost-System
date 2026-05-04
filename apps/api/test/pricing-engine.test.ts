@@ -2561,6 +2561,101 @@ test("POST /v1/reports/export queues a summary export task that completes when t
   await app.close();
 });
 
+test("POST /v1/reports/export supports stage bill report template", async () => {
+  const backgroundJobSink = new RecordingBackgroundJobSink();
+  const app = createPricingApp({
+    projectDefaults: {
+      defaultPriceVersionId: "price-version-001",
+      defaultFeeTemplateId: "fee-template-001",
+    },
+    backgroundJobSink,
+  });
+  const token = await signAccessToken(
+    {
+      sub: "engineer-001",
+      roleCodes: ["cost_engineer"],
+      displayName: "Cost Engineer",
+    },
+    jwtSecret,
+  );
+  const operatorToken = await signAccessToken(
+    {
+      sub: "ops-001",
+      roleCodes: ["system_admin"],
+      displayName: "Ops Admin",
+    },
+    jwtSecret,
+  );
+
+  await app.inject({
+    method: "POST",
+    url: "/v1/engine/calculate",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      billItemId: "bill-item-001",
+    },
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    url: "/v1/reports/export",
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+    payload: {
+      projectId: "project-001",
+      reportType: "stage_bill",
+      stageCode: "estimate",
+      disciplineCode: "building",
+    },
+  });
+
+  assert.equal(createResponse.statusCode, 202);
+  assert.equal(createResponse.json().result.reportType, "stage_bill");
+  assert.equal(backgroundJobSink.jobs[0].payload.reportType, "stage_bill");
+
+  const processResponse = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${createResponse.json().job.id}/process`,
+    headers: {
+      authorization: `Bearer ${operatorToken}`,
+    },
+  });
+
+  assert.equal(processResponse.statusCode, 200);
+  const taskId = createResponse.json().result.id as string;
+  const completedTaskResponse = await app.inject({
+    method: "GET",
+    url: `/v1/reports/export/${taskId}`,
+    headers: {
+      authorization: `Bearer ${token}`,
+    },
+  });
+
+  assert.equal(completedTaskResponse.statusCode, 200);
+  assert.equal(completedTaskResponse.json().status, "completed");
+  assert.equal(completedTaskResponse.json().resultPreview.template, "stage_bill");
+  assert.equal(
+    completedTaskResponse.json().resultPreview.summary.projectId,
+    "project-001",
+  );
+  assert.ok(
+    completedTaskResponse
+      .json()
+      .resultPreview.details.items.some(
+        (item: { itemCode?: string }) => item.itemCode === "A.1",
+      ),
+  );
+  assert.equal(
+    completedTaskResponse.json().downloadFileName,
+    `stage_bill-${taskId}.json`,
+  );
+
+  await app.close();
+});
+
 test("POST /v1/reports/export rejects roles without report export permission", async () => {
   const app = createPricingApp({
     projectDefaults: {

@@ -12,7 +12,7 @@ import type {
 
 export const createReportExportTaskSchema = z.object({
   projectId: z.string().min(1),
-  reportType: z.enum(["summary", "variance"]),
+  reportType: z.enum(["summary", "variance", "stage_bill"]),
   stageCode: z.string().min(1).optional(),
   disciplineCode: z.string().min(1).optional(),
 });
@@ -34,7 +34,7 @@ export class ReportExportTaskService {
 
   async createReportExportTask(input: {
     projectId: string;
-    reportType: "summary" | "variance";
+    reportType: "summary" | "variance" | "stage_bill";
     stageCode?: string;
     disciplineCode?: string;
     userId: string;
@@ -96,21 +96,7 @@ export class ReportExportTaskService {
     });
 
     try {
-      const resultPreview =
-        task.reportType === "summary"
-          ? await this.summaryService.getSummary({
-              projectId: task.projectId,
-              stageCode: task.stageCode ?? undefined,
-              disciplineCode: task.disciplineCode ?? undefined,
-              userId: input.userId,
-            })
-          : await this.summaryService.getSummaryDetails({
-              projectId: task.projectId,
-              stageCode: task.stageCode ?? undefined,
-              disciplineCode: task.disciplineCode ?? undefined,
-              limit: 20,
-              userId: input.userId,
-            });
+      const resultPreview = await this.buildReportPreview(task, input.userId);
       const downloadFileName = `${task.reportType}-${task.id}.json`;
       const downloadContentType = "application/json; charset=utf-8";
       const downloadContentLength = Buffer.byteLength(
@@ -172,6 +158,47 @@ export class ReportExportTaskService {
             "Unknown export task error",
           );
     }
+  }
+
+  private async buildReportPreview(
+    task: ReportExportTaskRecord,
+    userId: string,
+  ): Promise<Record<string, unknown>> {
+    if (task.reportType === "summary") {
+      return this.summaryService.getSummary({
+        projectId: task.projectId,
+        stageCode: task.stageCode ?? undefined,
+        disciplineCode: task.disciplineCode ?? undefined,
+        userId,
+      });
+    }
+
+    if (task.reportType === "stage_bill") {
+      return {
+        template: "stage_bill",
+        summary: await this.summaryService.getSummary({
+          projectId: task.projectId,
+          stageCode: task.stageCode ?? undefined,
+          disciplineCode: task.disciplineCode ?? undefined,
+          userId,
+        }),
+        details: await this.summaryService.getSummaryDetails({
+          projectId: task.projectId,
+          stageCode: task.stageCode ?? undefined,
+          disciplineCode: task.disciplineCode ?? undefined,
+          limit: 100,
+          userId,
+        }),
+      };
+    }
+
+    return this.summaryService.getSummaryDetails({
+      projectId: task.projectId,
+      stageCode: task.stageCode ?? undefined,
+      disciplineCode: task.disciplineCode ?? undefined,
+      limit: 20,
+      userId,
+    });
   }
 
   async getReportExportTask(input: {

@@ -655,7 +655,7 @@ export class GatewayApiClient {
   async exportSummaryReport(
     input: {
       projectId: string;
-      reportType: "summary" | "variance";
+      reportType: "summary" | "variance" | "stage_bill";
       stageCode?: string;
       disciplineCode?: string;
     },

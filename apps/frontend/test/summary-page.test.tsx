@@ -860,6 +860,7 @@ describe("SummaryPage", () => {
       }
 
       if (url.pathname === "/v1/reports/export" && init?.method === "POST") {
+        const payload = JSON.parse(String(init.body)) as { reportType: string };
         return createJsonResponse({
           job: {
             id: "job-export-001",
@@ -869,7 +870,7 @@ describe("SummaryPage", () => {
           result: {
             id: "report-task-001",
             projectId: "project-001",
-            reportType: "summary",
+            reportType: payload.reportType,
             status: "queued",
             requestedBy: "engineer-001",
             createdAt: "2026-04-26T08:00:00.000Z",
@@ -885,7 +886,7 @@ describe("SummaryPage", () => {
         return createJsonResponse({
           id: "report-task-001",
           projectId: "project-001",
-          reportType: "summary",
+          reportType: "stage_bill",
           status: "completed",
           requestedBy: "engineer-001",
           createdAt: "2026-04-26T08:00:00.000Z",
@@ -925,10 +926,11 @@ describe("SummaryPage", () => {
       expect(screen.getByRole("heading", { name: "汇总页" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "导出汇总" }));
+    expect(screen.getByRole("button", { name: "导出阶段清单" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "导出阶段清单" }));
 
     await waitFor(() => {
-      expect(screen.getByText("汇总导出 · 排队中")).toBeInTheDocument();
+      expect(screen.getByText("阶段清单导出 · 排队中")).toBeInTheDocument();
     });
     expect(screen.getByText("后台任务 job-export-001")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "下载文件" })).toBeDisabled();
@@ -936,7 +938,7 @@ describe("SummaryPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "刷新状态" }));
 
     await waitFor(() => {
-      expect(screen.getByText("汇总导出 · 已完成")).toBeInTheDocument();
+      expect(screen.getByText("阶段清单导出 · 已完成")).toBeInTheDocument();
     });
     expect(screen.getByText("文件 summary-report-task-001.json")).toBeInTheDocument();
 

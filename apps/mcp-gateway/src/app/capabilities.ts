@@ -183,7 +183,7 @@ export const TOOL_DEFINITIONS = [
     name: "export-summary-report",
     uri: "/v1/tools/export-summary-report",
     mode: "invoke",
-    description: "Queue an export task for summary or variance report output",
+    description: "Queue an export task for summary, variance, or stage bill report output",
     parameters: ["projectId", "reportType", "stageCode?", "disciplineCode?"],
   },
   {

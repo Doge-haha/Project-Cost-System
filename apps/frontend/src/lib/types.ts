@@ -580,7 +580,7 @@ export type VersionCompareResponse = {
 export type ReportExportTask = {
   id: string;
   projectId: string;
-  reportType: "summary" | "variance";
+  reportType: "summary" | "variance" | "stage_bill";
   status: "queued" | "processing" | "completed" | "failed";
   requestedBy: string;
   stageCode?: string | null;

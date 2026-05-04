@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { SignJWT } from "jose";
 
 import { RESOURCE_DEFINITIONS, TOOL_DEFINITIONS } from "../src/app/capabilities.js";
+import {
+  buildBillVersionContextResource,
+  buildProjectContextResource,
+  buildStageContextResource,
+} from "../src/app/mcp-context-builder/index.js";
 import { createGatewayApp } from "../src/main.js";
 
 const jwtSecret = "mcp-gateway-test-secret";
@@ -832,6 +837,109 @@ test("GET /v1/resources/project-context includes optional job status snapshot", 
   });
 
   await app.close();
+});
+
+test("MCP context builders normalize missing summaries and item arrays", () => {
+  assert.deepEqual(
+    buildProjectContextResource({
+      scope: {
+        projectId: "project-001",
+        stageCode: "estimate",
+        disciplineCode: "building",
+      },
+      parts: {
+        projectSummary: { totalFinalAmount: 3210 },
+        jobsSummary: { summary: { totalCount: 0 } },
+        jobStatus: null,
+        latestKnowledgeExtractionJobs: { items: [] },
+        latestKnowledgeEntries: { items: "invalid", summary: null },
+        latestMemoryEntries: { summary: { totalCount: 1 } },
+      },
+    }),
+    {
+      resourceType: "project_context",
+      scope: {
+        projectId: "project-001",
+        stageCode: "estimate",
+        disciplineCode: "building",
+        jobId: null,
+      },
+      data: {
+        projectSummary: { totalFinalAmount: 3210 },
+        jobsSummary: { summary: { totalCount: 0 } },
+        jobStatus: null,
+        latestKnowledgeExtractionJob: null,
+        latestKnowledgeSummary: null,
+        latestKnowledgeEntries: [],
+        latestMemorySummary: { totalCount: 1 },
+        latestMemoryEntries: [],
+      },
+    },
+  );
+});
+
+test("MCP context builders preserve stage and bill-version scopes", () => {
+  assert.deepEqual(
+    buildStageContextResource({
+      scope: {
+        projectId: "project-001",
+        stageCode: "estimate",
+      },
+      parts: {
+        projectSummary: { totalFinalAmount: 4560 },
+        latestKnowledgeEntries: { items: [{ id: "knowledge-entry-001" }] },
+        latestMemoryEntries: { items: [{ id: "memory-entry-001" }] },
+      },
+    }),
+    {
+      resourceType: "stage_context",
+      scope: {
+        projectId: "project-001",
+        stageCode: "estimate",
+        disciplineCode: null,
+      },
+      data: {
+        projectSummary: { totalFinalAmount: 4560 },
+        latestKnowledgeSummary: null,
+        latestKnowledgeEntries: [{ id: "knowledge-entry-001" }],
+        latestMemorySummary: null,
+        latestMemoryEntries: [{ id: "memory-entry-001" }],
+      },
+    },
+  );
+
+  assert.deepEqual(
+    buildBillVersionContextResource({
+      scope: {
+        projectId: "project-001",
+        billVersionId: "bill-version-001",
+        disciplineCode: "building",
+      },
+      parts: {
+        projectSummary: { totalFinalAmount: 7890 },
+        summaryDetails: { items: [{ itemId: "bill-item-001" }] },
+        latestKnowledgeEntries: { summary: { totalCount: 0 } },
+        latestMemoryEntries: { items: [] },
+      },
+    }),
+    {
+      resourceType: "bill_version_context",
+      scope: {
+        projectId: "project-001",
+        billVersionId: "bill-version-001",
+        stageCode: null,
+        disciplineCode: "building",
+      },
+      data: {
+        projectSummary: { totalFinalAmount: 7890 },
+        summaryDetails: { items: [{ itemId: "bill-item-001" }] },
+        latestKnowledgeSummary: { totalCount: 0 },
+        latestKnowledgeEntries: [],
+        latestMemorySummary: null,
+        latestMemoryEntries: [],
+      },
+    },
+  );
 });
 
 test("GET /v1/resources/stage-context aggregates stage summary and knowledge", async () => {

@@ -628,11 +628,14 @@ MCP 返回的 `execution.statusResource.query.jobId` 可继续查询
 
 ## 11. 推荐代码组织
 
-后端建议新增模块：
+MCP Gateway 已预留模块：
 
 - `mcp-capability`
 - `mcp-context-builder`
 - `mcp-permission-guard`
+
+后续可继续新增模块：
+
 - `mcp-search-adapter`
 
 ### 子模块职责

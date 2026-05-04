@@ -3,6 +3,11 @@ import type { FastifyInstance } from "fastify";
 import type { GatewayApiClient } from "../runtime/api-client.js";
 import { AppError } from "../shared/app-error.js";
 import { buildImportFailureContextResource } from "./import-failure-context.js";
+import {
+  buildBillVersionContextResource,
+  buildProjectContextResource,
+  buildStageContextResource,
+} from "./mcp-context-builder/index.js";
 import { resourceEnvelope } from "./responders.js";
 import {
   aiProviderTelemetryQuerySchema,
@@ -131,43 +136,19 @@ export function registerResourceRoutes(
       ),
     ]);
 
-    return resourceEnvelope({
-      resourceType: "project_context",
-      scope: {
-        projectId: query.projectId,
-        stageCode: query.stageCode ?? null,
-        disciplineCode: query.disciplineCode ?? null,
-        jobId: query.jobId ?? null,
-      },
-      data: {
-        projectSummary,
-        jobsSummary,
-        jobStatus,
-        latestKnowledgeExtractionJob:
-          Array.isArray(latestKnowledgeExtractionJobs.items) &&
-          latestKnowledgeExtractionJobs.items.length > 0
-            ? latestKnowledgeExtractionJobs.items[0]
-            : null,
-        latestKnowledgeSummary:
-          typeof latestKnowledgeEntries.summary === "object" &&
-          latestKnowledgeEntries.summary !== null
-            ? latestKnowledgeEntries.summary
-            : null,
-        latestKnowledgeEntries:
-          Array.isArray(latestKnowledgeEntries.items)
-            ? latestKnowledgeEntries.items
-            : [],
-        latestMemorySummary:
-          typeof latestMemoryEntries.summary === "object" &&
-          latestMemoryEntries.summary !== null
-            ? latestMemoryEntries.summary
-            : null,
-        latestMemoryEntries:
-          Array.isArray(latestMemoryEntries.items)
-            ? latestMemoryEntries.items
-            : [],
-      },
-    });
+    return resourceEnvelope(
+      buildProjectContextResource({
+        scope: query,
+        parts: {
+          projectSummary,
+          jobsSummary,
+          jobStatus,
+          latestKnowledgeExtractionJobs,
+          latestKnowledgeEntries,
+          latestMemoryEntries,
+        },
+      }),
+    );
   });
 
   app.get("/v1/resources/stage-context", async (request) => {
@@ -199,35 +180,16 @@ export function registerResourceRoutes(
       ),
     ]);
 
-    return resourceEnvelope({
-      resourceType: "stage_context",
-      scope: {
-        projectId: query.projectId,
-        stageCode: query.stageCode,
-        disciplineCode: query.disciplineCode ?? null,
-      },
-      data: {
-        projectSummary,
-        latestKnowledgeSummary:
-          typeof latestKnowledgeEntries.summary === "object" &&
-          latestKnowledgeEntries.summary !== null
-            ? latestKnowledgeEntries.summary
-            : null,
-        latestKnowledgeEntries:
-          Array.isArray(latestKnowledgeEntries.items)
-            ? latestKnowledgeEntries.items
-            : [],
-        latestMemorySummary:
-          typeof latestMemoryEntries.summary === "object" &&
-          latestMemoryEntries.summary !== null
-            ? latestMemoryEntries.summary
-            : null,
-        latestMemoryEntries:
-          Array.isArray(latestMemoryEntries.items)
-            ? latestMemoryEntries.items
-            : [],
-      },
-    });
+    return resourceEnvelope(
+      buildStageContextResource({
+        scope: query,
+        parts: {
+          projectSummary,
+          latestKnowledgeEntries,
+          latestMemoryEntries,
+        },
+      }),
+    );
   });
 
   app.get("/v1/resources/bill-version-context", async (request) => {
@@ -263,37 +225,17 @@ export function registerResourceRoutes(
         ),
       ]);
 
-    return resourceEnvelope({
-      resourceType: "bill_version_context",
-      scope: {
-        projectId: query.projectId,
-        billVersionId: query.billVersionId,
-        stageCode: query.stageCode ?? null,
-        disciplineCode: query.disciplineCode ?? null,
-      },
-      data: {
-        projectSummary,
-        summaryDetails,
-        latestKnowledgeSummary:
-          typeof latestKnowledgeEntries.summary === "object" &&
-          latestKnowledgeEntries.summary !== null
-            ? latestKnowledgeEntries.summary
-            : null,
-        latestKnowledgeEntries:
-          Array.isArray(latestKnowledgeEntries.items)
-            ? latestKnowledgeEntries.items
-            : [],
-        latestMemorySummary:
-          typeof latestMemoryEntries.summary === "object" &&
-          latestMemoryEntries.summary !== null
-            ? latestMemoryEntries.summary
-            : null,
-        latestMemoryEntries:
-          Array.isArray(latestMemoryEntries.items)
-            ? latestMemoryEntries.items
-            : [],
-      },
-    });
+    return resourceEnvelope(
+      buildBillVersionContextResource({
+        scope: query,
+        parts: {
+          projectSummary,
+          summaryDetails,
+          latestKnowledgeEntries,
+          latestMemoryEntries,
+        },
+      }),
+    );
   });
 
   app.get("/v1/resources/knowledge-search", async (request) => {

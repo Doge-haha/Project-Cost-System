@@ -63,6 +63,10 @@ npm --workspace @saas-pricing/mcp-gateway run typecheck
 `project-context`、`stage-context`、`bill-version-context` 会同时聚合最新
 `knowledge-entries` 与 `memory-entries`，并继续通过 API 应用层读取，继承项目、
 阶段和专业权限裁剪。
+
+MCP 模块边界已预留为 `mcp-capability`、`mcp-context-builder`、
+`mcp-permission-guard`，上下文 resource 由 context builder 统一打包，权限继续
+通过 API bearer token 透传裁剪。
 - `generate-ai-recommendations`
 - `expire-stale-ai-recommendations`
 - `decide-review`

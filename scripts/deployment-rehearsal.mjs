@@ -5,10 +5,11 @@ import net from "node:net";
 import { SignJWT } from "jose";
 import pg from "pg";
 
+const cliArgs = new Set(process.argv.slice(2));
+const trialMode = cliArgs.has("--trial") || process.env.TRIAL_REHEARSAL === "1";
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/saas_pricing";
 const jwtSecret = process.env.JWT_SECRET ?? "deployment-rehearsal-secret";
-const cliArgs = new Set(process.argv.slice(2));
 const requireLlmProvider =
   cliArgs.has("--require-llm-provider") || process.env.REQUIRE_LLM_PROVIDER === "1";
 const rootEnv = {
@@ -24,6 +25,7 @@ const report = {
 };
 
 async function main() {
+  assertRehearsalConfig();
   await run("docker dependencies", "npm", ["run", "dev:deps:up"], rootEnv);
   await run(
     "database migrations",
@@ -376,6 +378,26 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 
   await stopAll();
+}
+
+function assertRehearsalConfig() {
+  if (!trialMode) {
+    return;
+  }
+
+  const missing = [
+    "DATABASE_URL",
+    "JWT_SECRET",
+    "LLM_API_KEY",
+    "LLM_MODEL",
+    "LLM_BASE_URL",
+  ].filter((name) => !process.env[name]?.trim());
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Trial rehearsal requires explicit environment variables: ${missing.join(", ")}`,
+    );
+  }
 }
 
 async function signToken(payload) {

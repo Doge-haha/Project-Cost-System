@@ -52,6 +52,7 @@ Date: 2026-05-05
 - Fixed rehearsal blockers in database mode: Provider health no longer depends on a synthetic global audit project, and system-admin Worker tokens can read report summaries for queued export jobs.
 - Added strict Provider rehearsal mode so试运行准入 can fail fast when real `LLM_API_KEY`/`LLM_MODEL`/`LLM_BASE_URL` Provider health is missing.
 - Extended deployment rehearsal with a repeatable business sample: trial discipline/price/fee seed, bill version, bill item, work item, quota line, bill-version recalculation assertion, AI bill recommendation acceptance, source-bill semantic import upload (`ZaoJia_Qd_QdList` / `ZaoJia_Qd_Qdxm` / `ZaoJia_Qd_Gznr`), report export, runtime diagnostics, and frontend production build.
+- Added `npm run deploy:trial-rehearsal`, a trial-mode wrapper that requires explicit `DATABASE_URL`, `JWT_SECRET`, and `LLM_*` Provider settings before running the same strict rehearsal chain.
 
 ## Validation
 
@@ -71,6 +72,8 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 npm --workspace saas-pricing-frontend test -- test/project-detail-page.test.tsx
 npm run test:workspace
 npm run deploy:rehearsal
+npm run deploy:provider-rehearsal
+npm run deploy:trial-rehearsal
 ```
 
 Database smoke initially blocked because Docker daemon was not running at `/Users/huahaha/.docker/run/docker.sock`; after Docker started, the same command passed.
@@ -97,7 +100,7 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 
 - Treat I1-I5 as complete unless new regression evidence appears.
 - Continue I6 production hardening:
-  1. run `npm run deploy:provider-rehearsal` against the trial environment
+  1. run `npm run deploy:trial-rehearsal` against the trial environment
   2. replace the built-in source-bill semantic JSON sample with a real source-bill file once the trial file is available
-  3. push/local PR handling when remote scope is restored
+  3. push/local PR handling when GitHub HTTPS connectivity is restored
 - Do not spend more cycles waiting on push unless explicitly asked.

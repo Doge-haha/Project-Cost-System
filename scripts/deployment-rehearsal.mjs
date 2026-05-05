@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import fs from "node:fs/promises";
 import net from "node:net";
+import path from "node:path";
 
 import { SignJWT } from "jose";
 import pg from "pg";
@@ -23,6 +25,10 @@ const report = {
   startedAt: new Date().toISOString(),
   checks: [],
 };
+const sourceBillSamplePath = path.resolve(
+  process.cwd(),
+  "scripts/data/deployment-rehearsal-source-bill.json",
+);
 
 async function main() {
   assertRehearsalConfig();
@@ -309,13 +315,11 @@ async function main() {
         fileName: "deployment-rehearsal-source-bill.json",
         sourceType: "source_bill",
         sourceLabel: "部署演练源清单样本",
-        fileContent: JSON.stringify(
-          buildSourceBillImportEvents({
-            projectId,
-            billVersionId,
-            billItemId: billItem.id,
-          }),
-        ),
+        fileContent: await readSourceBillImportSample({
+          projectId,
+          billVersionId,
+          billItemId: billItem.id,
+        }),
       },
       expectedStatus: 202,
     },
@@ -400,6 +404,31 @@ function assertRehearsalConfig() {
   }
 }
 
+async function readSourceBillImportSample(input) {
+  const raw = await fs.readFile(sourceBillSamplePath, "utf8");
+  const events = JSON.parse(raw);
+  return JSON.stringify(
+    events.map((event) => ({
+      ...event,
+      projectId: input.projectId,
+      resourceId: resolveSampleResourceId(event, input),
+    })),
+  );
+}
+
+function resolveSampleResourceId(event, input) {
+  if (event.resourceType === "ZaoJia_Qd_QdList") {
+    return input.billVersionId;
+  }
+  if (event.resourceType === "ZaoJia_Qd_Qdxm") {
+    return input.billItemId;
+  }
+  if (event.resourceType === "ZaoJia_Qd_Gznr") {
+    return `${input.billItemId}:work-1`;
+  }
+  return event.resourceId;
+}
+
 async function signToken(payload) {
   return new SignJWT({
     displayName: payload.displayName,
@@ -410,44 +439,6 @@ async function signToken(payload) {
     .setIssuedAt()
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(jwtSecret));
-}
-
-function buildSourceBillImportEvents(input) {
-  return [
-    {
-      projectId: input.projectId,
-      resourceType: "ZaoJia_Qd_QdList",
-      resourceId: input.billVersionId,
-      action: "source_bill.version_imported",
-      QdGf: "JS-2014",
-      Qdmc: "部署演练源清单",
-      IsVisible: true,
-      IsDefault: true,
-    },
-    {
-      projectId: input.projectId,
-      resourceType: "ZaoJia_Qd_Qdxm",
-      resourceId: input.billItemId,
-      action: "source_bill.item_imported",
-      QdGf: "JS-2014",
-      QdID: "SRC-QD-001",
-      Qdbh: "A-001",
-      Xmmc: "土方工程",
-      Dw: "m3",
-      Sjxh: 1,
-      Dj: 6,
-    },
-    {
-      projectId: input.projectId,
-      resourceType: "ZaoJia_Qd_Gznr",
-      resourceId: `${input.billItemId}:work-1`,
-      action: "source_bill.work_item_imported",
-      QdGf: "JS-2014",
-      QdID: "SRC-QD-001",
-      Sjxh: 1,
-      Gznr: "土方开挖、场内倒运、基底清理",
-    },
-  ];
 }
 
 async function seedTrialProjectReferenceData(projectId) {

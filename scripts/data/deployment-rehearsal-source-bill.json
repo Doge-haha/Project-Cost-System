@@ -1,0 +1,29 @@
+[
+  {
+    "resourceType": "ZaoJia_Qd_QdList",
+    "action": "source_bill.version_imported",
+    "QdGf": "JS-2014",
+    "Qdmc": "部署演练源清单",
+    "IsVisible": true,
+    "IsDefault": true
+  },
+  {
+    "resourceType": "ZaoJia_Qd_Qdxm",
+    "action": "source_bill.item_imported",
+    "QdGf": "JS-2014",
+    "QdID": "SRC-QD-001",
+    "Qdbh": "A-001",
+    "Xmmc": "土方工程",
+    "Dw": "m3",
+    "Sjxh": 1,
+    "Dj": 6
+  },
+  {
+    "resourceType": "ZaoJia_Qd_Gznr",
+    "action": "source_bill.work_item_imported",
+    "QdGf": "JS-2014",
+    "QdID": "SRC-QD-001",
+    "Sjxh": 1,
+    "Gznr": "土方开挖、场内倒运、基底清理"
+  }
+]

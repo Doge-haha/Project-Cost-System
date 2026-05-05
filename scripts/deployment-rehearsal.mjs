@@ -304,29 +304,31 @@ async function main() {
       method: "POST",
       token: ownerToken,
       body: {
-        fileName: "deployment-rehearsal-events.json",
-        sourceType: "deployment_rehearsal",
-        sourceLabel: "部署演练导入样本",
-        fileContent: JSON.stringify([
-          {
+        fileName: "deployment-rehearsal-source-bill.json",
+        sourceType: "source_bill",
+        sourceLabel: "部署演练源清单样本",
+        fileContent: JSON.stringify(
+          buildSourceBillImportEvents({
             projectId,
-            resourceType: "bill_item",
-            resourceId: billItem.id,
-            action: "sample_imported",
-            amount: 60,
-          },
-        ]),
+            billVersionId,
+            billItemId: billItem.id,
+          }),
+        ),
       },
       expectedStatus: 202,
     },
   );
-  if (importUpload.acceptedEventCount !== 1 || importUpload.eventCount !== 1) {
-    throw new Error("Business sample import upload did not accept the sample event");
+  if (importUpload.acceptedEventCount !== 3 || importUpload.eventCount !== 3) {
+    throw new Error("Business sample source-bill import did not accept all sample events");
+  }
+  if (importUpload.task.sourceType !== "source_bill") {
+    throw new Error("Business sample import task did not preserve source_bill type");
   }
   record("business sample import upload", {
     projectId,
     taskId: importUpload.task.id,
     jobId: importUpload.job.id,
+    sourceType: importUpload.task.sourceType,
     acceptedEventCount: importUpload.acceptedEventCount,
   });
 
@@ -386,6 +388,44 @@ async function signToken(payload) {
     .setIssuedAt()
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(jwtSecret));
+}
+
+function buildSourceBillImportEvents(input) {
+  return [
+    {
+      projectId: input.projectId,
+      resourceType: "ZaoJia_Qd_QdList",
+      resourceId: input.billVersionId,
+      action: "source_bill.version_imported",
+      QdGf: "JS-2014",
+      Qdmc: "部署演练源清单",
+      IsVisible: true,
+      IsDefault: true,
+    },
+    {
+      projectId: input.projectId,
+      resourceType: "ZaoJia_Qd_Qdxm",
+      resourceId: input.billItemId,
+      action: "source_bill.item_imported",
+      QdGf: "JS-2014",
+      QdID: "SRC-QD-001",
+      Qdbh: "A-001",
+      Xmmc: "土方工程",
+      Dw: "m3",
+      Sjxh: 1,
+      Dj: 6,
+    },
+    {
+      projectId: input.projectId,
+      resourceType: "ZaoJia_Qd_Gznr",
+      resourceId: `${input.billItemId}:work-1`,
+      action: "source_bill.work_item_imported",
+      QdGf: "JS-2014",
+      QdID: "SRC-QD-001",
+      Sjxh: 1,
+      Gznr: "土方开挖、场内倒运、基底清理",
+    },
+  ];
 }
 
 async function seedTrialProjectReferenceData(projectId) {

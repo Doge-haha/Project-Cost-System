@@ -32,6 +32,24 @@ describe("runtime config", () => {
     });
   });
 
+  test("ignores stale localhost defaults when env config is explicit", async () => {
+    vi.resetModules();
+    vi.stubEnv("VITE_API_BASE_URL", "http://127.0.0.1:3300");
+    window.localStorage.setItem(
+      "saas-pricing-frontend.runtime-config",
+      JSON.stringify({
+        apiBaseUrl: "http://localhost:3000",
+      }),
+    );
+
+    const { getRuntimeConfig: readFreshConfig } = await import("../src/lib/config");
+
+    expect(readFreshConfig()).toEqual({
+      apiBaseUrl: "http://127.0.0.1:3300",
+      apiBearerToken: undefined,
+    });
+  });
+
   test("notifies subscribers after saving runtime config", () => {
     const listener = vi.fn();
     const stop = onRuntimeConfigChange(listener);

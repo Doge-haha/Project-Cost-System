@@ -8,9 +8,11 @@ function readEnv(name: string): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 
+const envApiBaseUrl = readEnv("VITE_API_BASE_URL");
+const envApiBearerToken = readEnv("VITE_API_BEARER_TOKEN");
 const defaultConfig: RuntimeConfig = {
-  apiBaseUrl: readEnv("VITE_API_BASE_URL") ?? "http://localhost:3000",
-  apiBearerToken: readEnv("VITE_API_BEARER_TOKEN"),
+  apiBaseUrl: envApiBaseUrl ?? "http://localhost:3000",
+  apiBearerToken: envApiBearerToken,
 };
 
 const storageKey = "saas-pricing-frontend.runtime-config";
@@ -34,7 +36,17 @@ function readStoredConfig(): RuntimeConfig | null {
   }
 
   try {
-    return normalizeConfig(JSON.parse(rawValue) as Partial<RuntimeConfig>);
+    const storedConfig = normalizeConfig(JSON.parse(rawValue) as Partial<RuntimeConfig>);
+    if (
+      envApiBaseUrl &&
+      storedConfig.apiBaseUrl === "http://localhost:3000" &&
+      storedConfig.apiBaseUrl !== envApiBaseUrl &&
+      !storedConfig.apiBearerToken
+    ) {
+      window.localStorage.removeItem(storageKey);
+      return null;
+    }
+    return storedConfig;
   } catch {
     return null;
   }

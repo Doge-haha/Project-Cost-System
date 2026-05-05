@@ -53,6 +53,7 @@ Date: 2026-05-05
 - Added strict Provider rehearsal mode so试运行准入 can fail fast when real `LLM_API_KEY`/`LLM_MODEL`/`LLM_BASE_URL` Provider health is missing.
 - Extended deployment rehearsal with a repeatable business sample: trial discipline/price/fee seed, bill version, bill item, work item, quota line, bill-version recalculation assertion, AI bill recommendation acceptance, source-bill semantic import upload (`ZaoJia_Qd_QdList` / `ZaoJia_Qd_Qdxm` / `ZaoJia_Qd_Gznr`), report export, runtime diagnostics, and frontend production build.
 - Added `npm run deploy:trial-rehearsal`, a trial-mode wrapper that requires explicit `DATABASE_URL`, `JWT_SECRET`, and `LLM_*` Provider settings before running the same strict rehearsal chain.
+- Ran `npm run deploy:trial-rehearsal` with explicit local trial database, JWT secret, and MiniMax OpenAI-compatible Provider settings; the full strict rehearsal chain passed.
 
 ## Validation
 
@@ -80,6 +81,8 @@ Database smoke initially blocked because Docker daemon was not running at `/User
 
 `npm run deploy:provider-rehearsal` is now the required real-Provider gate for trial rollout. It intentionally fails in shells without `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL`. With `MiniMax-M2.7` on the OpenAI-compatible path, it passed locally and completed the bill/pricing/recalculate sample, AI recommendation acceptance, source-bill semantic import upload, report export job, runtime diagnostics, and frontend production build.
 
+`npm run deploy:trial-rehearsal` also passed with explicit `DATABASE_URL`, `JWT_SECRET`, `LLM_API_KEY`, `LLM_MODEL=MiniMax-M2.7`, and `LLM_BASE_URL=https://api.minimax.io/v1`. The run completed Docker dependency health checks, migrations, API database-mode startup, Provider health, business sample setup and recalculation, AI recommendation acceptance, report export Worker processing, source-bill upload with 3 accepted events, MCP runtime diagnostics, and frontend production build.
+
 Targeted validation also passed for:
 
 ```bash
@@ -100,7 +103,6 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 
 - Treat I1-I5 as complete unless new regression evidence appears.
 - Continue I6 production hardening:
-  1. run `npm run deploy:trial-rehearsal` against the trial environment
-  2. replace the built-in source-bill semantic JSON sample with a real source-bill file once the trial file is available
-  3. push/local PR handling when GitHub HTTPS connectivity is restored
-- Do not spend more cycles waiting on push unless explicitly asked.
+  1. replace `scripts/data/deployment-rehearsal-source-bill.json` with a real source-bill file once the trial file is available
+  2. repeat `npm run deploy:trial-rehearsal` after the real source-bill sample is wired
+  3. continue frontend/browser acceptance on `http://localhost:5173/projects` if trial users need UI walkthrough coverage

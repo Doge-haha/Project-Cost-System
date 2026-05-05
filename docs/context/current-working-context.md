@@ -51,7 +51,7 @@ Date: 2026-05-05
 - Added automated deployment rehearsal for Docker/Postgres, API, Worker, MCP Gateway runtime diagnostics, trial project creation, report export processing, and frontend production build.
 - Fixed rehearsal blockers in database mode: Provider health no longer depends on a synthetic global audit project, and system-admin Worker tokens can read report summaries for queued export jobs.
 - Added strict Provider rehearsal mode so试运行准入 can fail fast when real `LLM_API_KEY`/`LLM_MODEL`/`LLM_BASE_URL` Provider health is missing.
-- Extended deployment rehearsal with a repeatable business sample: trial discipline seed, bill version, bill item, work item, AI bill recommendation acceptance, report export, runtime diagnostics, and frontend production build.
+- Extended deployment rehearsal with a repeatable business sample: trial discipline/price/fee seed, bill version, bill item, work item, quota line, bill-version recalculation assertion, AI bill recommendation acceptance, source import upload, report export, runtime diagnostics, and frontend production build.
 
 ## Validation
 
@@ -75,7 +75,7 @@ npm run deploy:rehearsal
 
 Database smoke initially blocked because Docker daemon was not running at `/Users/huahaha/.docker/run/docker.sock`; after Docker started, the same command passed.
 
-`npm run deploy:provider-rehearsal` is now the required real-Provider gate for trial rollout. It intentionally fails in shells without `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL`. With `MiniMax-M2.7` on the OpenAI-compatible path, it passed locally and completed the business sample, report export job, runtime diagnostics, and frontend production build.
+`npm run deploy:provider-rehearsal` is now the required real-Provider gate for trial rollout. It intentionally fails in shells without `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL`. With `MiniMax-M2.7` on the OpenAI-compatible path, it passed locally and completed the bill/pricing/recalculate sample, AI recommendation acceptance, source import upload, report export job, runtime diagnostics, and frontend production build.
 
 Targeted validation also passed for:
 
@@ -98,6 +98,6 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 - Treat I1-I5 as complete unless new regression evidence appears.
 - Continue I6 production hardening:
   1. run `npm run deploy:provider-rehearsal` against the trial environment
-  2. execute a real source-bill import sample in the same rehearsal path
-  3. add pricing/recalculate assertions to the rehearsal once trial price/fee defaults are seeded
+  2. replace the JSON source import sample with a real source-bill import sample once the trial file is available
+  3. push/local PR handling when remote scope is restored
 - Do not spend more cycles waiting on push unless explicitly asked.

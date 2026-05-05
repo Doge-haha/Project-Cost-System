@@ -82,7 +82,7 @@ async function main() {
     expectedStatus: 201,
   });
   const projectId = createdProject.project.id;
-  await seedTrialProjectDisciplines(projectId);
+  const trialPricing = await seedTrialProjectReferenceData(projectId);
   record("project create", { projectId, code: projectCode });
 
   await requestJson(`${apiBaseUrl}/v1/projects/${projectId}/workspace`, {
@@ -135,10 +135,51 @@ async function main() {
       expectedStatus: 201,
     },
   );
+  await requestJson(`${apiBaseUrl}/v1/projects/${projectId}/quota-lines/batch-create`, {
+    method: "POST",
+    token: ownerToken,
+    body: {
+      items: [
+        {
+          billVersionId,
+          billItemId: billItem.id,
+          sourceStandardSetCode: "JS-2014",
+          sourceQuotaId: "trial-quota-010101",
+          sourceSequence: 1,
+          chapterCode: "01",
+          quotaCode: "010101",
+          quotaName: "挖土方",
+          unit: "m3",
+          quantity: 10,
+          laborFee: 1,
+          materialFee: 2,
+          machineFee: 3,
+          contentFactor: 1,
+          sourceMode: "manual",
+        },
+      ],
+    },
+    expectedStatus: 201,
+  });
+  const recalculation = await requestJson(
+    `${apiBaseUrl}/v1/projects/${projectId}/bill-versions/${billVersionId}/recalculate`,
+    {
+      method: "POST",
+      token: ownerToken,
+      body: {
+        priceVersionId: trialPricing.priceVersionId,
+        feeTemplateId: trialPricing.feeTemplateId,
+      },
+    },
+  );
+  if (recalculation.recalculatedCount < 1) {
+    throw new Error("Business sample recalculation did not price any bill item");
+  }
   record("business sample bill setup", {
     projectId,
     billVersionId,
     billItemId: billItem.id,
+    recalculatedCount: recalculation.recalculatedCount,
   });
 
   const providerHealth = await requestJson(`${apiBaseUrl}/v1/ai/provider-health`, {
@@ -241,7 +282,8 @@ async function main() {
       API_BASE_URL: apiBaseUrl,
       WORKER_TOKEN: systemToken,
       POLL_INTERVAL_MS: "100",
-      MAX_ITERATIONS: "1",
+      MAX_ITERATIONS: "5",
+      AI_RUNTIME_CLI_PATH: `${process.cwd()}/apps/ai-runtime/app/cli.py`,
     },
   );
   const jobs = await requestJson(`${apiBaseUrl}/v1/jobs?projectId=${projectId}`, {
@@ -254,6 +296,38 @@ async function main() {
   record("worker processed job", {
     jobId: processedJob.id,
     status: processedJob.status,
+  });
+
+  const importUpload = await requestJson(
+    `${apiBaseUrl}/v1/projects/${projectId}/import-tasks/upload`,
+    {
+      method: "POST",
+      token: ownerToken,
+      body: {
+        fileName: "deployment-rehearsal-events.json",
+        sourceType: "deployment_rehearsal",
+        sourceLabel: "部署演练导入样本",
+        fileContent: JSON.stringify([
+          {
+            projectId,
+            resourceType: "bill_item",
+            resourceId: billItem.id,
+            action: "sample_imported",
+            amount: 60,
+          },
+        ]),
+      },
+      expectedStatus: 202,
+    },
+  );
+  if (importUpload.acceptedEventCount !== 1 || importUpload.eventCount !== 1) {
+    throw new Error("Business sample import upload did not accept the sample event");
+  }
+  record("business sample import upload", {
+    projectId,
+    taskId: importUpload.task.id,
+    jobId: importUpload.job.id,
+    acceptedEventCount: importUpload.acceptedEventCount,
   });
 
   startProcess(
@@ -314,7 +388,7 @@ async function signToken(payload) {
     .sign(new TextEncoder().encode(jwtSecret));
 }
 
-async function seedTrialProjectDisciplines(projectId) {
+async function seedTrialProjectReferenceData(projectId) {
   const pool = new pg.Pool({
     connectionString: databaseUrl,
   });
@@ -329,6 +403,50 @@ async function seedTrialProjectDisciplines(projectId) {
       `,
       [`discipline-${projectId}-building`, projectId],
     );
+    await pool.query(
+      `
+        insert into price_version
+          (id, version_code, version_name, region_code, discipline_code, status)
+        values
+          ($1, $2, '部署演练价目', 'JS', 'building', 'active')
+        on conflict (id) do nothing
+      `,
+      [`price-${projectId}`, `TRIAL-${projectId}-PRICE`],
+    );
+    await pool.query(
+      `
+        insert into price_item
+          (id, price_version_id, quota_code, labor_unit_price, material_unit_price, machine_unit_price, total_unit_price)
+        values
+          ($1, $2, '010101', 1, 2, 3, 6)
+        on conflict (id) do nothing
+      `,
+      [`price-item-${projectId}-010101`, `price-${projectId}`],
+    );
+    await pool.query(
+      `
+        insert into fee_template
+          (id, template_name, project_type, region_code, stage_scope, tax_mode, allocation_mode, status)
+        values
+          ($1, '部署演练取费', 'building', 'JS', ARRAY['estimate'], 'general', 'proportional', 'active')
+        on conflict (id) do nothing
+      `,
+      [`fee-${projectId}`],
+    );
+    await pool.query(
+      `
+        insert into fee_rule
+          (id, fee_template_id, discipline_code, fee_type, fee_rate)
+        values
+          ($1, $2, 'building', 'management_fee', 0.1)
+        on conflict (id) do nothing
+      `,
+      [`fee-rule-${projectId}-management`, `fee-${projectId}`],
+    );
+    return {
+      priceVersionId: `price-${projectId}`,
+      feeTemplateId: `fee-${projectId}`,
+    };
   } finally {
     await pool.end();
   }

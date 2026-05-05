@@ -50,6 +50,7 @@ Date: 2026-05-05
 - Added project detail page runtime diagnostics panel for API health, Provider health/telemetry, and Worker task summary with links to task status and Provider diagnostics.
 - Added automated deployment rehearsal for Docker/Postgres, API, Worker, MCP Gateway runtime diagnostics, trial project creation, report export processing, and frontend production build.
 - Fixed rehearsal blockers in database mode: Provider health no longer depends on a synthetic global audit project, and system-admin Worker tokens can read report summaries for queued export jobs.
+- Added strict Provider rehearsal mode so试运行准入 can fail fast when real `LLM_API_KEY`/`LLM_MODEL`/`LLM_BASE_URL` Provider health is missing.
 
 ## Validation
 
@@ -73,6 +74,8 @@ npm run deploy:rehearsal
 
 Database smoke initially blocked because Docker daemon was not running at `/Users/huahaha/.docker/run/docker.sock`; after Docker started, the same command passed.
 
+`npm run deploy:provider-rehearsal` is now the required real-Provider gate for trial rollout. It intentionally fails in shells without `LLM_API_KEY`, `LLM_MODEL`, and `LLM_BASE_URL`.
+
 Targeted validation also passed for:
 
 ```bash
@@ -93,6 +96,7 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 
 - Treat I1-I5 as complete unless new regression evidence appears.
 - Continue I6 production hardening:
-  1. review deployment rehearsal output before real trial environment rollout
-  2. apply production secrets and run the same rehearsal against the trial environment
+  1. apply real Provider secrets and run `npm run deploy:provider-rehearsal`
+  2. run the same rehearsal against the trial environment
+  3. execute a real business sample through import, pricing, AI recommendation, report export, and runtime diagnostics
 - Do not spend more cycles waiting on push unless explicitly asked.

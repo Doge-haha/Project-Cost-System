@@ -7,6 +7,9 @@ import { SignJWT } from "jose";
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/saas_pricing";
 const jwtSecret = process.env.JWT_SECRET ?? "deployment-rehearsal-secret";
+const cliArgs = new Set(process.argv.slice(2));
+const requireLlmProvider =
+  cliArgs.has("--require-llm-provider") || process.env.REQUIRE_LLM_PROVIDER === "1";
 const rootEnv = {
   ...process.env,
   DATABASE_URL: databaseUrl,
@@ -91,11 +94,27 @@ async function main() {
   const providerHealth = await requestJson(`${apiBaseUrl}/v1/ai/provider-health`, {
     token: ownerToken,
   });
-  record("provider health", {
+  const providerHealthStatus = {
     configured: Boolean(providerHealth.configured),
     healthy: Boolean(providerHealth.healthy),
+    provider: providerHealth.provider ?? null,
+    model: providerHealth.model ?? null,
     message: providerHealth.message ?? null,
-  });
+    required: requireLlmProvider,
+  };
+  record("provider health", providerHealthStatus);
+  if (
+    requireLlmProvider &&
+    (!providerHealthStatus.configured || !providerHealthStatus.healthy)
+  ) {
+    throw new Error(
+      [
+        "LLM Provider rehearsal is required but /v1/ai/provider-health is not healthy.",
+        "Configure LLM_API_KEY, LLM_MODEL, and LLM_BASE_URL, then rerun npm run deploy:provider-rehearsal.",
+        `Provider health: ${JSON.stringify(providerHealthStatus)}`,
+      ].join(" "),
+    );
+  }
 
   const exportResponse = await requestJson(`${apiBaseUrl}/v1/reports/export`, {
     method: "POST",

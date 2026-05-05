@@ -39,6 +39,7 @@ describe("runtime config", () => {
       "saas-pricing-frontend.runtime-config",
       JSON.stringify({
         apiBaseUrl: "http://localhost:3000",
+        apiBearerToken: "stale-token",
       }),
     );
 
@@ -47,6 +48,23 @@ describe("runtime config", () => {
     expect(readFreshConfig()).toEqual({
       apiBaseUrl: "http://127.0.0.1:3300",
       apiBearerToken: undefined,
+    });
+  });
+
+  test("ignores stored overrides after env defaults change", async () => {
+    saveRuntimeConfig({
+      apiBaseUrl: "http://localhost:3000",
+      apiBearerToken: "stale-token",
+    });
+    vi.resetModules();
+    vi.stubEnv("VITE_API_BASE_URL", "http://127.0.0.1:3300");
+    vi.stubEnv("VITE_API_BEARER_TOKEN", "fresh-token");
+
+    const { getRuntimeConfig: readFreshConfig } = await import("../src/lib/config");
+
+    expect(readFreshConfig()).toEqual({
+      apiBaseUrl: "http://127.0.0.1:3300",
+      apiBearerToken: "fresh-token",
     });
   });
 

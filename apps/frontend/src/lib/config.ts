@@ -16,6 +16,7 @@ const defaultConfig: RuntimeConfig = {
 };
 
 const storageKey = "saas-pricing-frontend.runtime-config";
+const storageVersionKey = `${storageKey}.default-signature`;
 const listeners = new Set<(config: RuntimeConfig) => void>();
 
 function normalizeConfig(input: Partial<RuntimeConfig>): RuntimeConfig {
@@ -36,12 +37,17 @@ function readStoredConfig(): RuntimeConfig | null {
   }
 
   try {
+    const defaultSignature = JSON.stringify(defaultConfig);
+    if (window.localStorage.getItem(storageVersionKey) !== defaultSignature) {
+      window.localStorage.removeItem(storageKey);
+      window.localStorage.setItem(storageVersionKey, defaultSignature);
+      return null;
+    }
     const storedConfig = normalizeConfig(JSON.parse(rawValue) as Partial<RuntimeConfig>);
     if (
       envApiBaseUrl &&
       storedConfig.apiBaseUrl === "http://localhost:3000" &&
-      storedConfig.apiBaseUrl !== envApiBaseUrl &&
-      !storedConfig.apiBearerToken
+      storedConfig.apiBaseUrl !== envApiBaseUrl
     ) {
       window.localStorage.removeItem(storageKey);
       return null;
@@ -60,6 +66,7 @@ export function saveRuntimeConfig(input: RuntimeConfig): RuntimeConfig {
   const normalized = normalizeConfig(input);
   if (typeof window !== "undefined") {
     window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+    window.localStorage.setItem(storageVersionKey, JSON.stringify(defaultConfig));
   }
   listeners.forEach((listener) => {
     listener(normalized);
@@ -70,6 +77,7 @@ export function saveRuntimeConfig(input: RuntimeConfig): RuntimeConfig {
 export function resetRuntimeConfig() {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(storageKey);
+    window.localStorage.setItem(storageVersionKey, JSON.stringify(defaultConfig));
   }
   listeners.forEach((listener) => {
     listener(defaultConfig);

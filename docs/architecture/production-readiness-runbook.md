@@ -15,7 +15,7 @@ npm run deploy:provider-rehearsal
 ```
 
 `npm run dev:smoke:live-db` 依赖 Docker daemon、PostgreSQL 和 Redis。若 Docker 未启动，失败属于本地环境阻塞，不按代码回归处理。
-`npm run deploy:rehearsal` 会启动 API、Worker、MCP Gateway，创建试运行项目，执行报表导出任务，校验运行诊断资源，并完成前端生产构建。
+`npm run deploy:rehearsal` 会启动 API、Worker、MCP Gateway，创建试运行项目，执行清单版本/清单项/工作内容样本、AI 推荐接受样本、报表导出任务，校验运行诊断资源，并完成前端生产构建。
 `npm run deploy:provider-rehearsal` 在同一演练链路上强制要求真实 AI Provider 健康；缺少 `LLM_API_KEY`、`LLM_MODEL` 或 `LLM_BASE_URL` 时必须失败，不能作为试运行通过。
 
 ## 2. 关键环境变量

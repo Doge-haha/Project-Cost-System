@@ -3,6 +3,7 @@ import { once } from "node:events";
 import net from "node:net";
 
 import { SignJWT } from "jose";
+import pg from "pg";
 
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/saas_pricing";
@@ -81,6 +82,7 @@ async function main() {
     expectedStatus: 201,
   });
   const projectId = createdProject.project.id;
+  await seedTrialProjectDisciplines(projectId);
   record("project create", { projectId, code: projectCode });
 
   await requestJson(`${apiBaseUrl}/v1/projects/${projectId}/workspace`, {
@@ -90,6 +92,54 @@ async function main() {
     token: ownerToken,
   });
   record("project workspace", { projectId });
+
+  const billVersion = await requestJson(
+    `${apiBaseUrl}/v1/projects/${projectId}/bill-versions`,
+    {
+      method: "POST",
+      token: ownerToken,
+      body: {
+        stageCode: "estimate",
+        disciplineCode: "building",
+        versionName: "部署演练估算版",
+      },
+      expectedStatus: 201,
+    },
+  );
+  const billVersionId = billVersion.id;
+  const billItem = await requestJson(
+    `${apiBaseUrl}/v1/projects/${projectId}/bill-versions/${billVersionId}/items`,
+    {
+      method: "POST",
+      token: ownerToken,
+      body: {
+        parentId: null,
+        itemCode: "A-001",
+        itemName: "土方工程",
+        quantity: 10,
+        unit: "m3",
+        sortNo: 1,
+      },
+      expectedStatus: 201,
+    },
+  );
+  await requestJson(
+    `${apiBaseUrl}/v1/projects/${projectId}/bill-versions/${billVersionId}/items/${billItem.id}/work-items`,
+    {
+      method: "POST",
+      token: ownerToken,
+      body: {
+        workContent: "土方开挖、场内倒运、基底清理",
+        sortNo: 1,
+      },
+      expectedStatus: 201,
+    },
+  );
+  record("business sample bill setup", {
+    projectId,
+    billVersionId,
+    billItemId: billItem.id,
+  });
 
   const providerHealth = await requestJson(`${apiBaseUrl}/v1/ai/provider-health`, {
     token: ownerToken,
@@ -115,6 +165,56 @@ async function main() {
       ].join(" "),
     );
   }
+
+  const recommendation = await requestJson(`${apiBaseUrl}/v1/ai/bill-recommendations`, {
+    method: "POST",
+    token: ownerToken,
+    body: {
+      projectId,
+      stageCode: "estimate",
+      disciplineCode: "building",
+      resourceType: "bill_version",
+      resourceId: billVersionId,
+      inputPayload: {
+        source: "deployment_rehearsal_business_sample",
+      },
+      outputPayload: {
+        parentId: null,
+        itemCode: "A-002",
+        itemName: "回填土",
+        quantity: 6,
+        unit: "m3",
+        sortNo: 2,
+        reason: "部署演练样本补齐常见缺项",
+      },
+    },
+    expectedStatus: 201,
+  });
+  const acceptedRecommendation = await requestJson(
+    `${apiBaseUrl}/v1/ai/recommendations/${recommendation.id}/accept`,
+    {
+      method: "POST",
+      token: ownerToken,
+      body: {
+        reason: "部署演练确认接受",
+      },
+    },
+  );
+  const billItems = await requestJson(
+    `${apiBaseUrl}/v1/projects/${projectId}/bill-versions/${billVersionId}/items`,
+    {
+      token: ownerToken,
+    },
+  );
+  if (billItems.items.length < 2 || acceptedRecommendation.status !== "accepted") {
+    throw new Error("AI recommendation accept did not create the sample bill item");
+  }
+  record("business sample ai recommendation accepted", {
+    projectId,
+    billVersionId,
+    recommendationId: recommendation.id,
+    acceptedBillItemId: acceptedRecommendation.outputPayload.acceptedBillItemId,
+  });
 
   const exportResponse = await requestJson(`${apiBaseUrl}/v1/reports/export`, {
     method: "POST",
@@ -212,6 +312,26 @@ async function signToken(payload) {
     .setIssuedAt()
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(jwtSecret));
+}
+
+async function seedTrialProjectDisciplines(projectId) {
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+  });
+  try {
+    await pool.query(
+      `
+        insert into project_discipline
+          (id, project_id, discipline_code, discipline_name, default_standard_set_code, status)
+        values
+          ($1, $2, 'building', '建筑工程', 'JS-2014', 'enabled')
+        on conflict (id) do nothing
+      `,
+      [`discipline-${projectId}-building`, projectId],
+    );
+  } finally {
+    await pool.end();
+  }
 }
 
 function record(name, details = {}) {

@@ -402,28 +402,12 @@ export class AiRecommendationService {
         model: input.model,
       });
       const providerResult = readObject(result, "result") ?? {};
-      await this.auditLogService.writeAuditLog({
-        projectId: "global",
-        resourceType: "ai_provider",
-        resourceId: readString(providerResult, "provider") ?? input.provider ?? "openai_compatible",
-        action: "health_checked",
-        operatorId: input.userId,
-        afterPayload: providerResult,
-      });
       return providerResult;
     } catch (error) {
       const failureSummary = buildProviderFailureSummary(error, {
         provider: input.provider ?? "openai_compatible",
         model: input.model ?? null,
         durationMs: 0,
-      });
-      await this.auditLogService.writeAuditLog({
-        projectId: "global",
-        resourceType: "ai_provider",
-        resourceId: input.provider ?? "openai_compatible",
-        action: "health_check_failed",
-        operatorId: input.userId,
-        afterPayload: failureSummary,
       });
       return {
         configured: false,

@@ -48,6 +48,8 @@ Date: 2026-05-05
 - Added Worker pressure sample for repeated `project_recalculate` and `ai_recommendation` jobs with provider failure summaries.
 - Regenerated API route and OpenAPI docs.
 - Added project detail page runtime diagnostics panel for API health, Provider health/telemetry, and Worker task summary with links to task status and Provider diagnostics.
+- Added automated deployment rehearsal for Docker/Postgres, API, Worker, MCP Gateway runtime diagnostics, trial project creation, report export processing, and frontend production build.
+- Fixed rehearsal blockers in database mode: Provider health no longer depends on a synthetic global audit project, and system-admin Worker tokens can read report summaries for queued export jobs.
 
 ## Validation
 
@@ -66,6 +68,7 @@ npm --workspace @saas-pricing/worker test -- test/job-runner.test.ts
 npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-page.test.tsx
 npm --workspace saas-pricing-frontend test -- test/project-detail-page.test.tsx
 npm run test:workspace
+npm run deploy:rehearsal
 ```
 
 Database smoke initially blocked because Docker daemon was not running at `/Users/huahaha/.docker/run/docker.sock`; after Docker started, the same command passed.
@@ -90,6 +93,6 @@ npm --workspace saas-pricing-frontend test -- test/project-ai-recommendations-pa
 
 - Treat I1-I5 as complete unless new regression evidence appears.
 - Continue I6 production hardening:
-  1. publish/merge handoff when requested
-  2. post-merge deployment rehearsal or trial-run checklist execution
+  1. review deployment rehearsal output before real trial environment rollout
+  2. apply production secrets and run the same rehearsal against the trial environment
 - Do not spend more cycles waiting on push unless explicitly asked.

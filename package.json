@@ -13,6 +13,7 @@
   "scripts": {
     "dev:deps:up": "docker compose -f deploy/docker/docker-compose.dev.yml up -d --wait",
     "dev:deps:down": "docker compose -f deploy/docker/docker-compose.dev.yml down",
+    "deploy:rehearsal": "node scripts/deployment-rehearsal.mjs",
     "docs:api": "npm run docs:api-routes && npm run docs:openapi-current",
     "docs:api-routes": "node scripts/generate-implemented-routes-doc.mjs",
     "docs:openapi-current": "node scripts/generate-openapi-v1-current.mjs",

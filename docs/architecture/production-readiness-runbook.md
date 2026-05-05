@@ -10,9 +10,11 @@ npm run test
 npm run docs:api
 npm run docs:openspec
 npm run dev:smoke:live-db
+npm run deploy:rehearsal
 ```
 
 `npm run dev:smoke:live-db` 依赖 Docker daemon、PostgreSQL 和 Redis。若 Docker 未启动，失败属于本地环境阻塞，不按代码回归处理。
+`npm run deploy:rehearsal` 会启动 API、Worker、MCP Gateway，创建试运行项目，执行报表导出任务，校验运行诊断资源，并完成前端生产构建。
 
 ## 2. 关键环境变量
 
@@ -83,6 +85,12 @@ npm --workspace @saas-pricing/mcp-gateway run start
 
 ```bash
 npm run dev:deps:down
+```
+
+自动化演练入口：
+
+```bash
+npm run deploy:rehearsal
 ```
 
 ## 4. 健康检查

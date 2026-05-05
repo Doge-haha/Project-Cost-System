@@ -131,6 +131,7 @@ export class SummaryService {
     unitCode?: string;
     taxMode?: SummaryTaxMode;
     userId: string;
+    roleCodes?: string[];
   }): Promise<SummaryResult> {
     const billVersions = await this.getAuthorizedBillVersions(input);
     const allItems = this.filterItemsByUnitCode(
@@ -199,6 +200,7 @@ export class SummaryService {
     taxMode?: SummaryTaxMode;
     limit?: number;
     userId: string;
+    roleCodes?: string[];
   }): Promise<SummaryDetailResult> {
     const billVersions = await this.getAuthorizedBillVersions(input);
     const allItems = this.filterItemsByUnitCode(
@@ -292,17 +294,20 @@ export class SummaryService {
     baseBillVersionId: string;
     targetBillVersionId: string;
     userId: string;
+    roleCodes?: string[];
   }): Promise<VersionCompareResult> {
     const [baseVersion, targetVersion] = await Promise.all([
       this.getAuthorizedBillVersion({
         projectId: input.projectId,
         billVersionId: input.baseBillVersionId,
         userId: input.userId,
+        roleCodes: input.roleCodes,
       }),
       this.getAuthorizedBillVersion({
         projectId: input.projectId,
         billVersionId: input.targetBillVersionId,
         userId: input.userId,
+        roleCodes: input.roleCodes,
       }),
     ]);
 
@@ -364,6 +369,7 @@ export class SummaryService {
     disciplineCode?: string;
     unitCode?: string;
     userId: string;
+    roleCodes?: string[];
   }): Promise<VarianceBreakdownResult> {
     const billVersions = await this.getAuthorizedBillVersions(input);
     const versionById = new Map(
@@ -464,13 +470,14 @@ export class SummaryService {
     stageCode?: string;
     disciplineCode?: string;
     userId: string;
+    roleCodes?: string[];
   }) {
     const project = await this.dependencies.projectRepository.findById(input.projectId);
     if (!project) {
       throw new AppError(404, "PROJECT_NOT_FOUND", "Project not found");
     }
 
-    const authorizationService = new ProjectAuthorizationService({
+    const authorizationServiceInput = {
       stages: await this.dependencies.projectStageRepository.listByProjectId(
         input.projectId,
       ),
@@ -480,14 +487,25 @@ export class SummaryService {
       members: await this.dependencies.projectMemberRepository.listByProjectId(
         input.projectId,
       ),
-    });
+    };
+    const authorizationService = new ProjectAuthorizationService(
+      authorizationServiceInput,
+    );
 
-    const authorized = authorizationService.canViewContext({
-      projectId: input.projectId,
-      stageCode: input.stageCode,
-      disciplineCode: input.disciplineCode,
-      userId: input.userId,
-    });
+    const authorized = input.roleCodes?.includes("system_admin")
+      ? this.isKnownReportContext({
+          projectId: input.projectId,
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          stages: authorizationServiceInput.stages,
+          disciplines: authorizationServiceInput.disciplines,
+        })
+      : authorizationService.canViewContext({
+          projectId: input.projectId,
+          stageCode: input.stageCode,
+          disciplineCode: input.disciplineCode,
+          userId: input.userId,
+        });
     if (!authorized) {
       throw new AppError(
         403,
@@ -572,6 +590,7 @@ export class SummaryService {
     projectId: string;
     billVersionId: string;
     userId: string;
+    roleCodes?: string[];
   }) {
     const [project, billVersion] = await Promise.all([
       this.dependencies.projectRepository.findById(input.projectId),
@@ -585,7 +604,7 @@ export class SummaryService {
       throw new AppError(404, "BILL_VERSION_NOT_FOUND", "Bill version not found");
     }
 
-    const authorizationService = new ProjectAuthorizationService({
+    const authorizationServiceInput = {
       stages: await this.dependencies.projectStageRepository.listByProjectId(
         input.projectId,
       ),
@@ -595,16 +614,27 @@ export class SummaryService {
       members: await this.dependencies.projectMemberRepository.listByProjectId(
         input.projectId,
       ),
-    });
+    };
+    const authorizationService = new ProjectAuthorizationService(
+      authorizationServiceInput,
+    );
 
-    if (
-      !authorizationService.canViewContext({
-        projectId: input.projectId,
-        stageCode: billVersion.stageCode,
-        disciplineCode: billVersion.disciplineCode,
-        userId: input.userId,
-      })
-    ) {
+    const authorized = input.roleCodes?.includes("system_admin")
+      ? this.isKnownReportContext({
+          projectId: input.projectId,
+          stageCode: billVersion.stageCode,
+          disciplineCode: billVersion.disciplineCode,
+          stages: authorizationServiceInput.stages,
+          disciplines: authorizationServiceInput.disciplines,
+        })
+      : authorizationService.canViewContext({
+          projectId: input.projectId,
+          stageCode: billVersion.stageCode,
+          disciplineCode: billVersion.disciplineCode,
+          userId: input.userId,
+        });
+
+    if (!authorized) {
       throw new AppError(
         403,
         "FORBIDDEN",
@@ -613,6 +643,37 @@ export class SummaryService {
     }
 
     return billVersion;
+  }
+
+  private isKnownReportContext(input: {
+    projectId: string;
+    stageCode?: string;
+    disciplineCode?: string;
+    stages: Array<{ projectId: string; stageCode: string }>;
+    disciplines: Array<{ projectId: string; disciplineCode: string }>;
+  }): boolean {
+    if (
+      input.stageCode &&
+      !input.stages.some(
+        (stage) =>
+          stage.projectId === input.projectId && stage.stageCode === input.stageCode,
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      input.disciplineCode &&
+      !input.disciplines.some(
+        (discipline) =>
+          discipline.projectId === input.projectId &&
+          discipline.disciplineCode === input.disciplineCode,
+      )
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   private async listBillItemsForVersions(

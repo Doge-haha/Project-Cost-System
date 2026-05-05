@@ -73,6 +73,7 @@ export function registerReportRoutes(
         unitCode: query.unitCode,
         taxMode: query.taxMode,
         userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
       }),
     );
   });
@@ -90,6 +91,7 @@ export function registerReportRoutes(
         taxMode: query.taxMode,
         limit: query.limit,
         userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
       }),
     );
   });
@@ -106,6 +108,7 @@ export function registerReportRoutes(
         disciplineCode: query.disciplineCode,
         unitCode: query.unitCode,
         userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
       }),
     );
   });
@@ -119,6 +122,7 @@ export function registerReportRoutes(
         baseBillVersionId: query.baseBillVersionId,
         targetBillVersionId: query.targetBillVersionId,
         userId: request.currentUser!.id,
+        roleCodes: request.currentUser!.roleCodes,
       }),
     );
   });

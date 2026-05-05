@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { createApp } from "../src/app/create-app.js";
 import { createDatabaseAppOptions } from "../src/infrastructure/database/create-database-app-options.js";
+import { AiRuntimePreviewService } from "../src/modules/ai/ai-runtime-preview-service.js";
 import { signAccessToken } from "../src/shared/auth/jwt.js";
 import { createPgMemDatabase } from "./helpers/pg-mem.js";
 
@@ -152,6 +153,123 @@ test("database-mode app aggregates provider telemetry after database filters and
       response.json().groups.map((group: { provider: string }) => group.provider),
       ["deepseek", "openai_compatible"],
     );
+
+    await app.close();
+    await close();
+  } finally {
+    try {
+      await runtime.close();
+    } catch {
+      // runtime may already be closed through createDatabaseAppOptions.close()
+    }
+  }
+});
+
+test("database-mode provider health does not require a global audit project", async () => {
+  const runtime = await createPgMemDatabase();
+  try {
+    const { appOptions, close } = createDatabaseAppOptions(
+      {
+        DATABASE_URL: "postgres://postgres:postgres@localhost:5432/saas_pricing",
+      },
+      {
+        createDatabaseClient: () => runtime,
+      },
+    );
+    const app = createApp({
+      jwtSecret,
+      ...appOptions,
+      aiRuntimePreviewService: new AiRuntimePreviewService({
+        pythonExecutable: "python3",
+        cliPath: "/tmp/ai-runtime-cli.py",
+        commandRunner: async () => ({
+          stdout: JSON.stringify({
+            source: "llm_provider",
+            result: {
+              provider: "openai_compatible",
+              configured: false,
+              healthy: false,
+              message: "LLM_API_KEY is required",
+            },
+          }),
+          stderr: "",
+        }),
+      }),
+    });
+    const token = await signAccessToken(
+      {
+        sub: "system-admin-001",
+        roleCodes: ["system_admin"],
+        displayName: "System Admin",
+      },
+      jwtSecret,
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/ai/provider-health",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().healthy, false);
+    assert.equal(response.json().message, "LLM_API_KEY is required");
+
+    await app.close();
+    await close();
+  } finally {
+    try {
+      await runtime.close();
+    } catch {
+      // runtime may already be closed through createDatabaseAppOptions.close()
+    }
+  }
+});
+
+test("database-mode report summary allows system admin worker access without project membership", async () => {
+  const runtime = await createPgMemDatabase();
+  try {
+    await runtime.pool.query(
+      "insert into project (id, code, name, status) values ('project-001', 'PRJ-001', '数据库模式项目', 'draft')",
+    );
+    await runtime.pool.query(
+      "insert into project_stage (id, project_id, stage_code, stage_name, status, sequence_no) values ('stage-001', 'project-001', 'estimate', '投资估算', 'draft', 1)",
+    );
+
+    const { appOptions, close } = createDatabaseAppOptions(
+      {
+        DATABASE_URL: "postgres://postgres:postgres@localhost:5432/saas_pricing",
+      },
+      {
+        createDatabaseClient: () => runtime,
+      },
+    );
+    const app = createApp({
+      jwtSecret,
+      ...appOptions,
+    });
+    const token = await signAccessToken(
+      {
+        sub: "system-admin-001",
+        roleCodes: ["system_admin"],
+        displayName: "System Admin",
+      },
+      jwtSecret,
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/reports/summary?projectId=project-001",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.json().projectId, "project-001");
+    assert.equal(response.json().versionCount, 0);
 
     await app.close();
     await close();
